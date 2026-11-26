@@ -1,0 +1,4 @@
+  total: 77
+  failed: 0
+  succeeded: 77
+  skipped: 0
