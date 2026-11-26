@@ -168,7 +168,7 @@ public sealed class SecurityTests(SqlFixture f) : SqlTest(f)
             var dto = await http.GetFromJsonAsync<ReadinessDto>("/api/health/ready");
             Assert.Contains(dto!.Warnings!, w => w.StartsWith("entries:CNC:") && w.Contains("script 12"));
             // The anonymous answer gives no row counts or file names.
-            Assert.DoesNotContain(dto.Warnings!, w => w.Contains(".sql") || w.Any(char.IsDigit) && w.Contains(" entries have"));
+            Assert.DoesNotContain(dto.Warnings!, w => w.Contains(".sql") || System.Text.RegularExpressions.Regex.IsMatch(w, @"\d+ entries"));
         }
         finally { await SqlFixture.Scalar<int>(F.CncCs, "DELETE FROM qa.QualityRejectionEntries WHERE SubmissionId = @s; SELECT 1", ("@s", id)); }
     }
