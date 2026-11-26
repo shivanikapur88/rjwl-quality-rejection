@@ -19,6 +19,14 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	private readonly INavigator _nav;
 
+	private readonly ISession _session;
+
+	private readonly EntryDraftStore _drafts;
+
+	private readonly IDialogs _dialogs;
+
+	private EntryDraft? _resume;
+
 	private ShopDto? _shop;
 
 	private StageDto? _stage;
@@ -148,10 +156,13 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	public bool CanSubmit => !_submitting && !IsBusy && (object)_selected != null && ParsedQuantity.HasValue && Remarks.Length <= 500;
 
-	public EntryFormViewModel(IApiClient api, INavigator nav)
+	public EntryFormViewModel(IApiClient api, INavigator nav, ISession session, EntryDraftStore drafts, IDialogs dialogs)
 	{
+		_dialogs = dialogs;
 		_api = api;
 		_nav = nav;
+		_session = session;
+		_drafts = drafts;
 		Title = "Rejection entry";
 		SubmitCommand = new AsyncCommand(SubmitAsync, () => CanSubmit);
 		ResetCommand = new AsyncCommand(() =>
@@ -181,6 +192,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_shop = BaseViewModel.Arg<ShopDto>(args, "shop");
 		_stage = BaseViewModel.Arg<StageDto>(args, "stage");
 		_machine = BaseViewModel.Arg<MachineDto>(args, "machine");
+		_resume = BaseViewModel.Arg<EntryDraft>(args, "draft");
 		OnPropertyChanged("ShopText");
 		OnPropertyChanged("StageText");
 		OnPropertyChanged("MachineText");
@@ -191,7 +203,20 @@ public sealed class EntryFormViewModel : BaseViewModel
 		else
 		{
 			await LoadPhenomenaAsync();
+			if (_resume is not null) Restore(_resume);
 		}
+	}
+
+	/// <summary>Puts back an entry that was being saved when the session expired, keeping its submission id.</summary>
+	private void Restore(EntryDraft d)
+	{
+		_resume = null;
+		SelectedPhenomenon = d.PhenomenonId is int pid ? _all.FirstOrDefault(p => p.Id == pid) : null;
+		QuantityText = d.QuantityText;
+		Remarks = d.Remarks;
+		SubmissionId = d.SubmissionId;
+		OnPropertyChanged("SubmissionId");
+		ErrorMessage = "Your session expired while this entry was being saved. Check the details and tap Save again - it will not create a duplicate.";
 	}
 
 	public override Task OnAppearingAsync()
@@ -281,6 +306,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 		}
 		_submitting = true;
 		SubmitCommand.RaiseCanExecuteChanged();
+		var userId = _session.User?.UserId;   // captured now: an expired session clears it
 		try
 		{
 			IsBusy = true;
@@ -309,12 +335,25 @@ public sealed class EntryFormViewModel : BaseViewModel
 				await LoadPhenomenaAsync();
 				ErrorMessage = e.Message;
 				break;
+			case "machine_inactive":
+				// The machine was deactivated after the list was loaded: go back to a refreshed machine list (the form is not saved).
+				ErrorMessage = e.Message;
+				await _dialogs.AlertAsync("Machine no longer active", e.Message);
+				await _nav.GoBackAsync();
+				break;
 			case "submission_payload_mismatch":
 				SubmissionId = Guid.NewGuid();
 				OnPropertyChanged("SubmissionId");
 				ErrorMessage = "An earlier attempt of this entry may already be saved with different details. Check My entries before saving again.";
 				break;
 			default:
+				if (e.Kind == ApiErrorKind.SessionExpired && userId is int uid && _shop is not null && _stage is not null && _machine is not null)
+				{
+					// The app is about to return to sign-in; keep this entry so it can be resumed with the same submission id.
+					_drafts.Save(new EntryDraft(uid, _shop, _stage, _machine, _selected?.Id, QuantityText, Remarks, SubmissionId));
+					ErrorMessage = e.Message;
+					break;
+				}
 				ErrorMessage = (e.OutcomeUnknown ? (e.Message + " Your entry may not have been saved. Tap Save again – it will not create a duplicate.") : e.Message);
 				break;
 			}

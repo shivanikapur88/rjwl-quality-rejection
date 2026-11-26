@@ -28,6 +28,7 @@ public static class MauiProgram
         s.AddSingleton(_ => new HttpClient(CreateHandler()));
         s.AddSingleton<IApiClient, ApiClient>();
         s.AddSingleton<SessionExpiryHandler>();
+        s.AddSingleton<EntryDraftStore>();   // keeps an entry interrupted by session expiry (in memory)
 
         s.AddTransient<LoginViewModel>(); s.AddTransient<LoginPage>();
         s.AddTransient<HomeViewModel>(); s.AddTransient<HomePage>();

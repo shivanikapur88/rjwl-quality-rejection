@@ -219,7 +219,7 @@ public sealed class UserEditorViewModel : BaseViewModel
 			}
 			else
 			{
-				ApiResult<AdminUserDto> u = await _api.AdminUserUpdateAsync(_editing.Id, new UpdateUserRequest(display, role, shops));
+				ApiResult<AdminUserDto> u = await _api.AdminUserUpdateAsync(_editing.Id, new UpdateUserRequest(display, role, shops, _editing.Version));
 				if (!u.IsSuccess)
 				{
 					ErrorMessage = u.Error.Message;

@@ -297,7 +297,7 @@ public sealed class AdminPhenomenaViewModel : BaseViewModel
 		}
 		await RunBusyAsync(async () =>
 		{
-			ApiResult<AdminPhenomenonDto> r = await _api.AdminSetStatusAsync(item.Dto.Id, !item.IsActive);
+			ApiResult<AdminPhenomenonDto> r = await _api.AdminSetStatusAsync(item.Dto.Id, !item.IsActive, item.Dto.Version);
 			if (!r.IsSuccess)
 			{
 				ErrorMessage = r.Error.Message;

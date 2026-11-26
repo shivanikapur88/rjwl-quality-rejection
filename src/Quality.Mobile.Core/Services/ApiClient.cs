@@ -72,6 +72,13 @@ public sealed class ApiClient : IApiClient
 		return SendAsync<List<EntryDto>>(HttpMethod.Get, $"/api/rejection-entries?limit={limit}");
 	}
 
+	public Task<ApiResult<EntryPage>> GetEntriesPageAsync(string? cursor, int limit = 50)
+	{
+		var path = $"/api/rejection-entries/page?limit={limit}";
+		if (!string.IsNullOrEmpty(cursor)) path += "&cursor=" + Uri.EscapeDataString(cursor);
+		return SendAsync<EntryPage>(HttpMethod.Get, path);
+	}
+
 	public Task<ApiResult<List<AdminPhenomenonDto>>> AdminListAsync(int? shopId, int? stageId, bool? isActive, string? search)
 	{
 		List<string> list = new List<string>();
@@ -116,9 +123,9 @@ public sealed class ApiClient : IApiClient
 		return SendAsync<AdminPhenomenonDto>(HttpMethod.Put, $"/api/admin/phenomena/{id}", r);
 	}
 
-	public Task<ApiResult<AdminPhenomenonDto>> AdminSetStatusAsync(int id, bool isActive)
+	public Task<ApiResult<AdminPhenomenonDto>> AdminSetStatusAsync(int id, bool isActive, string? version = null)
 	{
-		return SendAsync<AdminPhenomenonDto>(HttpMethod.Patch, $"/api/admin/phenomena/{id}/status", new SetStatusRequest(isActive));
+		return SendAsync<AdminPhenomenonDto>(HttpMethod.Patch, $"/api/admin/phenomena/{id}/status", new SetStatusRequest(isActive, version));
 	}
 
 	public Task<ApiResult<Unit>> AdminDeleteAsync(int id)
@@ -162,9 +169,9 @@ public sealed class ApiClient : IApiClient
 		return SendAsync<AdminMachineDto>(HttpMethod.Put, $"/api/admin/machines/{id}", r);
 	}
 
-	public Task<ApiResult<AdminMachineDto>> AdminMachineSetStatusAsync(int id, bool isActive)
+	public Task<ApiResult<AdminMachineDto>> AdminMachineSetStatusAsync(int id, bool isActive, string? version = null)
 	{
-		return SendAsync<AdminMachineDto>(HttpMethod.Patch, $"/api/admin/machines/{id}/status", new SetStatusRequest(isActive));
+		return SendAsync<AdminMachineDto>(HttpMethod.Patch, $"/api/admin/machines/{id}/status", new SetStatusRequest(isActive, version));
 	}
 
 	public Task<ApiResult<Unit>> AdminMachineDeleteAsync(int id)
@@ -200,9 +207,9 @@ public sealed class ApiClient : IApiClient
 		return SendAsync<AdminUserDto>(HttpMethod.Put, $"/api/admin/users/{id}", r);
 	}
 
-	public Task<ApiResult<AdminUserDto>> AdminUserSetStatusAsync(int id, bool isActive)
+	public Task<ApiResult<AdminUserDto>> AdminUserSetStatusAsync(int id, bool isActive, string? version = null)
 	{
-		return SendAsync<AdminUserDto>(HttpMethod.Patch, $"/api/admin/users/{id}/status", new SetStatusRequest(isActive));
+		return SendAsync<AdminUserDto>(HttpMethod.Patch, $"/api/admin/users/{id}/status", new SetStatusRequest(isActive, version));
 	}
 
 	public Task<ApiResult<Unit>> AdminUserResetPasswordAsync(int id, ResetPasswordRequest r)

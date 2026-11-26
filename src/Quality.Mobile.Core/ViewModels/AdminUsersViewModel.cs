@@ -169,7 +169,7 @@ public sealed class AdminUsersViewModel : BaseViewModel
 		}
 		await RunBusyAsync(async () =>
 		{
-			ApiResult<AdminUserDto> r = await _api.AdminUserSetStatusAsync(item.Dto.Id, !item.IsActive);
+			ApiResult<AdminUserDto> r = await _api.AdminUserSetStatusAsync(item.Dto.Id, !item.IsActive, item.Dto.Version);
 			if (!r.IsSuccess)
 			{
 				ErrorMessage = r.Error.Message;

@@ -23,13 +23,16 @@ public interface IApiClient
 
 	Task<ApiResult<List<EntryDto>>> GetEntriesAsync(int limit = 50);
 
+	/// <summary>One page of history (GET /api/rejection-entries/page). Pass the previous page's NextCursor to continue.</summary>
+	Task<ApiResult<EntryPage>> GetEntriesPageAsync(string? cursor, int limit = 50);
+
 	Task<ApiResult<List<AdminPhenomenonDto>>> AdminListAsync(int? shopId, int? stageId, bool? isActive, string? search);
 
 	Task<ApiResult<AdminPhenomenonDto>> AdminCreateAsync(CreatePhenomenonRequest request);
 
 	Task<ApiResult<AdminPhenomenonDto>> AdminUpdateAsync(int id, UpdatePhenomenonRequest request);
 
-	Task<ApiResult<AdminPhenomenonDto>> AdminSetStatusAsync(int id, bool isActive);
+	Task<ApiResult<AdminPhenomenonDto>> AdminSetStatusAsync(int id, bool isActive, string? version = null);
 
 	Task<ApiResult<Unit>> AdminDeleteAsync(int id);
 
@@ -39,7 +42,7 @@ public interface IApiClient
 
 	Task<ApiResult<AdminMachineDto>> AdminMachineUpdateAsync(int id, UpdateMachineRequest request);
 
-	Task<ApiResult<AdminMachineDto>> AdminMachineSetStatusAsync(int id, bool isActive);
+	Task<ApiResult<AdminMachineDto>> AdminMachineSetStatusAsync(int id, bool isActive, string? version = null);
 
 	Task<ApiResult<Unit>> AdminMachineDeleteAsync(int id);
 
@@ -49,7 +52,7 @@ public interface IApiClient
 
 	Task<ApiResult<AdminUserDto>> AdminUserUpdateAsync(int id, UpdateUserRequest request);
 
-	Task<ApiResult<AdminUserDto>> AdminUserSetStatusAsync(int id, bool isActive);
+	Task<ApiResult<AdminUserDto>> AdminUserSetStatusAsync(int id, bool isActive, string? version = null);
 
 	Task<ApiResult<Unit>> AdminUserResetPasswordAsync(int id, ResetPasswordRequest request);
 }

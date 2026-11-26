@@ -230,7 +230,7 @@ public sealed class AdminMachinesViewModel : BaseViewModel
 		}
 		await RunBusyAsync(async () =>
 		{
-			ApiResult<AdminMachineDto> r = await _api.AdminMachineSetStatusAsync(item.Dto.Id, !item.IsActive);
+			ApiResult<AdminMachineDto> r = await _api.AdminMachineSetStatusAsync(item.Dto.Id, !item.IsActive, item.Dto.Version);
 			if (!r.IsSuccess)
 			{
 				ErrorMessage = r.Error.Message;

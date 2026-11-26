@@ -162,7 +162,7 @@ public sealed class MachineEditorViewModel : BaseViewModel
 		}
 		await RunBusyAsync(async () =>
 		{
-			ApiResult<AdminMachineDto> apiResult = ((!IsEdit) ? (await _api.AdminMachineCreateAsync(new CreateMachineRequest(SelectedShop.Id.Value, code, name, IsActive))) : (await _api.AdminMachineUpdateAsync(_editing.Id, new UpdateMachineRequest(code, name))));
+			ApiResult<AdminMachineDto> apiResult = ((!IsEdit) ? (await _api.AdminMachineCreateAsync(new CreateMachineRequest(SelectedShop.Id.Value, code, name, IsActive))) : (await _api.AdminMachineUpdateAsync(_editing.Id, new UpdateMachineRequest(code, name, _editing.Version))));
 			ApiResult<AdminMachineDto> r = apiResult;
 			if (!r.IsSuccess)
 			{

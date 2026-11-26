@@ -14,6 +14,8 @@ public sealed class LoginViewModel : BaseViewModel
 
 	private readonly ISession _session;
 
+	private readonly EntryDraftStore _drafts;
+
 	private string _username = "";
 
 	private string _password = "";
@@ -48,11 +50,12 @@ public sealed class LoginViewModel : BaseViewModel
 
 	public AsyncCommand SettingsCommand { get; }
 
-	public LoginViewModel(IApiClient api, INavigator nav, ISession session)
+	public LoginViewModel(IApiClient api, INavigator nav, ISession session, EntryDraftStore drafts)
 	{
 		_api = api;
 		_nav = nav;
 		_session = session;
+		_drafts = drafts;
 		Title = "Sign in";
 		LoginCommand = new AsyncCommand(LoginAsync);
 		SettingsCommand = new AsyncCommand(() => _nav.GoToAsync("settings"));
@@ -89,6 +92,9 @@ public sealed class LoginViewModel : BaseViewModel
 				await _session.StartAsync(r.Value);
 				Password = "";
 				await _nav.GoToAsync("//home");
+				// Changed: resume an entry that was interrupted by session expiry (same user only).
+				if (_drafts.Take(r.Value.UserId) is { } d)
+					await _nav.GoToAsync("entry", new Dictionary<string, object> { ["shop"] = d.Shop, ["stage"] = d.Stage, ["machine"] = d.Machine, ["draft"] = d });
 			}
 		});
 	}

@@ -31,6 +31,8 @@ public sealed class MachineViewModel : BaseViewModel
 		SelectMachineCommand = new AsyncCommand<MachineDto>(Select);
 	}
 
+	private bool _loaded;
+
 	public override async Task OnNavigatedToAsync(IDictionary<string, object> args)
 	{
 		_shop = BaseViewModel.Arg<ShopDto>(args, "shop");
@@ -42,6 +44,15 @@ public sealed class MachineViewModel : BaseViewModel
 			ErrorMessage = "No stage selected.";
 			return;
 		}
+		await LoadAsync();
+	}
+
+	/// <summary>Changed: returning to this screen (e.g. after "machine no longer active") reloads the active machines.</summary>
+	public override Task OnAppearingAsync() => _loaded && _shop is not null && _stage is not null ? LoadAsync() : Task.CompletedTask;
+
+	public async Task LoadAsync()
+	{
+		_loaded = true;
 		await RunBusyAsync(async () =>
 		{
 			ApiResult<List<MachineDto>> r = await _api.GetMachinesAsync(_shop.Id, _stage.Id);

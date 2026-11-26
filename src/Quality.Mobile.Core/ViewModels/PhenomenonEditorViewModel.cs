@@ -200,7 +200,7 @@ public sealed class PhenomenonEditorViewModel : BaseViewModel
 		}
 		await RunBusyAsync(async () =>
 		{
-			ApiResult<AdminPhenomenonDto> apiResult = ((!IsEdit) ? (await _api.AdminCreateAsync(new CreatePhenomenonRequest(SelectedShop.Id.Value, SelectedStage.Id.Value, name, IsActive))) : (await _api.AdminUpdateAsync(_editing.Id, new UpdatePhenomenonRequest(name))));
+			ApiResult<AdminPhenomenonDto> apiResult = ((!IsEdit) ? (await _api.AdminCreateAsync(new CreatePhenomenonRequest(SelectedShop.Id.Value, SelectedStage.Id.Value, name, IsActive))) : (await _api.AdminUpdateAsync(_editing.Id, new UpdatePhenomenonRequest(name, _editing.Version))));
 			ApiResult<AdminPhenomenonDto> r = apiResult;
 			if (!r.IsSuccess)
 			{
