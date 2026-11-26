@@ -9,6 +9,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
+    <!-- xUnit1051 (pass TestContext cancellation tokens) is style only for these sequential HTTP/SQL calls. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
