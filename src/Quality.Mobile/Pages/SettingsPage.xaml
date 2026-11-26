@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.SettingsPage" x:DataType="vm:SettingsViewModel" Title="Settings">
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Server address" Style="{StaticResource H2}" />
+                    <Label Text="HTTPS address of the quality API, e.g. https://server:5001" Style="{StaticResource Muted}" />
+                    <Entry Text="{Binding ServerUrl}" Keyboard="Url" Placeholder="https://" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button Text="Save" Command="{Binding SaveCommand}" Style="{StaticResource SecondaryButton}" />
+                        <Button Grid.Column="1" Text="Test connection" Command="{Binding TestCommand}" Style="{StaticResource PrimaryButton}" />
+                    </Grid>
+                    <Border Style="{StaticResource Card}" BackgroundColor="{StaticResource SuccessSoft}" Stroke="{StaticResource Success}" IsVisible="{Binding HasInfo}">
+                        <Label Text="{Binding InfoMessage}" TextColor="{StaticResource Success}" FontAttributes="Bold" />
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+            <ctl:StatusBar />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Account" Style="{StaticResource H2}" />
+                    <Label Text="{Binding UserText}" Style="{StaticResource Body}" />
+                    <Button Text="Sign out" Command="{Binding LogoutCommand}" Style="{StaticResource DangerButton}" IsVisible="{Binding IsSignedIn}" />
+                </VerticalStackLayout>
+            </Border>
+            <Label Text="{Binding VersionText}" Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</pages:AppPage>

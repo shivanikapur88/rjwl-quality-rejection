@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Android-only .NET MAUI app. Needs Visual Studio 2022 17.14+ / Visual Studio 2026 with the ".NET Multi-platform App UI" workload and the .NET 10 SDK. (.NET MAUI 8 is out of support and no longer builds with current SDKs.).
-       NOT built in the authoring environment (no MAUI workload / NuGet access). -->
+  <!-- Android-only .NET MAUI app. Needs the .NET 10 SDK with the "maui-android" workload (Visual Studio 2026, or
+       `dotnet workload install maui-android` plus an Android SDK with platform 36). See docs/BUILD.md. -->
   <PropertyGroup>
     <TargetFrameworks>net10.0-android</TargetFrameworks>
     <OutputType>Exe</OutputType>
@@ -32,6 +32,9 @@
 
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#1F3A5F" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Quality.Mobile.Core\Quality.Mobile.Core.csproj" />
