@@ -72,6 +72,34 @@ public sealed class ApiClient : IApiClient
 		return SendAsync<List<EntryDto>>(HttpMethod.Get, $"/api/rejection-entries?limit={limit}");
 	}
 
+	public Task<ApiResult<EntryDto>> GetEntryAsync(int shopId, long id) => SendAsync<EntryDto>(HttpMethod.Get, $"/api/rejection-entries/{shopId}/{id}");
+
+	public Task<ApiResult<CorrectionDto>> RequestCorrectionAsync(int shopId, long entryId, CorrectionRequest request) =>
+		SendAsync<CorrectionDto>(HttpMethod.Post, $"/api/rejection-entries/{shopId}/{entryId}/corrections", request);
+
+	public Task<ApiResult<List<CorrectionDto>>> GetCorrectionsAsync(string status = "Pending") =>
+		SendAsync<List<CorrectionDto>>(HttpMethod.Get, "/api/corrections?status=" + Uri.EscapeDataString(status));
+
+	public Task<ApiResult<CorrectionDto>> ApproveCorrectionAsync(long id, string? note) =>
+		SendAsync<CorrectionDto>(HttpMethod.Post, $"/api/corrections/{id}/approve", new CorrectionDecisionRequest(note));
+
+	public Task<ApiResult<CorrectionDto>> RejectCorrectionAsync(long id, string note) =>
+		SendAsync<CorrectionDto>(HttpMethod.Post, $"/api/corrections/{id}/reject", new CorrectionDecisionRequest(note));
+
+	public Task<ApiResult<CorrectionDto>> WithdrawCorrectionAsync(long id) => SendAsync<CorrectionDto>(HttpMethod.Post, $"/api/corrections/{id}/withdraw");
+
+	public Task<ApiResult<CalendarDto>> GetCalendarAsync() => SendAsync<CalendarDto>(HttpMethod.Get, "/api/reports/calendar");
+
+	public Task<ApiResult<ReportDto>> GetTotalsAsync(DateOnly fromDate, DateOnly toDate, string? shiftCode, int top = 5)
+	{
+		var path = "/api/reports/totals?fromDate=" + fromDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + "&toDate=" + toDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + "&top=" + top.ToString(System.Globalization.CultureInfo.InvariantCulture);
+		if (!string.IsNullOrEmpty(shiftCode)) path += "&shiftCode=" + Uri.EscapeDataString(shiftCode);
+		return SendAsync<ReportDto>(HttpMethod.Get, path);
+	}
+
+	public Task<ApiResult<MachineLookupDto>> LookupMachineAsync(string scannedText) =>
+		SendAsync<MachineLookupDto>(HttpMethod.Get, "/api/machines/lookup?code=" + Uri.EscapeDataString(scannedText ?? ""));
+
 	public Task<ApiResult<EntryPage>> GetEntriesPageAsync(string? cursor, int limit = 50)
 	{
 		var path = $"/api/rejection-entries/page?limit={limit}";

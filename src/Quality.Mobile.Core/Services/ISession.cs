@@ -17,6 +17,8 @@ public interface ISession
 
 	bool IsInspector { get; }
 
+	bool IsSupervisor { get; }
+
 	event Action? Expired;
 
 	Task<bool> RestoreAsync();

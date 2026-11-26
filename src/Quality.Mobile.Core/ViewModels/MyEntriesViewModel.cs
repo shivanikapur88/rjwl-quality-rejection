@@ -13,6 +13,7 @@ public sealed class MyEntriesViewModel : BaseViewModel
     public const int PageSize = 50;
     private readonly IApiClient _api;
     private readonly ISession _session;
+    private readonly INavigator _nav;
     private bool _empty;
     private string? _cursor;
     private string? _incomplete;
@@ -34,10 +35,11 @@ public sealed class MyEntriesViewModel : BaseViewModel
 
     public string Heading => _session.IsInspector ? "My entries" : "Entries";
 
-    public MyEntriesViewModel(IApiClient api, ISession session)
+    public MyEntriesViewModel(IApiClient api, ISession session, INavigator nav)
     {
         _api = api;
         _session = session;
+        _nav = nav;
         RefreshCommand = new AsyncCommand(LoadAsync);
         LoadMoreCommand = new AsyncCommand(LoadMoreAsync, () => HasMore && !IsBusy);
     }
@@ -79,5 +81,10 @@ public sealed class MyEntriesViewModel : BaseViewModel
     public static EntryRow Row(EntryDto e) => new(e.Id,
         $"{e.PhenomenonName} × {e.Quantity}",
         $"{e.ShopCode} › {e.StageName} › {e.MachineCode}",
-        $"{e.ServerCreatedAtUtc.ToLocalTime():dd MMM yyyy HH:mm} · {e.InspectorEmployeeCode}" + (string.IsNullOrWhiteSpace(e.Remarks) ? "" : " · " + e.Remarks));
+        $"{EntryText.When(e)} · {e.InspectorEmployeeCode}" + (string.IsNullOrWhiteSpace(e.Remarks) ? "" : " · " + e.Remarks),
+        e, EntryText.Badge(e));
+
+    /// <summary>Round 2: tapping an entry opens its detail (where its inspector can ask for a correction).</summary>
+    public Task OpenAsync(EntryRow row) => row.Dto is null ? Task.CompletedTask
+        : _nav.GoToAsync(Routes.EntryDetail, new Dictionary<string, object> { ["entry"] = row.Dto });
 }

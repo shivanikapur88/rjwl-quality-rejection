@@ -17,6 +17,7 @@ public static class MauiProgram
 #endif
         var b = MauiApp.CreateBuilder();
         b.UseMauiApp<App>();
+        ZXing.Net.Maui.Controls.CameraViewExtensions.UseBarcodeReader(b);   // round 2 (#8): camera QR scanning
 
         var s = b.Services;
         s.AddSingleton(TimeProvider.System);
@@ -44,6 +45,10 @@ public static class MauiProgram
         s.AddTransient<MachineEditorViewModel>(); s.AddTransient<MachineEditorPage>();
         s.AddTransient<AdminUsersViewModel>(); s.AddTransient<AdminUsersPage>();
         s.AddTransient<UserEditorViewModel>(); s.AddTransient<UserEditorPage>();
+        s.AddTransient<EntryDetailViewModel>(); s.AddTransient<EntryDetailPage>();   // round 2
+        s.AddTransient<CorrectionsViewModel>(); s.AddTransient<CorrectionsPage>();
+        s.AddTransient<SummaryViewModel>(); s.AddTransient<SummaryPage>();
+        s.AddTransient<ScanViewModel>(); s.AddTransient<ScanPage>();
 
         var app = b.Build();
         app.Services.GetRequiredService<SessionExpiryHandler>();   // subscribe once so an expired token returns the user to login

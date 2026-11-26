@@ -10,4 +10,7 @@ public sealed class MauiDialogs : IDialogs
 
     public Task<bool> ConfirmAsync(string title, string message, string accept, string cancel) =>
         MainThread.InvokeOnMainThreadAsync(() => Shell.Current.DisplayAlertAsync(title, message, accept, cancel));
+
+    public Task<string?> PromptAsync(string title, string message, string accept, string cancel, string? placeholder = null, int maxLength = 500) =>
+        MainThread.InvokeOnMainThreadAsync(async () => (string?)await Shell.Current.DisplayPromptAsync(title, message, accept, cancel, placeholder, maxLength));
 }

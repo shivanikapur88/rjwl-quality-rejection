@@ -8,4 +8,7 @@ public interface IDialogs
 	Task AlertAsync(string title, string message);
 
 	Task<bool> ConfirmAsync(string title, string message, string accept, string cancel);
+
+	/// <summary>Text input dialog. Returns null when cancelled.</summary>
+	Task<string?> PromptAsync(string title, string message, string accept, string cancel, string? placeholder = null, int maxLength = 500);
 }

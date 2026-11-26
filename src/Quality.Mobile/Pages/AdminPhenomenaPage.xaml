@@ -9,7 +9,7 @@
                 </Grid>
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <VerticalStackLayout><Label Text="Status" Style="{StaticResource Muted}" /><Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}" /></VerticalStackLayout>
-                    <Button Grid.Column="1" Text="+ Add phenomenon" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" VerticalOptions="End" />
+                    <Button Grid.Column="1" Text="+ Add" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" VerticalOptions="End" />
                 </Grid>
                 <SearchBar Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by name" FontSize="17" />
             </VerticalStackLayout>

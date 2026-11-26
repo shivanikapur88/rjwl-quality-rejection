@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" x:Class="Quality.Mobile.Controls.SummaryRow" x:DataType="vm:SummaryLine">
+    <Border Style="{StaticResource Card}" Padding="12">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <VerticalStackLayout>
+                <Label Text="{Binding Name}" Style="{StaticResource Body}" FontAttributes="Bold" />
+                <Label Text="{Binding Detail}" Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+            <Label Grid.Column="1" Text="{Binding Value}" FontSize="22" FontAttributes="Bold" TextColor="{StaticResource Primary}" VerticalOptions="Center" />
+        </Grid>
+    </Border>
+</ContentView>

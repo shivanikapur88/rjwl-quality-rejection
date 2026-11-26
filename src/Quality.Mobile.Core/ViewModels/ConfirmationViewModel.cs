@@ -32,6 +32,9 @@ public sealed class ConfirmationViewModel : BaseViewModel
 
 	public string Inspector => _entry?.InspectorEmployeeCode ?? "";
 
+	/// <summary>Round 2 (#2): production day and shift the entry was booked to.</summary>
+	public string ShiftText => _entry?.ProductionDate is DateOnly d && _entry.ShiftCode is { } s ? $"Shift {s}, production day {d:dd MMM yyyy}" : "";
+
 	public string SavedAt => ((object)_entry == null) ? "" : _entry.ServerCreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss");
 
 	public string? Remarks => _entry?.Remarks;
@@ -51,9 +54,9 @@ public sealed class ConfirmationViewModel : BaseViewModel
 		_entry = BaseViewModel.Arg<EntryDto>(args, "entry");
 		bool flag = args.TryGetValue("already", out object value) && value is bool && (bool)value;
 		Headline = (flag ? "Already saved earlier – no duplicate created" : "Rejection entry saved");
-		string[] array = new string[11]
+		string[] array = new string[]
 		{
-			"Headline", "EntryNumber", "Shop", "Stage", "Machine", "Phenomenon", "Quantity", "Inspector", "SavedAt", "Remarks",
+			"Headline", "EntryNumber", "Shop", "Stage", "Machine", "Phenomenon", "Quantity", "Inspector", "SavedAt", "Remarks", "ShiftText",
 			"HasRemarks"
 		};
 		foreach (string name in array)

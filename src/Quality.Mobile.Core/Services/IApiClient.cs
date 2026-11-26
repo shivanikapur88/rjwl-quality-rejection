@@ -26,6 +26,18 @@ public interface IApiClient
 	/// <summary>One page of history (GET /api/rejection-entries/page). Pass the previous page's NextCursor to continue.</summary>
 	Task<ApiResult<EntryPage>> GetEntriesPageAsync(string? cursor, int limit = 50);
 
+	// ---- round 2: corrections (#1), shifts and reports (#2, #4), machine QR (#8) ----
+	Task<ApiResult<EntryDto>> GetEntryAsync(int shopId, long id);
+	Task<ApiResult<CorrectionDto>> RequestCorrectionAsync(int shopId, long entryId, CorrectionRequest request);
+	/// <summary>status: Pending (default), Approved, Rejected, Withdrawn or "all".</summary>
+	Task<ApiResult<List<CorrectionDto>>> GetCorrectionsAsync(string status = "Pending");
+	Task<ApiResult<CorrectionDto>> ApproveCorrectionAsync(long id, string? note);
+	Task<ApiResult<CorrectionDto>> RejectCorrectionAsync(long id, string note);
+	Task<ApiResult<CorrectionDto>> WithdrawCorrectionAsync(long id);
+	Task<ApiResult<CalendarDto>> GetCalendarAsync();
+	Task<ApiResult<ReportDto>> GetTotalsAsync(DateOnly fromDate, DateOnly toDate, string? shiftCode, int top = 5);
+	Task<ApiResult<MachineLookupDto>> LookupMachineAsync(string scannedText);
+
 	Task<ApiResult<List<AdminPhenomenonDto>>> AdminListAsync(int? shopId, int? stageId, bool? isActive, string? search);
 
 	Task<ApiResult<AdminPhenomenonDto>> AdminCreateAsync(CreatePhenomenonRequest request);

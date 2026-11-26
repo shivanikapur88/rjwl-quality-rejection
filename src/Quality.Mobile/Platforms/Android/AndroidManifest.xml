@@ -7,4 +7,7 @@
                android:supportsRtl="true" android:usesCleartextTraffic="false" />
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.INTERNET" />
+  <!-- Round 2 (#8): scanning machine QR labels. Asked at runtime the first time the scan screen opens. -->
+  <uses-permission android:name="android.permission.CAMERA" />
+  <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

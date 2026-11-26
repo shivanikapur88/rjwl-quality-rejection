@@ -46,6 +46,17 @@ public sealed class HomeViewModel : BaseViewModel
 
 	public bool IsAdmin => _session.IsAdministrator;
 
+	/// <summary>Round 2: supervisors and administrators see the shift summary and decide correction requests.</summary>
+	public bool CanReview => _session.IsSupervisor || _session.IsAdministrator;
+
+	public string CorrectionsButtonText => _session.IsInspector ? "My correction requests" : "Correction requests";
+
+	public AsyncCommand ScanCommand { get; private set; } = null!;
+
+	public AsyncCommand SummaryCommand { get; private set; } = null!;
+
+	public AsyncCommand CorrectionsCommand { get; private set; } = null!;
+
 	public string EntriesButtonText => _session.IsInspector ? "My entries" : "View entries";
 
 	public AsyncCommand<ShopDto> SelectShopCommand { get; }
@@ -75,6 +86,9 @@ public sealed class HomeViewModel : BaseViewModel
 		AdminUsersCommand = new AsyncCommand(() => _nav.GoToAsync("adminusers"));
 		SettingsCommand = new AsyncCommand(() => _nav.GoToAsync("settings"));
 		RefreshCommand = new AsyncCommand(LoadAsync);
+		ScanCommand = new AsyncCommand(() => _nav.GoToAsync(Routes.Scan));
+		SummaryCommand = new AsyncCommand(() => _nav.GoToAsync(Routes.Summary));
+		CorrectionsCommand = new AsyncCommand(() => _nav.GoToAsync(Routes.Corrections));
 	}
 
 	public override async Task OnAppearingAsync()
@@ -84,6 +98,8 @@ public sealed class HomeViewModel : BaseViewModel
 		OnPropertyChanged("CanRecord");
 		OnPropertyChanged("IsAdmin");
 		OnPropertyChanged("EntriesButtonText");
+		OnPropertyChanged(nameof(CanReview));
+		OnPropertyChanged(nameof(CorrectionsButtonText));
 		if (CanRecord)
 		{
 			await LoadAsync();

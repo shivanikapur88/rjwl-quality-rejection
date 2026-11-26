@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Round 2 (#4): rejected parts for one production day and shift. Counts only; no rejection percentage. -->
+<pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.SummaryPage" x:DataType="vm:SummaryViewModel" Title="Shift summary">
+    <RefreshView Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=OneWay}">
+        <ScrollView>
+            <VerticalStackLayout Padding="16" Spacing="12">
+                <Grid ColumnDefinitions="56,*,56" ColumnSpacing="8">
+                    <Button Text="‹" Command="{Binding PreviousDayCommand}" Style="{StaticResource SecondaryButton}" FontSize="26" SemanticProperties.Description="Previous day" />
+                    <Label Grid.Column="1" Text="{Binding DayText}" Style="{StaticResource H2}" HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                    <Button Grid.Column="2" Text="›" Command="{Binding NextDayCommand}" Style="{StaticResource SecondaryButton}" FontSize="26" SemanticProperties.Description="Next day" />
+                </Grid>
+                <Picker ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedShift, Mode=TwoWay}" Title="Shift" />
+                <ctl:StatusBar />
+                <Border Style="{StaticResource Card}" BackgroundColor="{StaticResource AccentSoft}" Stroke="{StaticResource Accent}" IsVisible="{Binding IsIncomplete}">
+                    <Label Text="{Binding IncompleteNotice}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" />
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout HorizontalOptions="Center">
+                        <Label Text="{Binding TotalText}" FontSize="44" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalTextAlignment="Center" />
+                        <Label Text="{Binding EntriesText}" Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+                    </VerticalStackLayout>
+                </Border>
+                <Label Text="By shop" Style="{StaticResource H2}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Shops}" Spacing="6">
+                    <BindableLayout.ItemTemplate><DataTemplate x:DataType="vm:SummaryLine"><ctl:SummaryRow /></DataTemplate></BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label Text="Top phenomena" Style="{StaticResource H2}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding TopPhenomena}" Spacing="6">
+                    <BindableLayout.ItemTemplate><DataTemplate x:DataType="vm:SummaryLine"><ctl:SummaryRow /></DataTemplate></BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label Text="Top machines" Style="{StaticResource H2}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding TopMachines}" Spacing="6">
+                    <BindableLayout.ItemTemplate><DataTemplate x:DataType="vm:SummaryLine"><ctl:SummaryRow /></DataTemplate></BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label Text="Rejected parts recorded in the app. Reversed entries are not counted." Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+</pages:AppPage>
