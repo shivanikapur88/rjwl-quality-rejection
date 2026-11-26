@@ -1,0 +1,42 @@
+# Review findings: closure evidence
+
+Source of the findings: the Q1-Q9 list in the implementation brief. **The review PDF itself (`RJWL-Andon-Review-With-Deep-Dive-2026-11-17.pdf`) was not available in this session**, so the wording below follows the brief, not the PDF. Check it against the PDF before signing off.
+
+"Mutation-checked" means the fix was removed again temporarily and the named test then **failed**, so the test really detects the original defect (see [TEST_EVIDENCE.md §4](TEST_EVIDENCE.md#4-mutation-check-do-the-tests-catch-the-original-defects)). All integration tests ran on SQL Server 2022 with READ_COMMITTED_SNAPSHOT both ON and OFF.
+
+| ID | Defect (as found in the supplied code) | Fix | Evidence | Status |
+|---|---|---|---|---|
+| **Q1** | Mobile.Core, all pages, platform code, resources and all test projects missing | Recovered from the supplied DLLs ([RECOVERY.md](RECOVERY.md)); new unit and integration test projects | Clean checkout builds all 7 projects, including the Android APK, with no binary from the package; 14 pages' compiled bindings verified at build | **Closed** (icon artwork is a placeholder) |
+| **Q2** | Password reset changed only the hash; old tokens stayed valid. Deactivate→reactivate or role change→back revived old tokens. | `Users.TokenVersion` (db/08), `tv` claim, checked on every request (`TokenRevocation`); bumped on reset, deactivation and role change | `SecurityTests.Q2_password_reset_revokes_existing_tokens`, `Q2_deactivate_then_reactivate…`, `Q2_role_change_and_back…` (HTTP, SQL Server); mutation-checked (all three fail without the check) | **Closed** |
+| **Q3** | "Last administrator" counted before the transaction, no lock, no DB guard | Count inside the transaction under `UPDLOCK, HOLDLOCK` on all active admin rows; trigger `TR_Users_KeepActiveAdministrator` with `READCOMMITTEDLOCK` as backstop | `LastAdministratorTests.Q3_two_admins_deactivating_each_other_at_once…` (5 rounds, truly concurrent); `Q3_database_trigger_refuses…` (direct SQL); upgrade script test step 6; mutation-checked | **Closed** |
+| **Q4** | One server-wide login limit (10/min), so one client could lock everyone out | `LoginThrottle`: failed-attempt counters per client+login (5/5 min), per login (10/15 min), per client (30/15 min); raw cap 300 requests/min per client | `SecurityTests.Q4_one_clients_failures_lock_only_that_login…` (HTTP); 4 unit tests on the limits and expiry | **Closed.** Counters are in memory, per API instance; reverse proxies need `ReverseProxy:KnownProxies` |
+| **Q5** | Username and employee code unique only separately; cross check was a query before saving; login took the first match | `qa.LoginIdentifiers` (one PK over UPPER(trimmed) usernames and employee codes), written in the user's transaction; login resolves through it; 08 backfills and stops on existing collisions | `ConcurrencyTests.Q5_concurrent_cross_column_collision…` (10 concurrent rounds); `SecurityTests.Q5_username_may_not_equal…`; upgrade test (collision → 50080, nothing written) | **Closed** |
+| **Q6** | Validation allowed 50-character employee codes into a 30-character column; overflow reported as "database unavailable" | `LoginRules`: employee code 2-30 in the API and bootstrap admin; DB CHECK `CK_Users_EmployeeCode_Length`; truncation errors map to 400 `value_too_long`, not 503 | `SecurityTests.Q6_employee_code_limits…` (30 OK, 31 → 400 `employee_code_invalid`); unit tests | **Closed.** `UserSqlGen` was not rebuilt (no third path to fix) |
+| **Q7** | Idempotent replay ignored remarks | Replay compares cleaned-up remarks, using the same function that cleans them before saving | `EntryTests.Q7_retry_with_changed_remarks…` (changed → 409, removed → 409, whitespace-only difference → replay); mutation-checked | **Closed** |
+| **Q8** | Next phenomenon code computed from the current highest without a lock; a concurrent add got a generic "duplicate" | Stage row locked (`UPDLOCK, HOLDLOCK`) for name check + code allocation + insert; up to 3 retries on a code clash; a name clash → 409 `duplicate_name` | `ConcurrencyTests.Q8_concurrent_phenomenon_creates_get_distinct_codes` (12 at once, all succeed, 12 distinct codes); `Q8_two_concurrent_creates_of_the_same_name…`; mutation-checked | **Closed** |
+| **Q9** | Delete checked "never used" then deleted, while an entry was being validated and saved in another database with no shared lock (same gap for deactivation) | Entry save reads machine and phenomenon with `HOLDLOCK` inside a master transaction held until the entry insert commits; delete takes an exclusive row lock **before** its usage check; deactivation's UPDATE waits the same way | `ConcurrencyTests.Q9_delete_waits_for_an_in_flight_entry_save…` (deterministic interleaving: the delete is shown to wait, then refuses with `machine_in_use`); `Q9_random_races…` (15 real HTTP races, no orphan entries, exactly one side wins each time); mutation-checked | **Closed** |
+
+## Other problems from the analysis
+
+| Problem | Fix | Evidence |
+|---|---|---|
+| No stale-screen protection (only phenomena had a version; the app never sent it; shop-only user edits did not change the user row) | `RowVer` on Users and Machines (db/08), `Version` in admin DTOs and requests, 409 `concurrent_edit`; user edits always touch `ModifiedAt`; the app sends the version | `EntryTests.Saving_from_a_stale_screen_is_refused` (machines, users incl. shop-only change, phenomena); unit test of the app request |
+| History capped at 200, no paging; inclusive end date; time zones not normalised; app fetched only 50 | Paged endpoint with stable cursor, exclusive `toUtc`, UTC normalisation of `Z`/offset input; app "Load more" | `EntryTests.Paging_returns_every_entry_once…` (equal timestamps in two shops sharing a table), `Date_filters_accept_utc_and_offset_times`; app unit test |
+| Multi-shop history looked complete when a store failed | Paged endpoint lists `unavailableShops`; the app shows an "incomplete" notice | `EntryTests.Paged_history_discloses_an_unreachable_store…`; app unit test |
+| First-admin creation queried SQL at start-up, so the API crashed when SQL was down | Background service with retries | Integration fixture (host starts before the admin exists) |
+| `/api/health` never checked the databases | `/api/health/ready` probes the master and all four stores | `SecurityTests.Readiness_*` (200 when healthy; 503 with only the broken store marked) |
+| Malformed token → 500 | Claims parsed with `TryParse`; failure → 401 | `SecurityTests.Malformed_or_foreign_tokens_get_401_not_500` |
+| Constraint/truncation errors shown as 503 "database unavailable" | SQL error classification (409/400/503 by error number) | unit test `Error_mapping…`; HTTP tests receive 409s, not 503s |
+| Inactive machine reported like a wrong-shop machine | 409 `machine_inactive`; the app alerts and returns to a refreshed machine list | `EntryTests.Inactive_machine_gets_its_own_code…`; app unit test |
+| No index on `MachineId` (full scan for "machine used?") | `IX_QRE_Machine` (db/09) | db/09 runs in every test database |
+| Session expiry during save lost the form | Draft kept with its SubmissionId and reopened after the same user signs in | app unit tests `Session_expiry_during_save…`, `A_different_user…` |
+| Quantity migration sets old entries to 1 | Unchanged, documented as an **assumption to confirm** | [DATABASE_RUNBOOK.md §2](DATABASE_RUNBOOK.md), [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) |
+| Upgrade text said "re-run 03 and 05" (05 = fake machines) | Corrected in 06 and the runbook; controlled machine load `10_load_production_machines.sql` | script tested: invalid lists refused, valid list applied with audit, re-run no-op |
+| Seed re-run failed once administrators had added phenomena | Seed check verifies seeded codes, not row counts | `ReferenceDataTests.Rerunning_the_seed…` |
+
+## Defects found during this work (not in the review)
+
+| Defect | Fix |
+|---|---|
+| EF Core refuses to save to a table with a trigger unless told about it (`OUTPUT` without `INTO`). Found by the integration tests as soon as the Q3 trigger existed. | `Users` mapping declares `HasTrigger(...)`. The runbook warns that the **old** API cannot save users on a database with the trigger. |
+| The supplied seed check `CAST(RIGHT(code,3) AS int)` failed on non-numeric codes when SQL Server evaluated it before the `LIKE` filter | `TRY_CAST` in the generated check |

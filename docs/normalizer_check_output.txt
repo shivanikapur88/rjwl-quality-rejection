@@ -1,0 +1,6 @@
+rows checked: 146, normalizer mismatches: 0
+GDC_SHOP       raw= 25 imported= 25
+CNC_SHOP       raw= 53 imported= 52
+PRE_TREATMENT  raw= 34 imported= 34
+FINAL          raw= 34 imported= 34
+RESULT: PASS

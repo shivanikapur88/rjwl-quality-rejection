@@ -1,0 +1,17 @@
+Created QRVERIFY_Master, QRVERIFY_Gdc, QRVERIFY_Cnc (READ_COMMITTED_SNAPSHOT ON)
+  ok  QRVERIFY_Master <- 01_master_schema.sql
+  ok  QRVERIFY_Master <- 02c_entries_schema_PRE_FINAL.sql
+  ok  QRVERIFY_Master <- 03_seed_reference.sql
+  ok  QRVERIFY_Master <- 04_seed_phenomena.sql
+  ok  QRVERIFY_Master <- 08_upgrade_master_review_fixes.sql
+  ok  QRVERIFY_Master <- 09_upgrade_entries_indexes.sql
+  ok  QRVERIFY_Gdc <- 02a_entries_schema_GDC_AndonDB.sql
+  ok  QRVERIFY_Gdc <- 09_upgrade_entries_indexes.sql
+  ok  QRVERIFY_Cnc <- 02b_entries_schema_MachineShopDB.sql
+  ok  QRVERIFY_Cnc <- 09_upgrade_entries_indexes.sql
+  ok  QRVERIFY_Master <- 01_master_schema.sql
+  ok  QRVERIFY_Master <- 03_seed_reference.sql
+  ok  QRVERIFY_Master <- 04_seed_phenomena.sql
+  ok  QRVERIFY_Master <- 08_upgrade_master_review_fixes.sql
+  ok  QRVERIFY_Master <- 09_upgrade_entries_indexes.sql
+Fresh install + idempotent re-run complete.

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reconstructed from the supplied build's generated manifest (obj/Debug/net10.0-android/AndroidManifest.xml),
+     which was generated from the original Platforms/Android/AndroidManifest.xml. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- allowBackup=false: keeps the stored session out of device backups. Cleartext HTTP is not permitted (HTTPS only). -->
+  <application android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round"
+               android:supportsRtl="true" android:usesCleartextTraffic="false" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

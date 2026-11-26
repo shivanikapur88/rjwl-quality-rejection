@@ -1,0 +1,34 @@
+PASS  M01  Login success: session stored securely, navigates Home, later calls carry the Bearer token, login call does not
+PASS  M02  Invalid login shows the server message, no navigation, no session; blank fields send nothing
+PASS  M03  Network disconnected: friendly message, nothing internal leaked, busy flag reset
+PASS  M04  Request timeout: friendly timeout message
+PASS  M05  API/database unavailable: 503 safe title shown; 500/502 HTML error pages never shown
+PASS  M06  Expired token (401 on an authenticated call): session cleared, expiry event fired once, user sent to login with notice
+PASS  M07  Server address not configured: clear message and no request
+PASS  M08  Restore session: still-valid token goes straight Home once; expired token stays on login
+PASS  M09  Home with four shops: lists all four; a shop with ONE stage goes straight to machines (no stage screen); several stages -> stage screen; roles
+PASS  M10  Stage, machine and phenomena lists come from the server for the chosen shop/stage (nothing hard-coded)
+PASS  M11  Phenomenon search filters the loaded list case-insensitively; empty list explains itself
+PASS  M12  Submit success: request has submission id + ids + trimmed remarks, NO inspector/time fields; navigates to confirmation
+PASS  M13  Network failure keeps the SAME submission id; retry succeeds; both requests carry the identical id
+PASS  M14  Repeated taps: concurrent submits and command taps produce exactly ONE request
+PASS  M15  Validation: no phenomenon -> no request and Save disabled; remarks over 500 -> blocked
+PASS  M16  Inactive phenomenon (409): list is reloaded from the server, selection cleared, message shown
+PASS  M17  Server replays an already-saved submission (200): treated as success, shown as 'already saved'
+PASS  M18  After a saved entry the form resets with a NEW submission id; Clear also starts a new id; payload-mismatch gets a new id + guidance
+PASS  M19  My entries lists server data; empty state; error shown
+PASS  M20  Settings: server address validation (HTTPS only), normalisation, connection test without auth header, logout confirm
+PASS  M21  Admin list: filters become query parameters; stage list follows the chosen shop; search works
+PASS  M22  Admin deactivate asks for confirmation (cancel = no request); activate does not; delete of used item shows the server refusal
+PASS  M23  Admin editor: create sends shop/stage/name/status; duplicate name is shown inline and the form stays open; blank blocked; edit sends PUT
+PASS  M24  Unauthorized master request (403) is reported, not hidden; app cannot succeed without server approval
+PASS  M25  Quantity on the entry form: default 1, typed value sent, +/- with limits, invalid text blocks Save, reset returns to 1
+PASS  M26  Quantity: a failed save keeps the same submission id AND the same quantity on retry
+PASS  M27  Machine admin list: filters become query parameters; deactivate asks first; delete shows server refusal or removes; add/edit navigation
+PASS  M28  Machine editor: create sends shop/code/name/status; duplicate code stays inline; blank blocked; edit sends PUT
+PASS  M29  User admin list: search/filter become query parameters; deactivate asks first; add/edit navigation; server refusals shown
+PASS  M30  User editor (create): client checks, admin role hides shops, request carries shops and password, server duplicate shown inline, password cleared on success
+PASS  M31  User editor (edit): prefilled with shops ticked; PUT without any password; optional reset via its own call; partial failure is explained
+PASS  M32  Home (administrator): phenomena, machines and users entries navigate to their screens
+
+32 passed, 0 failed, 32 total

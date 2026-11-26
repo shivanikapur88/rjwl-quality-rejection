@@ -1,0 +1,2 @@
+XAML files: 15, bindings checked: 168, event handlers: 11, StaticResource refs: 172
+RESULT: PASS (static check only; MAUI build NOT RUN)

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.MachinePage" x:DataType="vm:MachineViewModel" Title="Machine">
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="12">
+        <Label Text="{Binding ContextText}" Style="{StaticResource H2}" />
+        <ctl:StatusBar Grid.Row="1" />
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Machines}" SelectionMode="Single" SelectionChanged="OnSelected">
+            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="10" /></CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="dto:MachineDto">
+                    <Border Style="{StaticResource Card}" Padding="0">
+                        <Grid Style="{StaticResource ListItem}" ColumnDefinitions="*,Auto" MinimumHeightRequest="72">
+                            <VerticalStackLayout VerticalOptions="Center">
+                                <Label Text="{Binding MachineCode}" Style="{StaticResource H2}" />
+                                <Label Text="{Binding MachineName}" Style="{StaticResource Muted}" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1" Text="›" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</pages:AppPage>

@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+*.user
+*.keystore
+*.jks
+appsettings.*.local.json
+secrets.json
+create_user*.sql
+*.apk
+*.aab

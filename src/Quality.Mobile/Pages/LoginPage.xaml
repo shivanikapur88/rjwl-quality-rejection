@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.LoginPage" x:DataType="vm:LoginViewModel" Shell.NavBarIsVisible="False">
+    <ScrollView>
+        <VerticalStackLayout Padding="24,48" Spacing="18" MaximumWidthRequest="520">
+            <Label Text="Quality Rejection Entry" Style="{StaticResource H1}" HorizontalTextAlignment="Center" />
+            <Label Text="Sign in with your username or employee ID" Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Username or employee ID" Style="{StaticResource Muted}" />
+                    <Entry Text="{Binding Username}" Placeholder="e.g. E1234" Keyboard="Plain" ReturnType="Next" AutomationId="username" />
+                    <Label Text="Password" Style="{StaticResource Muted}" />
+                    <Entry Text="{Binding Password}" IsPassword="True" Placeholder="Password" ReturnType="Done" ReturnCommand="{Binding LoginCommand}" AutomationId="password" />
+                    <Button Text="Sign in" Command="{Binding LoginCommand}" Style="{StaticResource PrimaryButton}" AutomationId="signin" />
+                </VerticalStackLayout>
+            </Border>
+            <ctl:StatusBar />
+            <Button Text="Server settings" Command="{Binding SettingsCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</pages:AppPage>

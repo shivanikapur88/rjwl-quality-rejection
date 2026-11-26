@@ -1,0 +1,137 @@
+# Quality Rejection: reconciled specification
+
+This document replaces the scattered statements in the supplied README, `Phase2_Design.md`, `TEST_RESULTS.md` and the short report. Where they disagreed, the position below is the one the code now implements. It describes **behaviour**; evidence for each claim is in [TEST_EVIDENCE.md](TEST_EVIDENCE.md).
+
+## 1. Reconciled facts
+
+| Topic | Supplied documents said | Position (and evidence) |
+|---|---|---|
+| Mobile pages | Short report: 11 pages | **14 pages**: Login, Home, Stage, Machine, Entry form, Confirmation, My entries, Settings, Admin phenomena, Phenomenon editor, Admin machines, Machine editor, Admin users, User editor. Registered in `MauiProgram.cs` and present in the supplied build. |
+| Framework | ".NET 8, upgrade pending"; mobile already `net10.0-android` | **Everything on .NET 10** (LTS, supported to Nov 2028). .NET 8 left support on 10 Nov 2026. MAUI 10 support ends earlier than .NET 10's; plan the move to MAUI 11 (see [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)). |
+| User management | "No user-management screen" **and** in-app user management | **In-app user management exists** (Admin users + User editor) and is part of the scope. |
+| PRE/FINAL entries | Early design: undecided | **Both in `QualityMasterDB`**, one shared table `qa.QualityRejectionEntries`, separated by `ShopId`/`ShopCode` (CHECK constraint allows only PRE/FINAL there). |
+| Compile status | "Data/API not compiled" | Out of date: compiled in October (build output). Now compiled on .NET 10 together with the mobile projects. |
+| Test counts | 22 / 23 / 30 / 62 from different phases | **None carried forward.** The test source was missing; the counts could not be reproduced. Current counts come only from tests in this repository, run against this source ([TEST_EVIDENCE.md](TEST_EVIDENCE.md)). |
+| Upgrade instructions | "re-run 03 **and 05**" | **Wrong:** 05 loads fake machines. Production never runs 05; real machines come from `10_load_production_machines.sql` or the admin screen ([DATABASE_RUNBOOK.md](DATABASE_RUNBOOK.md)). |
+
+## 2. Scope
+
+**In scope (supplied design, completed):** the Android entry workflow for four shops, role-based history, in-app administration of phenomena, machines and users, the API, and the SQL scripts.
+
+**Not added (out of the documented scope; listed so nobody assumes they exist):** offline entry or a local queue, a web administration portal, entry correction or reversal, an audit-viewing screen, photos, QR/barcode, dashboards, exports, PLC integration, shift or production-date allocation, and rejection percentages. Each needs a business decision first ([BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)).
+
+**Outside this application:** the CNC production collector and the ShopMonitor dashboard. The scripts add only schema `qa` and the table `qa.QualityRejectionEntries` to `GDC_AndonDB` and `MachineShopDB`; nothing else in those databases is touched.
+
+## 3. Architecture
+
+```
+Android app (Quality.Mobile + Quality.Mobile.Core)
+    │  HTTPS, JWT bearer token
+    ▼
+ASP.NET Core API (Quality.Api)        controllers, authentication, throttling, error mapping
+    ▼
+Business services (Quality.Core)      all rules and authorization decisions
+    ▼
+EF Core + routing (Quality.Data)      ├─ QualityMasterDB : users, roles, shops, stages, machines, phenomena, audit,
+                                      │                    login identifiers + PRE and FINAL entries
+                                      ├─ GDC_AndonDB      : GDC entries   (qa.QualityRejectionEntries)
+                                      └─ MachineShopDB    : CNC entries   (qa.QualityRejectionEntries)
+```
+* The app never receives SQL credentials and never chooses a database. The API picks the entry database from the **authorised** shop (`Shops.EntryStoreKey` → `ConnectionStrings:GdcEntries|CncEntries|PreEntries|FinalEntries`).
+* The SQL scripts own the schema; EF Core only maps it (no EF migrations).
+
+## 4. Shops, stages, machines, phenomena
+
+| Shop | Code | Stage | Entry database | Seeded phenomena |
+|---|---|---|---|---:|
+| GDC Shop | GDC | GDC Shop (`GDC_SHOP`) | GDC_AndonDB | 25 |
+| CNC Shop | CNC | CNC Shop (`CNC_SHOP`) | MachineShopDB | 52 |
+| Pre-treatment Inspection | PRE | Pre-treatment Inspection (`PRE_TREATMENT`) | QualityMasterDB | 34 |
+| FINAL Inspection | FINAL | FINAL Inspection (`FINAL`) | QualityMasterDB | 34 |
+
+* Shops and stages are linked through `qa.ShopStages`. The app skips the stage screen **only when a shop has exactly one active stage**; nothing assumes one stage forever.
+* Machines belong to a shop. Phenomena belong to a stage. PRE and FINAL have separate phenomenon rows, even though the initial lists match.
+* Phenomenon names keep their original text (including double spaces). Uniqueness within a stage uses a normalized key: trim, collapse whitespace, upper case.
+* The seed counts are starting values, not limits: administrators add phenomena later.
+
+## 5. Roles
+
+| Capability | Quality Inspector | Supervisor | Administrator |
+|---|---|---|---|
+| See shops | assigned, active | assigned, active | all active |
+| Create rejection entries | **yes** (assigned shops) | no | no |
+| History | own entries, assigned shops | all entries of assigned shops | all shops |
+| Manage phenomena, machines, users | no | no | yes |
+
+Enforced on the server on every request, whatever IDs a caller sends. A deactivated user, a changed role, a password reset, a removed shop assignment and a deactivated shop, stage or machine all take effect on the **next request**.
+
+## 6. Rejection entry
+
+Request (`POST /api/rejection-entries`): `SubmissionId, ShopId, StageId, MachineId, PhenomenonId, Quantity, Remarks`.
+
+| Rule | Detail |
+|---|---|
+| SubmissionId | non-empty GUID, generated by the app once per intended entry and **reused for every retry** of that entry |
+| Quantity | whole number 1-9,999 (also a CHECK constraint) |
+| Remarks | optional; trimmed; blank becomes "none"; max 500 characters |
+| Shop | assigned to the user (administrators: any active shop) |
+| Stage | active and mapped to the shop |
+| Machine | belongs to the shop; **inactive → 409 `machine_inactive`** (the app returns to a refreshed machine list) |
+| Phenomenon | belongs to the stage; inactive → 409 `phenomenon_inactive` (the app reloads the list) |
+| Server-owned values | inspector id and employee code (from the token), server UTC time, entry database, snapshots of shop/stage/machine/phenomenon names |
+
+**Idempotency:** a request whose SubmissionId already exists returns the original entry with **200** (`alreadySubmitted: true`) if shop, stage, machine, phenomenon, quantity **and cleaned-up remarks** all match. Otherwise it is refused with 409 `submission_payload_mismatch`. A new entry returns **201**. The unique index on `SubmissionId` in each entry database is the final guard. An id used by another inspector gives 409 `submission_id_in_use`.
+
+**Consistency across databases:** while an entry is being saved, the API holds shared locks on the machine and phenomenon rows (master database) until the entry insert has committed. Deleting or deactivating either waits for that, so an entry can never point at a machine or phenomenon that was deleted in the same moment.
+
+## 7. History
+
+| Endpoint | Behaviour |
+|---|---|
+| `GET /api/rejection-entries/page?shopId&stageId&fromUtc&toUtc&limit&cursor` (**new**) | Newest first, ordered by `ServerCreatedAt DESC, ShopId DESC, Id DESC`, which is stable even when timestamps are equal across databases. `limit` 1-200 (default 50). Returns `{items, nextCursor, unavailableShops, isComplete}`. Send `nextCursor` back as `cursor` for the next page; `null` means the last page. If a shop's entry database cannot be read, its code is in `unavailableShops` and the app says the list is **incomplete**. |
+| `GET /api/rejection-entries?…&limit` (supplied, kept for compatibility) | At most `limit` newest entries (max 200); **not** a complete history. Fails with 503 if any store is unreachable. |
+| `GET /api/rejection-entries/{shopId}/{id}` | One entry. The shop is part of the key (ids are only unique per database, and PRE/FINAL share a table). |
+
+**Time:** stored as UTC (`datetime2(3)`, server clock). `fromUtc` is inclusive; `toUtc` is **exclusive** in the paged endpoint (inclusive in the legacy one). Query times may carry `Z` or an offset (`+05:30`) and are converted to UTC; times without a zone are taken as UTC. The app shows times in the device's local time zone. No shift or production-day logic exists (the CNC 05:59 reset is not applied); see [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md).
+
+## 8. Administration and audit
+
+| Area | Create | Edit | Deactivate | Delete |
+|---|---|---|---|---|
+| Phenomena | yes (code `<STAGE>-NNN`, allocated safely) | rename | yes | only if never used (otherwise 409 `phenomenon_in_use`) |
+| Machines | yes (per shop; code unique per shop - case-insensitive with SQL Server's default collation) | code and name | yes | only if never used (409 `machine_in_use`) |
+| Users | yes (role, shops, initial password) | name, role, shops, reset password | yes | never (history refers to them) |
+
+Safeguards: no self-deactivation or self-demotion; at least one active administrator, guarded in the service **and** by a database trigger; username and employee code share one namespace across all users; employee code 2-30 characters, username 2-50, password 10-128.
+
+**Stale screens:** list and detail responses carry `version`. Edit and status requests may send it back. If the record changed since the screen was loaded, the save is refused with 409 `concurrent_edit`. The app sends it on every edit. Older clients that send no version are not checked.
+
+**Audit:** every create, edit, (de)activation, delete and password reset writes `qa.AuditLog` (actor, action, entity, id, before/after JSON, UTC time) **in the same transaction** as the change. Passwords and hashes are never written. There is no audit-viewing screen (not in scope).
+
+## 9. API
+
+| Method and path | Who | Notes |
+|---|---|---|
+| `GET /api/health` | anyone | process is up (liveness) |
+| `GET /api/health/ready` (**new**) | anyone | 200 if the master and all four entry stores are reachable, otherwise 503; reports only `ok`/`unavailable` per component |
+| `POST /api/auth/login` | anyone | username **or** employee code; 429 `too_many_attempts` with `Retry-After` after repeated failures |
+| `GET /api/shops`, `/shops/{id}/stages`, `/shops/{id}/stages/{id}/machines`, `/…/phenomena` | signed in | only assigned shops; active items only |
+| `POST /api/rejection-entries` | inspector | 201 new / 200 replay |
+| `GET /api/rejection-entries`, `/page`, `/{shopId}/{id}` | signed in | role-scoped (section 7) |
+| `/api/admin/phenomena`, `/api/admin/machines`, `/api/admin/users` (+ `PATCH {id}/status`, `POST users/{id}/reset-password`, `DELETE`) | administrator | section 8 |
+
+Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `unauthenticated`/`token_expired` 401, `forbidden`/`shop_not_assigned` 403, `*_not_found` 404, conflicts 409 (`concurrent_edit`, `concurrent_change`, `duplicate*`, `last_admin`, `*_in_use`, `*_inactive`, `submission_*`), `value_too_long` 400, `too_many_attempts` 429, `database_unavailable`/`store_not_configured` 503, `server_error` 500. **Only real connectivity problems** are reported as 503 (previously every constraint error was "database unavailable"). Bodies never contain SQL text, stack traces or secrets.
+
+## 10. Security
+
+* **Tokens:** HS256 JWT, 480 minutes by default, claims `sub`, `emp`, `role`, `tv` (token version). Every request re-checks: user exists, is active, still has that role, and `tv` equals `Users.TokenVersion`. Password reset, deactivation and role change increase `TokenVersion`, so **all earlier tokens stop working immediately**, and reactivating or changing the role back does not revive them. Tokens with missing or malformed claims get 401, not 500.
+* **Login throttling:** failed attempts are counted per client address + login (5 in 5 min), per login (10 in 15 min) and per client address (30 in 15 min). A success clears that login's counters. There is a generous raw cap of 300 login requests/minute per address (configurable). Counters are in memory, per API instance. Behind a reverse proxy, set `ReverseProxy:KnownProxies` so the real client address is used.
+* **Passwords:** ASP.NET Core `PasswordHasher` (PBKDF2, salted). One generic message for unknown user, wrong password and inactive account.
+* **Device:** token in Android Keystore-backed storage, backup disabled, cleartext HTTP disabled; debug builds accept the development certificate only for `10.0.2.2`/`localhost`.
+
+## 11. App behaviour on network problems (online-only, as designed)
+
+* The form is kept after any recoverable failure. Double taps send one request.
+* The same SubmissionId is reused after an uncertain failure (timeout, connection loss, 5xx); the message says the entry **may not have been saved** and that Save again will not create a duplicate. Validation errors are shown as validation errors, not as an unknown outcome.
+* **Session expiry while saving (changed):** the entry, with its SubmissionId, is kept in memory. After the same user signs in again the form reopens with it, and Save again is safe. Another user signing in does not see it.
+* **Closing the app** with an unsaved entry discards it (no offline storage, by design). Anything already sent with that SubmissionId was either saved once or not at all; check **My entries**.

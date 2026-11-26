@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <!-- Light industrial palette: steel navy + safety amber, high contrast for factory lighting -->
+    <Color x:Key="Primary">#1F3A5F</Color>
+    <Color x:Key="PrimaryDark">#142840</Color>
+    <Color x:Key="Accent">#F2A900</Color>
+    <Color x:Key="AccentSoft">#FFF3CC</Color>
+    <Color x:Key="PageBackground">#F4F5F7</Color>
+    <Color x:Key="Surface">#FFFFFF</Color>
+    <Color x:Key="TextPrimary">#1B1F24</Color>
+    <Color x:Key="TextMuted">#555F69</Color>
+    <Color x:Key="Border">#C5CDD5</Color>
+    <Color x:Key="Success">#1E7B34</Color>
+    <Color x:Key="SuccessSoft">#E4F4E8</Color>
+    <Color x:Key="Danger">#B3261E</Color>
+    <Color x:Key="DangerSoft">#FDECEA</Color>
+    <Color x:Key="InfoSoft">#E8F1FB</Color>
+    <Color x:Key="Disabled">#AEB6BE</Color>
+</ResourceDictionary>

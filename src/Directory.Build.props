@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <UseAppHost>false</UseAppHost>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+</Project>

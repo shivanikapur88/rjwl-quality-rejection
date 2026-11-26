@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.HomePage" x:DataType="vm:HomeViewModel" Title="Home">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="16" RowSpacing="12">
+        <Border Grid.Row="0" Style="{StaticResource Card}">
+            <VerticalStackLayout Spacing="2">
+                <Label Text="{Binding Welcome}" Style="{StaticResource H2}" />
+                <Label Text="{Binding RoleText}" Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+        </Border>
+        <ctl:StatusBar Grid.Row="1" />
+        <Label Grid.Row="2" Text="Select shop" Style="{StaticResource H2}" IsVisible="{Binding CanRecord}" />
+        <CollectionView Grid.Row="3" ItemsSource="{Binding Shops}" SelectionMode="Single" SelectionChanged="OnShopSelected" IsVisible="{Binding CanRecord}">
+            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="10" /></CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="dto:ShopDto">
+                    <Border Style="{StaticResource Card}" Padding="0">
+                        <Grid Style="{StaticResource ListItem}" ColumnDefinitions="*,Auto" MinimumHeightRequest="72">
+                            <Label Text="{Binding ShopName}" Style="{StaticResource H2}" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="›" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+        <VerticalStackLayout Grid.Row="4" Spacing="12">
+            <Button Text="{Binding EntriesButtonText}" Command="{Binding MyEntriesCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Text="Manage rejection phenomena" Command="{Binding AdminCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding IsAdmin}" />
+            <Button Text="Manage machines" Command="{Binding AdminMachinesCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding IsAdmin}" />
+            <Button Text="Manage users" Command="{Binding AdminUsersCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding IsAdmin}" />
+            <Button Text="Settings" Command="{Binding SettingsCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+    </Grid>
+</pages:AppPage>

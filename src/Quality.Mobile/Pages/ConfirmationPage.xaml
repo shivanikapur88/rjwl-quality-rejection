@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.ConfirmationPage" x:DataType="vm:ConfirmationViewModel" Title="Entry saved">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+            <Border Style="{StaticResource Card}" BackgroundColor="{StaticResource SuccessSoft}" Stroke="{StaticResource Success}">
+                <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                    <Label Text="✓" FontSize="56" TextColor="{StaticResource Success}" HorizontalTextAlignment="Center" />
+                    <Label Text="{Binding Headline}" Style="{StaticResource H2}" TextColor="{StaticResource Success}" HorizontalTextAlignment="Center" />
+                    <Label Text="{Binding EntryNumber}" FontSize="22" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="8">
+                    <Label Text="Shop" Style="{StaticResource Muted}" /><Label Grid.Column="1" Text="{Binding Shop}" Style="{StaticResource Body}" />
+                    <Label Grid.Row="1" Text="Stage" Style="{StaticResource Muted}" /><Label Grid.Row="1" Grid.Column="1" Text="{Binding Stage}" Style="{StaticResource Body}" />
+                    <Label Grid.Row="2" Text="Machine" Style="{StaticResource Muted}" /><Label Grid.Row="2" Grid.Column="1" Text="{Binding Machine}" Style="{StaticResource Body}" />
+                    <Label Grid.Row="4" Text="Quantity" Style="{StaticResource Muted}" /><Label Grid.Row="4" Grid.Column="1" Text="{Binding Quantity}" Style="{StaticResource Body}" FontAttributes="Bold" />
+                    <Label Grid.Row="3" Text="Phenomenon" Style="{StaticResource Muted}" /><Label Grid.Row="3" Grid.Column="1" Text="{Binding Phenomenon}" Style="{StaticResource Body}" FontAttributes="Bold" />
+                    <Label Grid.Row="5" Text="Inspector" Style="{StaticResource Muted}" /><Label Grid.Row="5" Grid.Column="1" Text="{Binding Inspector}" Style="{StaticResource Body}" />
+                    <Label Grid.Row="6" Text="Saved at" Style="{StaticResource Muted}" /><Label Grid.Row="6" Grid.Column="1" Text="{Binding SavedAt}" Style="{StaticResource Body}" />
+                    <Label Grid.Row="7" Text="Remarks" Style="{StaticResource Muted}" IsVisible="{Binding HasRemarks}" /><Label Grid.Row="7" Grid.Column="1" Text="{Binding Remarks}" Style="{StaticResource Body}" IsVisible="{Binding HasRemarks}" />
+                </Grid>
+            </Border>
+            <Button Text="Record another" Command="{Binding RecordAnotherCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Text="Home" Command="{Binding HomeCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</pages:AppPage>
