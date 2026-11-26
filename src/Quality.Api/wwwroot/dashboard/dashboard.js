@@ -154,7 +154,10 @@
 
   function rateText(rate) {
     if (!rate || rate.rate === null || rate.rate === undefined) return { value: '–', note: rate ? 'Production counts exist but show 0 produced.' : 'No production data for this selection.' };
-    return { value: pct(rate.rate, 2), note: `${fmt(rate.rejectedWithProduction)} rejected of ${fmt(rate.produced)} produced · based on ${pct(rate.coverage ?? 0, 0)} of rejected parts` };
+    const cov = rate.coverage ?? 0;
+    // Below 80% coverage the rate describes only part of the selection: say so plainly, not in small grey text only.
+    const warn = cov < 0.8 ? `⚠ Partial: based on only ${pct(cov, 0)} of rejected parts (production counts missing). ` : '';
+    return { value: pct(rate.rate, 2), warn: !!warn, note: warn + `${fmt(rate.rejectedWithProduction)} rejected of ${fmt(rate.produced)} produced` + (warn ? '' : ` · based on ${pct(cov, 0)} of rejected parts`) };
   }
 
   function render(r) {
@@ -163,7 +166,7 @@
     text(el('dParts'), delta(r.total.quantity, r.total.previousQuantity, r, 'rejected parts'));
     text(el('dEntries'), delta(r.total.entries, r.total.previousEntries, r, 'entries'));
     const rt = rateText(r.total.rate);
-    text(el('tRate'), rt.value); text(el('dRate'), rt.note);
+    text(el('tRate'), rt.value); text(el('dRate'), rt.note); el('dRate').classList.toggle('warn-text', !!rt.warn);
     el('incomplete').hidden = r.unavailableShops.length === 0;
     text(el('incomplete'), r.unavailableShops.length ? `Incomplete: the entries of ${r.unavailableShops.join(', ')} could not be read right now. Totals below leave them out.` : '');
     renderTrend(r);
@@ -248,6 +251,7 @@
     const list = r.topPhenomena;
     if (!list.length) { text(el('paretoNote'), ''); host.append(make('p', 'muted', 'No rejections in this selection.')); return; }
     const total = r.total.quantity || 1, max = list[0].quantity;
+    const multiShop = new Set(list.map(p => p.shopCode)).size > 1;
     let cum = 0, vital = 0;
     for (const p of list) { if (cum / total < 0.8) vital++; cum += p.quantity; }
     const cut = list.slice(0, vital).reduce((a, p) => a + p.quantity, 0) / total;
@@ -262,7 +266,9 @@
       cum += p.quantity;
       const row = make('div', 'prow' + (i < vital ? ' vital' : ''));
       const track = make('div', 'bartrack'); const bar = make('div', 'bar'); bar.style.width = `${Math.max(2, (p.quantity / max) * 100)}%`; track.append(bar);
-      const name = make('button', 'barname rowbtn', p.phenomenonName); name.type = 'button';
+      // Two shops can have a phenomenon of the same name: show the shop when the selection covers more than one.
+      const label = multiShop ? `${p.phenomenonName} (${p.shopCode})` : p.phenomenonName;
+      const name = make('button', 'barname rowbtn', label); name.type = 'button';
       name.setAttribute('aria-label', `${p.phenomenonName}: ${fmt(p.quantity)} parts, ${pct(p.quantity / total, 0)} of rejected parts, cumulative ${pct(cum / total, 0)}. Show only this phenomenon.`);
       row.append(make('div', 'muted', String(i + 1)), name, track, make('div', 'num', fmt(p.quantity)),
         make('div', 'num', pct(p.quantity / total, 0)), make('div', 'num', pct(cum / total, 0)), make('div', 'num muted', shortDelta(p.quantity, p.previousQuantity)));
@@ -328,7 +334,8 @@
   function wireUpload() {
     el('prodTemplate').addEventListener('click', () => {
       const d = cal ? cal.productionDate : isoDay(new Date());
-      const csv = `shop,machine,date,shift,produced\nGDC,GDC-01,${d},A,1200\nGDC,GDC-01,${d},B,1150\n`;
+      // Example rows only: replace the shop and machine codes with your own (the codes shown in "Top machines" or the app).
+      const csv = `shop,machine,date,shift,produced\nGDC,YOUR-MACHINE-CODE,${d},A,1200\nGDC,YOUR-MACHINE-CODE,${d},B,1150\n`;
       const a = make('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'production-counts-template.csv';
       document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     });

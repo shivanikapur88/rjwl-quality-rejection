@@ -63,6 +63,10 @@ public interface IMasterData
     Task<bool> MachineCodeExistsAsync(int shopId, string machineCode, int? excludeMachineId);     // case-insensitive, per shop
     void AddMachine(Machine m);
     void RemoveMachine(Machine m);
+    /// <summary>True if production counts or correction requests (proposed machine) refer to the machine (delete check).</summary>
+    Task<bool> IsMachineReferencedInMasterAsync(int machineId);
+    /// <summary>True if correction requests (proposed phenomenon) refer to the phenomenon (delete check).</summary>
+    Task<bool> IsPhenomenonReferencedInMasterAsync(int phenomenonId);
 
     // ---- user administration ----
     Task<IReadOnlyList<User>> GetUsersAsync(string? search, bool? isActive);                      // includes Role
@@ -125,6 +129,8 @@ public interface IEntryStore
     /// <exception cref="DuplicateSubmissionException">unique SubmissionId violated (concurrent retry)</exception>
     Task<QualityRejectionEntry> InsertAsync(QualityRejectionEntry entry);
     Task<QualityRejectionEntry?> GetByIdAsync(long id);
+    /// <summary>Several entries in one query (correction lists).</summary>
+    Task<IReadOnlyList<QualityRejectionEntry>> GetByIdsAsync(IReadOnlyCollection<long> ids);
     Task<IReadOnlyList<QualityRejectionEntry>> ListAsync(EntryFilter filter); // newest first
     Task<bool> IsPhenomenonUsedAsync(int phenomenonId);
     Task<bool> IsMachineUsedAsync(int machineId);

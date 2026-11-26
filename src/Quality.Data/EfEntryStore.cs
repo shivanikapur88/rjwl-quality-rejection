@@ -41,6 +41,7 @@ public sealed class EfEntryStore : IEntryStore
         return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(f.Limit).ToListAsync();
     }
 
+    // Uses the filtered index IX_QRE_NoProductionDate (db/12), which is normally empty, so this is not a table scan.
     public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => _db.Entries.CountAsync(e => e.ProductionDate == null, ct);
 
     public async Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode)
@@ -100,6 +101,12 @@ public sealed class EfEntryStore : IEntryStore
         return saved;
     }
 
+    public async Task<IReadOnlyList<QualityRejectionEntry>> GetByIdsAsync(IReadOnlyCollection<long> ids)
+    {
+        if (ids.Count == 0) return Array.Empty<QualityRejectionEntry>();
+        var list = ids.Distinct().ToList();
+        return await _db.Entries.AsNoTracking().Where(e => list.Contains(e.Id)).ToListAsync();
+    }
     public Task<bool> IsPhenomenonUsedAsync(int phenomenonId) => _db.Entries.AnyAsync(e => e.RejectionPhenomenonId == phenomenonId);
     public Task<bool> IsMachineUsedAsync(int machineId) => _db.Entries.AnyAsync(e => e.MachineId == machineId);
 }

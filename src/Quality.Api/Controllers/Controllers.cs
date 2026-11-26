@@ -19,11 +19,19 @@ public sealed class HealthController : ControllerBase
     /// <summary>
     /// Readiness: can the API reach the master database and every entry database? 200 when all are reachable, otherwise 503.
     /// Reports only "ok"/"unavailable" per component (no server names, no error text).
+    /// Anonymous, so it is rate-limited per address and the result is cached for 10 seconds: a client looping on it cannot
+    /// open five database connections per request (second full review).
     /// </summary>
-    [HttpGet("ready"), AllowAnonymous]
+    [HttpGet("ready"), AllowAnonymous, EnableRateLimiting("health")]
     [ProducesResponseType(typeof(ReadinessDto), 200), ProducesResponseType(typeof(ReadinessDto), 503)]
     public async Task<IActionResult> Ready([FromServices] Quality.Data.MasterDbContext master, [FromServices] Quality.Core.Abstractions.IEntryStoreRouter router,
-        CancellationToken ct)
+        [FromServices] ReadinessCache cache, CancellationToken ct)
+    {
+        var (status, dto) = await cache.GetAsync(() => Probe(master, router, ct));
+        return StatusCode(status, dto);
+    }
+
+    private async Task<(int, ReadinessDto)> Probe(Quality.Data.MasterDbContext master, Quality.Core.Abstractions.IEntryStoreRouter router, CancellationToken ct)
     {
         var components = new Dictionary<string, string>();
         components["master"] = await CanConnect(() => master.Database.CanConnectAsync(ct));
@@ -39,17 +47,41 @@ public sealed class HealthController : ControllerBase
             try
             {
                 var n = await router.For(key).CountWithoutProductionDateAsync(ct);
-                if (n > 0) warnings.Add($"entries:{key}: {n} entries have no production day and are not in reports. Run db/12_upgrade_entries_shift_reversal.sql in that database.");
+                if (n > 0) warnings.Add($"entries:{key}: some entries have no production day and are not in reports (see the database runbook, script 12).");
             }
             catch (Exception) { /* reachability is already reported above */ }
         }
         var ok = components.Values.All(v => v == "ok");
-        return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));
+        return (ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));
 
         static async Task<string> CanConnect(Func<Task<bool>> probe)
         {
             try { return await probe() ? "ok" : "unavailable"; } catch (Exception) { return "unavailable"; }
         }
+    }
+}
+
+/// <summary>Holds the last readiness result for 10 seconds; concurrent callers share one probe.</summary>
+public sealed class ReadinessCache(TimeProvider time)
+{
+    public static readonly TimeSpan For = TimeSpan.FromSeconds(10);
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private (DateTime At, int Status, ReadinessDto Dto)? _last;
+
+    public async Task<(int Status, ReadinessDto Dto)> GetAsync(Func<Task<(int, ReadinessDto)>> probe)
+    {
+        var now = time.GetUtcNow().UtcDateTime;
+        if (_last is { } l && now - l.At < For) return (l.Status, l.Dto);
+        await _gate.WaitAsync();
+        try
+        {
+            now = time.GetUtcNow().UtcDateTime;
+            if (_last is { } l2 && now - l2.At < For) return (l2.Status, l2.Dto);
+            var (status, dto) = await probe();
+            _last = (now, status, dto);
+            return (status, dto);
+        }
+        finally { _gate.Release(); }
     }
 }
 
@@ -61,7 +93,7 @@ public sealed class AuthController : ApiControllerBase
     public AuthController(AuthService auth, LoginThrottle throttle) => (_auth, _throttle) = (auth, throttle);
 
     /// <summary>429 "too_many_attempts" (with Retry-After) after repeated FAILED attempts from this client/for this login (review Q4).</summary>
-    [HttpPost("login"), AllowAnonymous, EnableRateLimiting("login")]
+    [HttpPost("login"), AllowAnonymous, EnableRateLimiting("login"), RequestSizeLimit(8 * 1024)]   // no 30 MB anonymous bodies
     [ProducesResponseType(typeof(LoginResponse), 200), ProducesResponseType(429)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {

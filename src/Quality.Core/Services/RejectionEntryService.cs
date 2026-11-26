@@ -86,7 +86,7 @@ public sealed class RejectionEntryService
                 RejectionPhenomenonId = phen.Id, PhenomenonNameSnapshot = phen.PhenomenonName, Quantity = req.Quantity,
                 InspectorId = user.Id, InspectorEmployeeCode = user.EmployeeCode,   // from the token, never the client
                 Remarks = remarks,
-                ServerCreatedAt = _time.GetUtcNow().UtcDateTime,                    // server time
+                ServerCreatedAt = TimeRules.ToMilliseconds(_time.GetUtcNow().UtcDateTime),   // server time, at the column's datetime2(3) precision
             };
             (entry.ProductionDate, entry.ShiftCode) = calendar.Resolve(entry.ServerCreatedAt);   // #2: plant production day + shift
 

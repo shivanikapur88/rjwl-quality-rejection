@@ -216,14 +216,20 @@ public sealed class EntryCorrectionService
         else shops = await _guard.AccessibleShopsAsync(user);
         var list = await _master.ListCorrectionsAsync(shops.Select(s => s.Id).ToList(), user.IsInspector ? user.Id : null, status, MaxListSize);
         var byId = shops.ToDictionary(s => s.Id);
-        var result = new List<CorrectionDto>();
-        foreach (var c in list)
+        // Batched (second full review): one entry query per shop, one query each for users, machines and phenomena,
+        // instead of four queries per request. An unreachable entry database is tried once; its requests show without the entry.
+        var entries = new Dictionary<(int ShopId, long EntryId), QualityRejectionEntry>();
+        foreach (var g in list.GroupBy(c => c.ShopId))
         {
-            QualityRejectionEntry? entry = null;
-            try { entry = await _router.For(byId[c.ShopId].EntryStoreKey).GetByIdAsync(c.EntryId); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { /* entry database unreachable: show the request without the entry */ }
-            result.Add(await ToDtoAsync(c, byId[c.ShopId], entry));
+            try
+            {
+                foreach (var e in await _router.For(byId[g.Key].EntryStoreKey).GetByIdsAsync(g.Select(c => c.EntryId).ToList()))
+                    if (e.ShopId == g.Key) entries[(g.Key, e.Id)] = e;   // PRE and FINAL share a table: match the shop too
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException) { /* entry database unreachable */ }
         }
+        var lookups = await LookupsAsync(list);
+        var result = list.Select(c => ToDto(c, byId[c.ShopId], entries.GetValueOrDefault((c.ShopId, c.EntryId)), lookups)).ToList();
         return ServiceResult<IReadOnlyList<CorrectionDto>>.Ok(result);
     }
 
@@ -275,7 +281,7 @@ public sealed class EntryCorrectionService
             RejectionPhenomenonId = p.Id, PhenomenonNameSnapshot = p.PhenomenonName,
             Quantity = c.ProposedQuantity ?? o.Quantity, Remarks = ResultingRemarks(c, o),
             InspectorId = o.InspectorId, InspectorEmployeeCode = o.InspectorEmployeeCode,   // the inspector who found the defect
-            ServerCreatedAt = now,
+            ServerCreatedAt = TimeRules.ToMilliseconds(now),
             // The correction describes the SAME rejection event, so it keeps the original production day and shift.
             ProductionDate = o.ProductionDate ?? calendar.Resolve(o.ServerCreatedAt).ProductionDate,
             ShiftCode = o.ShiftCode ?? calendar.Resolve(o.ServerCreatedAt).ShiftCode,
@@ -295,14 +301,31 @@ public sealed class EntryCorrectionService
         OldValue = old, NewValue = Snapshot(c), Timestamp = _time.GetUtcNow().UtcDateTime,
     };
 
-    private async Task<CorrectionDto> ToDtoAsync(EntryCorrection c, Shop shop, QualityRejectionEntry? entry)
+    private sealed record Lookups(IReadOnlyDictionary<int, string> Codes, IReadOnlyDictionary<int, string> MachineCodes, IReadOnlyDictionary<int, string> PhenomenonNames);
+
+    private async Task<Lookups> LookupsAsync(IReadOnlyCollection<EntryCorrection> list)
     {
-        var codes = await _master.GetUserCodesAsync(new[] { c.RequestedBy }.Concat(c.DecidedBy is int d ? new[] { d } : Array.Empty<int>()).Distinct().ToList());
-        var m = c.ProposedMachineId is int mid ? await _master.GetMachineAsync(mid) : null;
-        var p = c.ProposedPhenomenonId is int pid ? await _master.GetPhenomenonAsync(pid) : null;
+        var users = list.Select(c => c.RequestedBy).Concat(list.Where(c => c.DecidedBy is not null).Select(c => c.DecidedBy!.Value)).Distinct().ToList();
+        var codes = users.Count == 0 ? new Dictionary<int, string>() : await _master.GetUserCodesAsync(users);
+        var machines = new Dictionary<int, string>(); var phenomena = new Dictionary<int, string>();
+        foreach (var mid in list.Where(c => c.ProposedMachineId is not null).Select(c => c.ProposedMachineId!.Value).Distinct())
+            if (await _master.GetMachineAsync(mid) is { } m) machines[mid] = m.MachineCode;          // proposals are rare: few ids
+        foreach (var pid in list.Where(c => c.ProposedPhenomenonId is not null).Select(c => c.ProposedPhenomenonId!.Value).Distinct())
+            if (await _master.GetPhenomenonAsync(pid) is { } p) phenomena[pid] = p.PhenomenonName;
+        return new Lookups(codes, machines, phenomena);
+    }
+
+    private async Task<CorrectionDto> ToDtoAsync(EntryCorrection c, Shop shop, QualityRejectionEntry? entry) =>
+        ToDto(c, shop, entry, await LookupsAsync(new[] { c }));
+
+    private static CorrectionDto ToDto(EntryCorrection c, Shop shop, QualityRejectionEntry? entry, Lookups l)
+    {
+        var codes = l.Codes;
+        string? machineCode = c.ProposedMachineId is int mid ? l.MachineCodes.GetValueOrDefault(mid) : null;
+        string? phenName = c.ProposedPhenomenonId is int pid ? l.PhenomenonNames.GetValueOrDefault(pid) : null;
         return new CorrectionDto(c.Id, c.ShopId, shop.ShopCode, c.EntryId, entry is null ? null : Mapping.ToDto(entry, c.Status),
             c.RequestedBy, codes.GetValueOrDefault(c.RequestedBy, "#" + c.RequestedBy), DateTime.SpecifyKind(c.RequestedAt, DateTimeKind.Utc), c.Reason,
-            c.IsReverseOnly, c.ProposedMachineId, m?.MachineCode, c.ProposedPhenomenonId, p?.PhenomenonName, c.ProposedQuantity, c.ProposedRemarks,
+            c.IsReverseOnly, c.ProposedMachineId, machineCode, c.ProposedPhenomenonId, phenName, c.ProposedQuantity, c.ProposedRemarks,
             c.Status, c.DecidedBy, c.DecidedBy is int db ? codes.GetValueOrDefault(db, "#" + db) : null,
             c.DecidedAt is DateTime da ? DateTime.SpecifyKind(da, DateTimeKind.Utc) : null, c.DecisionNote, c.ReplacementEntryId);
     }

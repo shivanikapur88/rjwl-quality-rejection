@@ -84,6 +84,10 @@ BEGIN TRANSACTION;
         THROW 50080, N'Two or more users share a username/employee code (listed above). Rename one of each pair in qa.Users, then re-run 08.', 1;
     END;
 
+    -- qa.Users is the source of truth: remove identifier rows that no longer match a user's current username/code
+    -- (for example after an old API renamed a user on the upgraded database), then add the missing ones.
+    DELETE x FROM qa.LoginIdentifiers x
+    WHERE NOT EXISTS (SELECT 1 FROM @ids i WHERE i.NormalizedIdentifier = x.NormalizedIdentifier AND i.UserId = x.UserId AND i.Kind = x.Kind);
     INSERT INTO qa.LoginIdentifiers (NormalizedIdentifier, UserId, Kind)
     SELECT i.NormalizedIdentifier, i.UserId, i.Kind
     FROM @ids i
@@ -111,6 +115,12 @@ BEGIN
                    WHERE r.RoleName = N'Administrator' AND u.IsActive = 1)
         THROW 50090, N'At least one active administrator must remain.', 1;
 END;
+GO
+
+-- Lets the trigger's check (and the API's administrator lock) seek the active administrators instead of scanning and
+-- share-locking every user row, which could block or deadlock behind unrelated user edits.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Users_Role_Active' AND object_id = OBJECT_ID(N'qa.Users'))
+    CREATE INDEX IX_Users_Role_Active ON qa.Users (RoleId, IsActive);
 GO
 
 /* ---------- 5. Employee code length matches validation (2..30) ---------- */

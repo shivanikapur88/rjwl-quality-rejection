@@ -56,7 +56,8 @@ public static class ErrorHandling
         {
             ConcurrencyConflictException or DbUpdateConcurrencyException => (409, "concurrent_edit", "This record was changed by someone else. Refresh and try again."),
             UniqueViolationException => (409, "duplicate", "A record with the same unique value already exists."),
-            BadHttpRequestException => (400, "bad_request", "The request was not valid."),
+            BadHttpRequestException { StatusCode: 413 } => (413, "request_too_large", "The request is too large (for uploads: at most 5,000 rows)."),
+            BadHttpRequestException bre => (bre.StatusCode is >= 400 and < 500 ? bre.StatusCode : 400, "bad_request", "The request was not valid."),
             OperationCanceledException when ex is not TimeoutException => (499, "cancelled", "The request was cancelled."),
             InvalidOperationException { Message: var m } when m.StartsWith("No connection string configured", StringComparison.Ordinal)
                 => (503, "store_not_configured", "The server is not fully configured. Contact your administrator."),

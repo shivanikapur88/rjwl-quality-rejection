@@ -120,14 +120,16 @@ public sealed class EfMasterData : IMasterData
     public async Task<IReadOnlyList<ProductionCount>> GetProductionCountsForUpdateAsync(IReadOnlyCollection<int> machineIds, DateOnly fromDate, DateOnly toDate)
     {
         RequireTransaction();
-        // UPDLOCK+HOLDLOCK on the (machine, day) key ranges of the upload, through the unique index that leads on MachineId:
-        // two uploads (or an upload and the feed) touching the same machine and days are serialised instead of colliding on the
-        // unique key; uploads for other machines are not blocked. The machine filter is composed by EF, so it stays parameterised.
-        var ids = machineIds.ToList();
-        return await _db.ProductionCounts
-            .FromSqlInterpolated($"SELECT * FROM qa.ProductionCounts WITH (UPDLOCK, HOLDLOCK) WHERE ProductionDate BETWEEN {fromDate} AND {toDate}")
-            .Where(p => ids.Contains(p.MachineId))
-            .ToListAsync();
+        // UPDLOCK+HOLDLOCK on each machine's (MachineId, ProductionDate) key range through the unique index that leads on
+        // MachineId: two uploads (or an upload and the feed) touching the same machine and days are serialised instead of
+        // colliding on the unique key; other machines are not blocked. The predicate sits INSIDE the hinted query, so the
+        // optimizer cannot turn it into a table-wide range lock. One parameterised query per distinct machine.
+        var rows = new List<ProductionCount>();
+        foreach (var id in machineIds.Distinct().OrderBy(x => x))   // fixed order: no deadlock between two uploads
+            rows.AddRange(await _db.ProductionCounts
+                .FromSqlInterpolated($"SELECT * FROM qa.ProductionCounts WITH (UPDLOCK, HOLDLOCK, INDEX(UQ_ProductionCounts_Machine_Day_Shift)) WHERE MachineId = {id} AND ProductionDate BETWEEN {fromDate} AND {toDate}")
+                .ToListAsync());
+        return rows;
     }
 
     public void AddProductionCount(ProductionCount c) => _db.ProductionCounts.Add(c);
@@ -181,6 +183,9 @@ public sealed class EfMasterData : IMasterData
         _db.Machines.AnyAsync(m => m.ShopId == shopId && m.MachineCode == machineCode && m.Id != excludeMachineId);
     public void AddMachine(Machine m) => _db.Machines.Add(m);
     public void RemoveMachine(Machine m) => _db.Machines.Remove(m);
+    public async Task<bool> IsMachineReferencedInMasterAsync(int machineId) =>
+        await _db.ProductionCounts.AnyAsync(c => c.MachineId == machineId) || await _db.EntryCorrections.AnyAsync(c => c.ProposedMachineId == machineId);
+    public Task<bool> IsPhenomenonReferencedInMasterAsync(int phenomenonId) => _db.EntryCorrections.AnyAsync(c => c.ProposedPhenomenonId == phenomenonId);
 
     // ---- user administration ----
     public async Task<IReadOnlyList<User>> GetUsersAsync(string? search, bool? isActive)

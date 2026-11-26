@@ -51,6 +51,28 @@ public sealed class LoginThrottleTests
         Assert.Null(th.TryBegin("tablet-7", "admin"));                                           // usual device: still signs in
     }
 
+    /// <summary>Second full review: 30 failures from the shared plant address must not block users who signed in there before.</summary>
+    [Fact]
+    public void One_bad_tablet_on_the_shared_plant_address_does_not_block_known_users()
+    {
+        var th = new LoginThrottle(_t);
+        Assert.Null(th.TryBegin("plant-nat", "ravi.k")); th.RecordSuccess("plant-nat", "ravi.k");
+        for (var i = 0; i < LoginThrottle.PerClient.MaxFailures; i++) Fail(th, "plant-nat", $"typo{i}");   // address cap reached
+        Assert.NotNull(th.TryBegin("plant-nat", "someone.new"));    // an unknown login from that address is limited
+        Assert.Null(th.TryBegin("plant-nat", "ravi.k"));            // a known login still signs in
+        for (var i = 0; i < 4; i++) Fail(th, "plant-nat", "ravi.k");
+        Assert.NotNull(th.TryBegin("plant-nat", "ravi.k"));         // ... but keeps its own 5-per-5-minutes limit
+    }
+
+    /// <summary>Accent and width variants of one login share a bucket (an accent-insensitive collation treats them as one account).</summary>
+    [Fact]
+    public void Accent_variants_of_a_login_share_one_bucket()
+    {
+        var th = new LoginThrottle(_t);
+        foreach (var v in new[] { "admin", "admín", "ádmin", "ＡＤＭＩＮ", "admiñ" }) Fail(th, "10.0.0.5", v);
+        Assert.NotNull(th.TryBegin("10.0.0.5", "Admìn"));
+    }
+
     /// <summary>Full review #2: the check and the count are one step, so a parallel burst cannot slip past the limit.</summary>
     [Fact]
     public void Parallel_burst_cannot_exceed_the_per_client_and_login_limit()
@@ -145,6 +167,8 @@ public sealed class RuleTests
         Assert.Equal(409, ErrorHandling.Classify(new UniqueViolationException("UQ_x")).Status);
         Assert.Equal(409, ErrorHandling.Classify(new ConcurrencyConflictException()).Status);
         Assert.Equal(503, ErrorHandling.Classify(new TimeoutException()).Status);
+        Assert.Equal(413, ErrorHandling.Classify(new Microsoft.AspNetCore.Http.BadHttpRequestException("too big", 413)).Status);
+        Assert.Equal(400, ErrorHandling.Classify(new Microsoft.AspNetCore.Http.BadHttpRequestException("bad")).Status);
         Assert.Equal(500, ErrorHandling.Classify(new InvalidOperationException("other")).Status);
         Assert.Equal(503, ErrorHandling.Classify(new InvalidOperationException("No connection string configured for entry store 'X'.")).Status);
     }

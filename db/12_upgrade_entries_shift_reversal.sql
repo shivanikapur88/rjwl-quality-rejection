@@ -51,22 +51,36 @@ IF OBJECT_ID(N'qa.ShiftDefinitions', N'U') IS NOT NULL AND EXISTS (SELECT 1 FROM
 DECLARE @msg nvarchar(200) = CONCAT(N'Backfill parameters: UTC offset ', @OffsetMinutes, N' min; A ', CONVERT(varchar(5), @A, 108), N', B ', CONVERT(varchar(5), @B, 108), N', C ', CONVERT(varchar(5), @C, 108),
     N'; rows to fill: ', (SELECT COUNT(*) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL));
 PRINT @msg;
-WHILE 1 = 1
+-- Walk the clustered key in ranges of 4,000 ids: each batch seeks instead of rescanning the filled rows, and stays below
+-- the 5,000-lock escalation threshold, so other systems' tables in GDC_AndonDB/MachineShopDB are not locked table-wide.
+-- Times are compared at millisecond precision (time(3)): a cast to time(0) would ROUND 05:59:59.700 up to 06:00:00.
+DECLARE @lo bigint = (SELECT MIN(Id) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL),
+        @hi bigint = (SELECT MAX(Id) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL);
+DECLARE @A3 time(3) = @A, @B3 time(3) = @B, @C3 time(3) = @C;
+WHILE @lo <= @hi
 BEGIN
-    UPDATE TOP (5000) e
+    UPDATE e
     SET ProductionDate = CAST(DATEADD(MINUTE, -DATEDIFF(MINUTE, CAST('00:00' AS time(0)), @A), l.LocalTime) AS date),
-        ShiftCode = CASE WHEN CAST(l.LocalTime AS time(0)) >= @A AND CAST(l.LocalTime AS time(0)) < @B THEN N'A'
-                         WHEN CAST(l.LocalTime AS time(0)) >= @B AND CAST(l.LocalTime AS time(0)) < @C THEN N'B'
+        ShiftCode = CASE WHEN CAST(l.LocalTime AS time(3)) >= @A3 AND CAST(l.LocalTime AS time(3)) < @B3 THEN N'A'
+                         WHEN CAST(l.LocalTime AS time(3)) >= @B3 AND CAST(l.LocalTime AS time(3)) < @C3 THEN N'B'
                          ELSE N'C' END
     FROM qa.QualityRejectionEntries e
     CROSS APPLY (SELECT DATEADD(MINUTE, @OffsetMinutes, e.ServerCreatedAt) AS LocalTime) l
-    WHERE e.ProductionDate IS NULL;
-    IF @@ROWCOUNT = 0 BREAK;
+    WHERE e.Id >= @lo AND e.Id < @lo + 4000 AND e.ProductionDate IS NULL;
+    SET @lo += 4000;
 END;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_Shop_ProductionDate' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
     CREATE INDEX IX_QRE_Shop_ProductionDate ON qa.QualityRejectionEntries (ShopId, ProductionDate, ShiftCode)
         INCLUDE (Quantity, MachineId, MachineCode, RejectionPhenomenonId, PhenomenonNameSnapshot, ReversedAt);
+GO
+-- Rows still without a production day (normally none): lets the readiness check find them without a table scan.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_NoProductionDate' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
+    CREATE INDEX IX_QRE_NoProductionDate ON qa.QualityRejectionEntries (Id) WHERE ProductionDate IS NULL;
+GO
+-- Backstop for the cross-database approval: at most one replacement entry per corrected entry.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_QRE_CorrectsEntryId' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
+    CREATE UNIQUE INDEX UX_QRE_CorrectsEntryId ON qa.QualityRejectionEntries (CorrectsEntryId) WHERE CorrectsEntryId IS NOT NULL;
 GO
 PRINT N'12_upgrade_entries_shift_reversal.sql complete.';

@@ -124,8 +124,9 @@ public sealed class Round3Tests(SqlFixture f) : SqlTest(f)
         var b = (await sup.GetFromJsonAsync<ReportDto>($"/api/reports/totals?fromDate={day:yyyy-MM-dd}&toDate={day.AddDays(1):yyyy-MM-dd}&shopId={gdc.Id}&shiftCode=B"))!;
         Assert.Equal((800, 2), (b.Total.Rate!.Produced, b.Total.Rate.RejectedWithProduction));
 
-        // Partial coverage: delete m2's count -> its 4 rejected parts are outside the rate and coverage drops.
-        await SqlFixture.Scalar<int>(F.MasterCs, $"DELETE FROM qa.ProductionCounts WHERE MachineId = {m2}; SELECT 1");
+        // Partial coverage: m2 produced 0 on that shift -> its 4 rejected parts are outside the rate (they would otherwise
+        // raise it with nothing added below the line) and coverage drops.
+        Assert.True((await (await admin.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(new[] { Row(m2, day.AddDays(1), "A", 0) }, DryRun: false))).Content.ReadFromJsonAsync<ProductionCountResult>())!.Applied);
         var partial = (await sup.GetFromJsonAsync<ReportDto>($"/api/reports/totals?fromDate={day:yyyy-MM-dd}&toDate={day.AddDays(1):yyyy-MM-dd}&shopId={gdc.Id}"))!;
         Assert.Equal((1800, 8), (partial.Total.Rate!.Produced, partial.Total.Rate.RejectedWithProduction));
         Assert.Equal(Math.Round(8m / 12, 4), partial.Total.Rate.Coverage);
@@ -176,6 +177,13 @@ public sealed class Round3Tests(SqlFixture f) : SqlTest(f)
         var gdcMachine = (await (await admin.PostAsJsonAsync("/api/admin/machines", new CreateMachineRequest(shops["GDC"].Id, "R3L-1", "R3L-1 name", true))).Content.ReadFromJsonAsync<AdminMachineDto>())!;
         var res = (await (await admin.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(new[] { new ProductionCountRow("GDC", gdcMachine.MachineCode, old, "A", 1) }))).Content.ReadFromJsonAsync<ProductionCountResult>())!;
         Assert.Contains("400 days", Assert.Single(res.Problems).Problem);
+        // A machine with production counts (but no entries) cannot be deleted: a clear 409, not a foreign-key error.
+        var recent = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-5);
+        var saved = (await (await admin.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(new[] { new ProductionCountRow("GDC", gdcMachine.MachineCode, recent, "A", 10) }, DryRun: false))).Content.ReadFromJsonAsync<ProductionCountResult>())!;
+        Assert.True(saved.Applied);
+        var del = await admin.DeleteAsync($"/api/admin/machines/{gdcMachine.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, del.StatusCode);
+        Assert.Equal("machine_in_use", await Code(del));
     }
 
     /// <summary>Wraps the real router; the named store's report reads that start before <c>cutoff</c> fail like an unreachable database.</summary>
@@ -191,6 +199,7 @@ public sealed class Round3Tests(SqlFixture f) : SqlTest(f)
             public Task<QualityRejectionEntry?> FindBySubmissionIdAsync(Guid id) => s.FindBySubmissionIdAsync(id);
             public Task<QualityRejectionEntry> InsertAsync(QualityRejectionEntry e) => s.InsertAsync(e);
             public Task<QualityRejectionEntry?> GetByIdAsync(long id) => s.GetByIdAsync(id);
+            public Task<IReadOnlyList<QualityRejectionEntry>> GetByIdsAsync(IReadOnlyCollection<long> ids) => s.GetByIdsAsync(ids);
             public Task<IReadOnlyList<QualityRejectionEntry>> ListAsync(EntryFilter f) => s.ListAsync(f);
             public Task<bool> IsPhenomenonUsedAsync(int id) => s.IsPhenomenonUsedAsync(id);
             public Task<bool> IsMachineUsedAsync(int id) => s.IsMachineUsedAsync(id);

@@ -100,3 +100,5 @@ tr.clickable { cursor: pointer; }
 .problems { max-height: 220px; overflow: auto; font-size: 14px; }
 @media (max-width: 760px) { .prow { grid-template-columns: 22px 1fr 50px 48px 64px; } .prow > :nth-child(3), .prow > :nth-child(7) { display: none; } }
 td.num, th.num { white-space: nowrap; }
+
+.warn-text { color: var(--warn); font-weight: 600; }

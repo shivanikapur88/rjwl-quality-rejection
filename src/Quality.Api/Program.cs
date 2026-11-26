@@ -93,7 +93,12 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = loginRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Anonymous readiness probe: monitoring needs a few calls a minute, not thousands.
+    o.AddPolicy("health", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = cfg.GetValue("Health:RequestsPerMinutePerClient", 60), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
+builder.Services.AddSingleton<Quality.Api.Controllers.ReadinessCache>();
 // Behind a reverse proxy the client address must come from X-Forwarded-For, or every device would share one throttle bucket.
 var knownProxies = cfg.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? Array.Empty<string>();
 builder.Services.Configure<ForwardedHeadersOptions>(o =>

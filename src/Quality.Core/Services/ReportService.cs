@@ -102,7 +102,11 @@ public sealed class ReportService
 
         // ---- production counts for the rejection rate (round 3, #8) ----
         var counts = await _master.GetProductionCountsAsync(shops.Where(s => !unavailable.Contains(s.ShopCode)).Select(s => s.Id).ToList(), from, to, shift, q.MachineId);
-        var produced = counts.GroupBy(c => (c.MachineId, c.ProductionDate, c.ShiftCode)).ToDictionary(g => g.Key, g => g.Sum(c => (long)c.ProducedQuantity));
+        // Only machine/day/shift combinations that PRODUCED something put rejected parts into the rate: rejections logged on a
+        // shift with 0 produced (stock, rework) would otherwise raise the rate with nothing added below the line. They are
+        // left outside the rate and show up as lower coverage instead (second full review; rules still decision #13).
+        var produced = counts.GroupBy(c => (c.MachineId, c.ProductionDate, c.ShiftCode)).Select(g => (g.Key, Qty: g.Sum(c => (long)c.ProducedQuantity)))
+            .Where(x => x.Qty > 0).ToDictionary(x => x.Key, x => x.Qty);
         RateDto? Rate(IEnumerable<(Shop Shop, EntryAggregateRow Row)> rejected, Func<ProductionCount, bool> inScope)
         {
             var list = rejected.ToList();
@@ -124,13 +128,17 @@ public sealed class ReportService
             .Select(g => new DayShiftTotalDto(g.Key.ProductionDate, g.Key.ShiftCode, g.Sum(r => r.Row.Quantity), g.Sum(r => r.Row.Entries),
                 counts.Where(c => c.ProductionDate == g.Key.ProductionDate && c.ShiftCode == g.Key.ShiftCode) is var dc && dc.Any() ? dc.Sum(c => (long)c.ProducedQuantity) : null))
             .OrderBy(d => d.ProductionDate).ThenBy(d => d.ShiftCode, StringComparer.Ordinal).ToList();
+        // Names: the CURRENT master names (deterministic; entry snapshots may differ after a rename), else the snapshot.
+        var machineNames = (await _master.GetMachinesAsync(null, null, null)).ToDictionary(m => m.Id);
+        var phenNames = (await _master.GetPhenomenaAsync(null, null, null)).ToDictionary(p => p.Id, p => p.PhenomenonName);
         var allPhen = rows.GroupBy(r => r.Row.PhenomenonId).ToList();
         var phen = allPhen
-            .Select(g => new PhenomenonTotalDto(g.Key, g.First().Row.PhenomenonName, g.First().Shop.ShopCode, g.Sum(r => r.Row.Quantity), g.Sum(r => r.Row.Entries),
+            .Select(g => new PhenomenonTotalDto(g.Key, phenNames.GetValueOrDefault(g.Key) ?? g.First().Row.PhenomenonName, g.First().Shop.ShopCode, g.Sum(r => r.Row.Quantity), g.Sum(r => r.Row.Entries),
                 prevPhen is null ? null : prevPhen.GetValueOrDefault(g.Key)))
             .OrderByDescending(p => p.Quantity).ThenBy(p => p.PhenomenonName, StringComparer.Ordinal).Take(top).ToList();
         var machines = rows.GroupBy(r => r.Row.MachineId)
-            .Select(g => new MachineTotalDto(g.Key, g.First().Row.MachineCode, g.First().Row.MachineName, g.First().Shop.ShopCode, g.Sum(r => r.Row.Quantity), g.Sum(r => r.Row.Entries),
+            .Select(g => new MachineTotalDto(g.Key, machineNames.GetValueOrDefault(g.Key)?.MachineCode ?? g.First().Row.MachineCode,
+                machineNames.GetValueOrDefault(g.Key)?.MachineName ?? g.First().Row.MachineName, g.First().Shop.ShopCode, g.Sum(r => r.Row.Quantity), g.Sum(r => r.Row.Entries),
                 prevMachine is null ? null : prevMachine.GetValueOrDefault(g.Key), Rate(g, c => c.MachineId == g.Key)))
             .OrderByDescending(m => m.Quantity).ThenBy(m => m.MachineCode, StringComparer.Ordinal).Take(top).ToList();
         var total = new ReportTotal(rows.Sum(r => r.Row.Quantity), rows.Sum(r => r.Row.Entries), prevQty, prevEntries, Rate(rows, _ => true));

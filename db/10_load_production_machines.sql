@@ -42,8 +42,8 @@ UNION ALL SELECT i.RowNo, N'Machine code has characters other than letters, digi
 UNION ALL SELECT i.RowNo, N'Machine name is empty' FROM @in i WHERE LEN(LTRIM(RTRIM(ISNULL(i.MachineName, N'')))) = 0
 UNION ALL SELECT i.RowNo, N'Machine name longer than 100 characters' FROM @in i WHERE LEN(LTRIM(RTRIM(i.MachineName))) > 100
 UNION ALL SELECT i.RowNo, N'Active flag must be 1 or 0' FROM @in i WHERE i.IsActive IS NULL
-UNION ALL SELECT i.RowNo, N'EXAMPLE row still present - replace the example rows with the approved list' FROM @in i WHERE i.MachineCode LIKE N'EXAMPLE-%'
-UNION ALL SELECT i.RowNo, N'DEV- codes are development placeholders and may not be loaded as production machines' FROM @in i WHERE i.MachineCode LIKE N'DEV-%'
+UNION ALL SELECT i.RowNo, N'EXAMPLE row still present - replace the example rows with the approved list' FROM @in i WHERE LTRIM(RTRIM(i.MachineCode)) LIKE N'EXAMPLE-%'
+UNION ALL SELECT i.RowNo, N'DEV- codes are development placeholders and may not be loaded as production machines' FROM @in i WHERE LTRIM(RTRIM(i.MachineCode)) LIKE N'DEV-%'
 UNION ALL SELECT i.RowNo, N'Same machine code appears more than once for this shop in the list'
           FROM @in i WHERE EXISTS (SELECT 1 FROM @in j WHERE j.RowNo <> i.RowNo AND j.ShopCode = i.ShopCode AND UPPER(LTRIM(RTRIM(j.MachineCode))) = UPPER(LTRIM(RTRIM(i.MachineCode))));
 
@@ -61,7 +61,8 @@ BEGIN TRANSACTION;
     USING (SELECT s.Id AS ShopId, s.ShopCode, LTRIM(RTRIM(i.MachineCode)) AS MachineCode, LTRIM(RTRIM(i.MachineName)) AS MachineName, i.IsActive
            FROM @in i JOIN qa.Shops s ON s.ShopCode = i.ShopCode) AS src
        ON t.ShopId = src.ShopId AND t.MachineCode = src.MachineCode
-    WHEN MATCHED AND (t.MachineName <> src.MachineName OR (@UpdateActiveFlagOfExisting = 1 AND t.IsActive <> src.IsActive)) THEN
+    -- Binary comparison: a change of letter case only (e.g. 'press' -> 'Press') is a rename too.
+    WHEN MATCHED AND (t.MachineName COLLATE Latin1_General_BIN2 <> src.MachineName COLLATE Latin1_General_BIN2 OR (@UpdateActiveFlagOfExisting = 1 AND t.IsActive <> src.IsActive)) THEN
         UPDATE SET MachineName = src.MachineName,
                    IsActive = CASE WHEN @UpdateActiveFlagOfExisting = 1 THEN src.IsActive ELSE t.IsActive END,
                    ModifiedAt = SYSUTCDATETIME()

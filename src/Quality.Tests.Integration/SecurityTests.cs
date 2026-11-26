@@ -162,8 +162,13 @@ public sealed class SecurityTests(SqlFixture f) : SqlTest(f)
             """, ("@s", id));
         try
         {
-            var dto = await F.Client().GetFromJsonAsync<ReadinessDto>("/api/health/ready");
-            Assert.Contains(dto!.Warnings!, w => w.StartsWith("entries:CNC:") && w.Contains("db/12"));
+            // A fresh API instance: readiness results are cached for 10 seconds per instance.
+            await using var factory = F.CreateFactory(new Dictionary<string, string?>());
+            var http = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+            var dto = await http.GetFromJsonAsync<ReadinessDto>("/api/health/ready");
+            Assert.Contains(dto!.Warnings!, w => w.StartsWith("entries:CNC:") && w.Contains("script 12"));
+            // The anonymous answer gives no row counts or file names.
+            Assert.DoesNotContain(dto.Warnings!, w => w.Contains(".sql") || w.Any(char.IsDigit) && w.Contains(" entries have"));
         }
         finally { await SqlFixture.Scalar<int>(F.CncCs, "DELETE FROM qa.QualityRejectionEntries WHERE SubmissionId = @s; SELECT 1", ("@s", id)); }
     }

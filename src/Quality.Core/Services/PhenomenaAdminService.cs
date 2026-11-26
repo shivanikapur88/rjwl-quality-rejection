@@ -195,11 +195,12 @@ public sealed class PhenomenaAdminService
             await _master.LockPhenomenonExclusiveAsync(p.Id);                 // Q9: lock first ...
             foreach (var store in _router.All())                             // ... then check every entry database
                 if (await store.IsPhenomenonUsedAsync(p.Id)) { inUse = true; return; }
+            if (await _master.IsPhenomenonReferencedInMasterAsync(p.Id)) { inUse = true; return; }   // and correction requests
             _master.RemovePhenomenon(p);
             _master.AddAudit(new AuditLogEntry { UserId = user.Id, Action = AuditActions.PhenomenonDeleted, EntityType = Entity, EntityId = p.Id.ToString(), OldValue = old, Timestamp = _time.GetUtcNow().UtcDateTime });
             await _master.SaveChangesAsync();
         });
-        if (inUse) return ServiceResult<bool>.Fail(ErrorKind.Conflict, "phenomenon_in_use", "This phenomenon is used in saved rejection entries and cannot be deleted. Deactivate it instead.");
+        if (inUse) return ServiceResult<bool>.Fail(ErrorKind.Conflict, "phenomenon_in_use", "This phenomenon is used in saved rejection entries or correction requests and cannot be deleted. Deactivate it instead.");
         return ServiceResult<bool>.Ok(true);
     }
 

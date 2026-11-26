@@ -14,6 +14,12 @@ namespace Quality.Api.Infrastructure;
 ///   the check before the first failure is recorded. A success or a request that never reached the password check gives the
 ///   reserved attempt back.
 /// * Login names are truncated to 50 characters (the identifier column size) so suffixes cannot create endless fresh buckets.
+/// Second full review (Sonnet):
+/// * Many tablets share one plant address, so 30 failures from that address (one bad tablet, or an insider) used to block
+///   EVERY sign-in from the plant for up to 15 minutes. A login that already signed in successfully from this address
+///   ("known") is now exempt from the per-address cap; it keeps its own 5-per-5-minutes limit.
+/// * Keys are folded (Unicode compatibility form, accents removed) so "admín" and "admin", which an accent-insensitive
+///   database collation treats as the same account, share one bucket.
 /// Counters live in memory: they reset when the API restarts and are per server instance (single-instance deployment).
 /// Behind a reverse proxy, configure ReverseProxy:KnownProxies or every client shares the proxy's address.
 /// </remarks>
@@ -35,15 +41,20 @@ public sealed class LoginThrottle
 
     private static string Login(string login)
     {
-        var l = (login ?? "").Trim().ToUpperInvariant();
-        return l.Length > MaxLoginKeyLength ? l[..MaxLoginKeyLength] : l;
+        var l = (login ?? "").Trim();
+        if (l.Length > MaxLoginKeyLength) l = l[..MaxLoginKeyLength];   // cut first: never upper-case a huge string
+        var folded = new System.Text.StringBuilder(l.Length);
+        foreach (var ch in l.Normalize(System.Text.NormalizationForm.FormKD))
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.NonSpacingMark) folded.Append(ch);
+        return folded.ToString().ToUpperInvariant();
     }
 
     private IEnumerable<(string Key, Limit Limit)> Buckets(string client, string login, bool knownClient)
     {
         var l = Login(login);
         yield return ($"cl:{client}|{l}", PerClientAndLogin);
-        if (!knownClient) yield return ($"l:{l}", PerLogin);
+        if (knownClient) yield break;                 // known login on this address: only its own client+login limit
+        yield return ($"l:{l}", PerLogin);
         yield return ($"c:{client}", PerClient);
     }
 
@@ -94,7 +105,7 @@ public sealed class LoginThrottle
             var l = Login(login);
             _failures.Remove($"cl:{client}|{l}");
             _failures.Remove($"l:{l}");
-            RemoveNewest($"c:{client}");
+            if (!IsKnown(client, login, now)) RemoveNewest($"c:{client}");   // a known login reserved nothing there
             _known[$"{client}|{l}"] = now;
         }
     }

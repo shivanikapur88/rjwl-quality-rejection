@@ -111,3 +111,10 @@ public static class LoginRules
             : new[] { new LoginIdentifier { NormalizedIdentifier = un, UserId = u.Id, Kind = "U" }, new LoginIdentifier { NormalizedIdentifier = ec, UserId = u.Id, Kind = "E" } };
     }
 }
+
+public static class TimeRules
+{
+    /// <summary>Cuts a time to whole milliseconds: entry times are stored as datetime2(3), so the value returned to the
+    /// client on save is exactly the one later reads return.</summary>
+    public static DateTime ToMilliseconds(DateTime t) => new(t.Ticks - t.Ticks % TimeSpan.TicksPerMillisecond, t.Kind);
+}

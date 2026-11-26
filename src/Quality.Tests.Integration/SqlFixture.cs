@@ -34,6 +34,14 @@ public sealed class SqlFixture : IAsyncLifetime
 
     public string Db(string suffix) => new SqlConnectionStringBuilder(Server) { InitialCatalog = $"{Prefix}_{suffix}", MultipleActiveResultSets = false, Pooling = true }.ConnectionString;
 
+    /// <summary>
+    /// The API itself connects as a LOW-PRIVILEGE login with exactly the rights of db/15_api_permissions.sql, so every
+    /// integration test also proves the documented grants are sufficient (the tests' own SQL checks use the admin login).
+    /// </summary>
+    public string ApiLogin => Prefix + "_api";
+    private readonly string _apiPassword = "Api-" + Guid.NewGuid().ToString("N") + "-aA1!";
+    public string ApiDb(string suffix) => new SqlConnectionStringBuilder(Db(suffix)) { UserID = ApiLogin, Password = _apiPassword, IntegratedSecurity = false }.ConnectionString;
+
     public async ValueTask InitializeAsync()
     {
         if (Server is null) return;
@@ -48,6 +56,18 @@ public sealed class SqlFixture : IAsyncLifetime
             "08_upgrade_master_review_fixes", "09_upgrade_entries_indexes", "11_upgrade_master_shifts_corrections", "12_upgrade_entries_shift_reversal", "13_upgrade_master_production_counts");
         await RunScripts(GdcCs, "02a_entries_schema_GDC_AndonDB", "09_upgrade_entries_indexes", "12_upgrade_entries_shift_reversal");
         await RunScripts(CncCs, "02b_entries_schema_MachineShopDB", "09_upgrade_entries_indexes", "12_upgrade_entries_shift_reversal");
+        await using (var c = new SqlConnection(Server))
+        {
+            await c.OpenAsync();
+            await Exec(c, $"CREATE LOGIN [{ApiLogin}] WITH PASSWORD = '{_apiPassword}', CHECK_POLICY = OFF;");
+        }
+        var grants = (await File.ReadAllTextAsync(Path.Combine(DbDir, "15_api_permissions.sql"))).Replace("N'qr_api'", $"N'{ApiLogin}'");
+        foreach (var cs in new[] { MasterCs, GdcCs, CncCs })
+        {
+            await using var c = new SqlConnection(cs);
+            await c.OpenAsync();
+            foreach (var batch in Go.Split(grants).Where(b => b.Trim().Length > 0)) await Exec(c, batch);
+        }
 
         Factory = CreateFactory(new Dictionary<string, string?>());
         _ = Factory.Services;   // starts the host (and its background bootstrap-administrator service) now, not on first request
@@ -60,8 +80,8 @@ public sealed class SqlFixture : IAsyncLifetime
         {
             var settings = new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Master"] = MasterCs, ["ConnectionStrings:GdcEntries"] = GdcCs, ["ConnectionStrings:CncEntries"] = CncCs,
-                ["ConnectionStrings:PreEntries"] = MasterCs, ["ConnectionStrings:FinalEntries"] = MasterCs,
+                ["ConnectionStrings:Master"] = ApiDb("Master"), ["ConnectionStrings:GdcEntries"] = ApiDb("Gdc"), ["ConnectionStrings:CncEntries"] = ApiDb("Cnc"),
+                ["ConnectionStrings:PreEntries"] = ApiDb("Master"), ["ConnectionStrings:FinalEntries"] = ApiDb("Master"),
                 ["Jwt:Key"] = "integration-test-signing-key-0123456789-abcdefghij", ["Jwt:Issuer"] = "QualityRejectionApi",
                 ["Jwt:Audience"] = "QualityRejectionApp", ["Jwt:ExpiryMinutes"] = "480",
                 ["LoginThrottle:RequestsPerMinutePerClient"] = "100000",   // the whole suite runs from one test client address
@@ -82,6 +102,7 @@ public sealed class SqlFixture : IAsyncLifetime
         await c.OpenAsync();
         foreach (var d in new[] { "Master", "Gdc", "Cnc" })
             await Exec(c, $"IF DB_ID('{Prefix}_{d}') IS NOT NULL BEGIN ALTER DATABASE [{Prefix}_{d}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{Prefix}_{d}]; END");
+        await Exec(c, $"IF SUSER_ID('{ApiLogin}') IS NOT NULL DROP LOGIN [{ApiLogin}];");
     }
 
     // ---------- SQL helpers ----------

@@ -51,5 +51,5 @@ const QR = (() => {
     });
   }
 
-  return { api, session, wireLogin, el, fmt, text, make };
+  return { api, session, clear, wireLogin, el, fmt, text, make };
 })();
