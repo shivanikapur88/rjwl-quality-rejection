@@ -1,0 +1,9 @@
+Mutation check - each fix removed temporarily, the named tests run, the file restored (git checkout).
+Server code at that run (commit 1258278) is identical to the verified commit 3313612 for src/Quality.Core, src/Quality.Data, src/Quality.Api.
+SQL Server 2022 CU28, READ_COMMITTED_SNAPSHOT ON, 2026-11-26.
+
+Q9 no lock before delete check (MachineAdminService: LockMachineExclusiveAsync removed)   *Q9_delete_waits*      total: 1 failed: 1
+Q7 remarks not compared (RejectionEntryService.Replay)                                      *Q7_*                  total: 1 failed: 1
+Q2 token version ignored (TokenRevocation: "|| u.TokenVersion != tv" removed)               *Q2_*                  total: 3 failed: 3
+Q3 unlocked count (EfMasterData: UPDLOCK, HOLDLOCK removed)                                 *Q3_two_admins*        total: 1 failed: 1
+Q8 no stage lock (PhenomenaAdminService: LockStageForPhenomenonChangesAsync removed)        *Q8_concurrent*        total: 1 failed: 1

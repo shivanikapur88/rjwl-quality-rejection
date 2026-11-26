@@ -1,0 +1,27 @@
+Quality.Tests.Unit.LoginThrottleTests.Five_failures_from_one_client_lock_that_login_on_that_client_only
+Quality.Tests.Unit.LoginThrottleTests.Per_client_limit_is_generous_for_shared_plant_addresses
+Quality.Tests.Unit.LoginThrottleTests.Per_login_limit_stops_a_distributed_guess_and_expires
+Quality.Tests.Unit.LoginThrottleTests.Success_clears_that_logins_counters
+Quality.Tests.Unit.MobileViewModelTests.A_different_user_signing_in_does_not_get_someone_elses_draft
+Quality.Tests.Unit.MobileViewModelTests.Admin_edit_sends_the_version_the_screen_was_built_from
+Quality.Tests.Unit.MobileViewModelTests.Double_tap_sends_one_request
+Quality.Tests.Unit.MobileViewModelTests.History_pages_and_discloses_incomplete_results
+Quality.Tests.Unit.MobileViewModelTests.Inactive_machine_alerts_and_returns_to_the_machine_list
+Quality.Tests.Unit.MobileViewModelTests.Inactive_phenomenon_reloads_the_list_and_clears_the_choice
+Quality.Tests.Unit.MobileViewModelTests.Lost_response_keeps_the_form_and_the_retry_reuses_the_submission_id
+Quality.Tests.Unit.MobileViewModelTests.Session_expiry_during_save_keeps_the_entry_and_login_resumes_it_with_the_same_submission_id
+Quality.Tests.Unit.MobileViewModelTests.Validation_error_is_not_reported_as_an_unknown_outcome
+Quality.Tests.Unit.RuleTests.Date_filters_are_normalised_to_utc
+Quality.Tests.Unit.RuleTests.Error_mapping_does_not_report_conflicts_as_database_unavailable
+Quality.Tests.Unit.RuleTests.Q5_username_and_employee_code_share_one_normalized_namespace
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "A", ok: False)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234", ok: True)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "ABCDEFGHIJKLMNOPQRSTUVWXYZ12345", ok: False)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "E 1", ok: False)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "E.1_2-3", ok: True)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "E1", ok: True)
+Quality.Tests.Unit.RuleTests.Q7_remarks_cleanup_used_for_save_and_replay(input: "   ", expected: null)
+Quality.Tests.Unit.RuleTests.Q7_remarks_cleanup_used_for_save_and_replay(input: " a  b ", expected: "a  b")
+Quality.Tests.Unit.RuleTests.Q7_remarks_cleanup_used_for_save_and_replay(input: null, expected: null)
+Quality.Tests.Unit.RuleTests.Row_versions_round_trip_and_garbage_never_matches
+Quality.Tests.Unit.RuleTests.Text_normalizer_matches_the_import_rule

@@ -1,0 +1,1 @@
+06c4a7f80d868038db30cd3355e192ac458917856893791b6f331f3b284e7479  src/Quality.Mobile/bin/Debug/net10.0-android/com.yourcompany.qualityrejection-Signed.apk

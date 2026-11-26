@@ -1,0 +1,85 @@
+# Test evidence
+
+Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
+
+| | |
+|---|---|
+| Source commit | `3313612a00a13179f572afd3e8b3d4cd590d522c` (later commits change only documentation and evidence files) |
+| Date | 2026-11-26 (UTC) |
+| Environment | Linux container (cloud session), .NET SDK 10.0.404, MAUI Android workload 10.0.110, Android SDK platform 36 / build-tools 36.0.0, JDK 21 |
+| Database | **Real SQL Server**: Microsoft SQL Server 2022 (RTM-CU28) 16.0.4325.4, Linux container image `mcr.microsoft.com/mssql/server:2022-latest` |
+| Not available | Windows, Visual Studio, an Android emulator (no hardware virtualisation in the container), a physical device, RJWL's SQL Server and network |
+
+## 1. Results
+
+| Suite | Command | Result | Raw output |
+|---|---|---|---|
+| Build, all 7 projects incl. Android | `dotnet build src/QualityRejection.sln -c Debug` | **0 errors**, 135 warnings (all nullable/unawaited-call warnings in the decompiled `Quality.Mobile.Core`, see [RECOVERY.md §3](RECOVERY.md)) | `evidence/build.txt` |
+| Android debug APK | (same build) | produced; debug-signed; SHA-256 `06c4a7f8…7479` | `evidence/apk.txt` |
+| Unit tests | `dotnet test --project src/Quality.Tests.Unit` | **27 passed**, 0 failed, 0 skipped | `evidence/unit.txt`, names in `evidence/tests_Unit.txt` |
+| Integration, SQL Server, READ_COMMITTED_SNAPSHOT **ON** | `QR_TEST_SQL=… dotnet test --project src/Quality.Tests.Integration` | **37 passed**, 0 failed, 0 skipped | `evidence/integration_ON.txt`, names in `evidence/tests_Integration.txt` |
+| Integration, READ_COMMITTED_SNAPSHOT **OFF** | `QR_TEST_RCSI=OFF …` | **37 passed**, 0 failed, 0 skipped | `evidence/integration_OFF.txt` |
+| Reference data: workbook → JSON → SQL | `python3 -I tools/import_excel.py --check` | **OK** | `evidence/import_check.txt` |
+| Reference data: workbook → database | `ReferenceDataTests` (in the integration run) | all 145 seeded rows equal the seed exactly (code, original text, normalized key, stage) | — |
+| Fresh install, documented order + idempotent re-run | `tools/create-test-databases.sh` | all scripts OK | `evidence/fresh_install.txt` |
+| Upgrade from the supplied schema | `tools/test-upgrade-path.sh` | 07 sets old quantity to 1; 08 refuses a login collision (error 50080, nothing written), succeeds after the fix, re-runs cleanly; trigger blocks removal of the last admin | `evidence/upgrade_path.txt` |
+| Machine loader | `db/10_load_production_machines.sql` (manual run on the test server) | example rows and 5 kinds of invalid row refused with nothing changed; valid list applied with audit rows; re-run changes nothing | see [DATABASE_RUNBOOK.md §3](DATABASE_RUNBOOK.md) |
+
+Before the final run, the integration suite also passed **four consecutive times** (two with READ_COMMITTED_SNAPSHOT ON, two OFF) at commit `1258278`, to check that the concurrency tests are not flaky.
+
+## 2. What the integration tests cover
+
+They run against real SQL Server databases built from the `db/` scripts (master + two entry databases, PRE/FINAL in the master), with the **real API** hosted in-process (`WebApplicationFactory`) over HTTP:
+
+* **Brief §16C service rules / §16E HTTP:** the entry flow for all four shops, each landing in the correct database; PRE/FINAL isolation in the shared table; quantity and remarks limits; history snapshots after a machine rename; role and shop enforcement (supervisor and administrator cannot create entries; inspector cannot use admin endpoints or unassigned shops); a removed shop assignment takes effect on the next request; audit rows without passwords; readiness 200/503; malformed and forged tokens → 401.
+* **§16D SQL behaviour:** unique constraints (submission id, login identifiers, phenomenon names, machine codes), transaction rollback, concurrency (Q3, Q5, Q8, Q9 races, 6 simultaneous submissions of one entry), row versions (stale edits), schema scripts (fresh and re-run), routing across the three databases, shared PRE/FINAL table isolation.
+* **Review findings:** see [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md) for test name per finding.
+
+Unit tests cover the login throttle limits and expiry, identifier rules, remark clean-up, UTC normalisation, row versions, error classification, and the recovered app logic (double tap, lost response with the same submission id, validation vs. unknown outcome, session-expiry draft and resume, another user's draft, inactive machine and phenomenon, paging with an incomplete notice, version sent on admin edit). The app logic runs through the **real** `ApiClient` and `Session` against a scripted HTTP handler.
+
+## 3. Tested with substitutes, and not tested
+
+| Area | Status |
+|---|---|
+| Android UI on an emulator or device (brief §16F: touch targets, keyboard, real navigation, app restart, certificate validation, signed install/update) | **Not tested.** No emulator possible in this environment. The APK builds and every XAML binding compiles; the screen logic is unit-tested without a UI. Needs an approved Windows/Android environment (checklist below). |
+| Signed release APK | **Not produced**: needs RJWL's package id and keystore. |
+| RJWL's SQL Server (collation, existing objects in `GDC_AndonDB`/`MachineShopDB`, permissions, `qr_api` login) | **Not tested.** Tests used a container with default collation `SQL_Latin1_General_CP1_CI_AS` and `sa`. |
+| IIS / reverse proxy / real TLS certificate | **Not tested.** The in-process test host stands in for Kestrel/IIS. |
+| Windows build (Visual Studio) | **Not run here.** Same SDK and projects; earlier attempts on the developer PC were blocked by Windows Application Control, which must not be bypassed. |
+| Login throttling by real client address | Tested with a single test client address (unit tests cover several addresses). |
+| Business acceptance | **Not done.** |
+
+### Android acceptance checklist (to run on an approved PC + emulator/device)
+1. Build and deploy Debug to an emulator (API 24+) and to one target device model.
+2. Settings → server address → Test connection (`https://10.0.2.2:<port>` on the emulator).
+3. Sign in as an inspector of each shop; record one entry per shop; confirm the row in the right database.
+4. Double-tap Save → one entry. Airplane mode → Save → message; reconnect → Save → "Already saved earlier – no duplicate created".
+5. Stop the API after the request is sent (or drop the response at a proxy) → Save again → one entry.
+6. Let the token expire (or reset the user's password from another device) during an entry → sign in → the entry reopens → Save.
+7. Deactivate the selected machine / phenomenon from an admin device before Save → alert and refreshed list.
+8. Admin screens: create/edit/deactivate/delete for phenomena, machines and users; two admin devices editing the same record → "changed by someone else".
+9. Supervisor: history of assigned shops, Load more, pull to refresh.
+10. Kill and restart the app → still signed in (token valid) / sign-in screen (token expired).
+11. Release build with the real certificate; install and update over the previous version.
+
+## 4. Mutation check: do the tests catch the original defects?
+
+Each fix was removed temporarily and the related tests were run against SQL Server. Every one **failed** without its fix (`evidence/mutation_check.txt`): Q2 (3 tests), Q3, Q7, Q8 and Q9 (deterministic interleaving). The server code at that run is identical to the verified commit.
+
+## 5. How to reproduce
+
+```bash
+docker run -d --name qr-sql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD='<strong pwd>' -p 14333:1433 mcr.microsoft.com/mssql/server:2022-latest
+```
+```bash
+dotnet build src/QualityRejection.sln
+```
+```bash
+dotnet test --project src/Quality.Tests.Unit
+```
+```bash
+QR_TEST_SQL="Server=localhost,14333;User Id=sa;Password=<pwd>;TrustServerCertificate=True" dotnet test --project src/Quality.Tests.Integration
+```
+```bash
+python3 -I tools/import_excel.py --check
+```
