@@ -1,3 +1,7 @@
+> **Historical (supplied package, October-November 2026).** These results came from test projects whose source was **not** in the
+> package, so none of the counts below (22 / 23 / 30 / 62) can be reproduced. They are kept only as a record. Current, reproducible
+> results: [TEST_EVIDENCE.md](TEST_EVIDENCE.md).
+
 # Test results (as of Phase 7)
 
 **Read this first.** "PASS" below means the test was actually executed in this environment, at the level stated.

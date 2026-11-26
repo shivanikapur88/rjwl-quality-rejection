@@ -1,3 +1,6 @@
+> **Superseded** by [SPECIFICATION.md](SPECIFICATION.md) where they differ (e.g. PRE/FINAL placement is decided: QualityMasterDB).
+> Kept as the original design record.
+
 # Phase 2 - Database design, shop-stage mapping, import process
 
 Status legend: **Executed** = actually run during authoring; **Not executed** = written but not run.

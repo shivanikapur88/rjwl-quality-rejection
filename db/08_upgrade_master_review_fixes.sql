@@ -19,7 +19,9 @@
 
    If step 3 finds two users whose username/employee code collide (possible with
    the earlier schema), it STOPS with error 50080 and lists them. Resolve the
-   collision (rename one account in qa.Users) and run the script again.
+   collision (rename one account in qa.Users) and run the script again. Steps 1-2 (new columns) have then
+   already been applied; that is harmless, and the re-run skips them.
+   Existing tokens carry no token version, so every user signs in again once after the API update.
    Tested against SQL Server 2022 (see docs/TEST_EVIDENCE.md).
    ============================================================================ */
 SET NOCOUNT ON;

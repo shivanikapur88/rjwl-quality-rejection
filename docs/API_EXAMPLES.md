@@ -138,3 +138,27 @@ Machine code rules: 1-30 characters, letters, digits, space and `. _ / -`; uniqu
 `POST /api/admin/users/7/reset-password` → `{ "newPassword": "<new password, min 10 chars>" }` (204)
 Roles: `Administrator` (sees all shops; `shopIds` is empty), `QualityInspector`, `Supervisor` (both need at least one shop).
 Refusals (409): `duplicate_user` (the employee code or username is already used as either), `last_admin`, `cannot_deactivate_self`, `cannot_change_own_role`.
+
+
+## Additions (November 2026)
+
+### Readiness
+`GET /api/health/ready` (anonymous): `200 {"status":"ok","components":{"master":"ok","entries:GDC":"ok","entries:CNC":"ok","entries:PRE":"ok","entries:FINAL":"ok"}}`,
+or `503` with `"status":"unavailable"` and the failing component marked `"unavailable"`.
+
+### Paged history
+`GET /api/rejection-entries/page?limit=50` → `200`
+```json
+{ "items": [ { "id": 812, "shopCode": "CNC", "phenomenonName": "DENT", "quantity": 2, "serverCreatedAtUtc": "2026-11-26T08:15:02.113Z", "...": "..." } ],
+  "nextCursor": "NjM4OTg...", "unavailableShops": [], "isComplete": true }
+```
+Next page: `GET /api/rejection-entries/page?limit=50&cursor=NjM4OTg...`. `toUtc` is exclusive. Times may use `Z` or an offset (`2026-11-26T00:00:00+05:30`).
+
+### Stale-screen protection
+List/detail responses of `/api/admin/*` include `"version": "AAAAAAAAB9E="`. Send it back:
+`PUT /api/admin/machines/5` `{"machineCode":"M-05","machineName":"Press 5","version":"AAAAAAAAB9E="}` → `409 {"code":"concurrent_edit", ...}` if someone saved the machine in between.
+`PATCH /api/admin/users/7/status` `{"isActive":false,"version":"..."}` works the same way.
+
+### New error codes
+`machine_inactive` (409), `too_many_attempts` (429, with `Retry-After`), `concurrent_edit` / `concurrent_change` (409), `last_admin` (409),
+`value_too_long` (400), `cursor_invalid` / `date_range_invalid` (400). A token issued before a password reset, deactivation or role change → `401`.

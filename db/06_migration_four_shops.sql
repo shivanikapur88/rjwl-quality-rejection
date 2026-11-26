@@ -3,7 +3,9 @@
    (two shops, with Pre-treatment and FINAL nested inside both). Skip this on a fresh setup.
 
    Converts the master data to four independent shops with one stage each. Run in QualityMasterDB,
-   then re-run the new 03_seed_reference.sql and 05_DEV_ONLY_placeholder_machines.sql.
+   then re-run the new 03_seed_reference.sql. Do NOT run 05_DEV_ONLY_placeholder_machines.sql on a production
+   database (it adds fake machines); load the real list with 10_load_production_machines.sql instead.
+   Corrected 2026-11-26: earlier text said to re-run 03 AND 05. See docs/DATABASE_RUNBOOK.md.
    Existing entries in GDC_AndonDB / MachineShopDB are NOT touched (their ShopId values stay valid).
    Review before running. NOT YET EXECUTED against SQL Server.
    ============================================================================ */
@@ -27,4 +29,4 @@ WHERE st.StageCode IN (N'PRE_TREATMENT', N'FINAL') AND sh.ShopCode IN (N'GDC', N
 --    INSERT INTO qa.UserShops (UserId, ShopId) SELECT u.Id, s.Id FROM qa.Users u JOIN qa.Shops s ON s.ShopCode IN (N'PRE', N'FINAL') WHERE u.EmployeeCode = N'E1001';
 
 COMMIT TRANSACTION;
-PRINT N'Migration done. Now run 03_seed_reference.sql (adds the new 1:1 mappings) and 05 (dev machines).';
+PRINT N'Migration done. Now run 03_seed_reference.sql (adds the new 1:1 mappings). Production: load real machines with 10, never 05.';
