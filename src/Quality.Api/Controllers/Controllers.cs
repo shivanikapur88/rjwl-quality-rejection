@@ -11,20 +11,56 @@ namespace Quality.Api.Controllers;
 [ApiController, Route("api/health")]
 public sealed class HealthController : ControllerBase
 {
-    /// <summary>Anonymous connectivity check used by the app's Settings screen. Reveals nothing about the system.</summary>
+    /// <summary>Liveness: the API process answers. Used by the app's Settings screen. Says nothing about the databases.</summary>
     [HttpGet, AllowAnonymous]
     public IActionResult Get() => Ok(new { status = "ok" });
+
+    /// <summary>
+    /// Readiness: can the API reach the master database and every entry database? 200 when all are reachable, otherwise 503.
+    /// Reports only "ok"/"unavailable" per component (no server names, no error text).
+    /// </summary>
+    [HttpGet("ready"), AllowAnonymous]
+    [ProducesResponseType(typeof(ReadinessDto), 200), ProducesResponseType(typeof(ReadinessDto), 503)]
+    public async Task<IActionResult> Ready([FromServices] Quality.Data.MasterDbContext master, [FromServices] Quality.Core.Abstractions.IEntryStoreRouter router,
+        CancellationToken ct)
+    {
+        var components = new Dictionary<string, string>();
+        components["master"] = await CanConnect(() => master.Database.CanConnectAsync(ct));
+        foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(() => router.CanConnectAsync(key, ct));
+        var ok = components.Values.All(v => v == "ok");
+        return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components));
+
+        static async Task<string> CanConnect(Func<Task<bool>> probe)
+        {
+            try { return await probe() ? "ok" : "unavailable"; } catch (Exception) { return "unavailable"; }
+        }
+    }
 }
 
 [ApiController, Route("api/auth")]
 public sealed class AuthController : ApiControllerBase
 {
     private readonly AuthService _auth;
-    public AuthController(AuthService auth) => _auth = auth;
+    private readonly LoginThrottle _throttle;
+    public AuthController(AuthService auth, LoginThrottle throttle) => (_auth, _throttle) = (auth, throttle);
 
+    /// <summary>429 "too_many_attempts" (with Retry-After) after repeated FAILED attempts from this client/for this login (review Q4).</summary>
     [HttpPost("login"), AllowAnonymous, EnableRateLimiting("login")]
-    [ProducesResponseType(typeof(LoginResponse), 200)]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request) => Map(await _auth.LoginAsync(request));
+    [ProducesResponseType(typeof(LoginResponse), 200), ProducesResponseType(429)]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        var client = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var login = request?.Username ?? "";
+        if (_throttle.RetryAfter(client, login) is { } wait)
+        {
+            Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return ProblemFor(429, "too_many_attempts", "Too many failed sign-in attempts. Wait a few minutes and try again.");
+        }
+        var result = await _auth.LoginAsync(request!);
+        if (result.IsSuccess) _throttle.RecordSuccess(client, login);
+        else if (result.Error!.Kind == ErrorKind.Unauthorized) _throttle.RecordFailure(client, login);
+        return Map(result);
+    }
 }
 
 /// <summary>Lists that drive the inspector workflow. Phenomena and machines are always read from the database.</summary>
@@ -61,9 +97,19 @@ public sealed class RejectionEntriesController : ApiControllerBase
             ? Ok(r)
             : Created($"/api/rejection-entries/{r.Entry.ShopId}/{r.Entry.Id}", r));
 
+    /// <summary>Legacy list: newest first, at most `limit` (default 50, max 200), toUtc INCLUSIVE. Not a complete history - use /page.</summary>
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] int? shopId, [FromQuery] int? stageId, [FromQuery] DateTime? fromUtc, [FromQuery] DateTime? toUtc, [FromQuery] int? limit) =>
         Map(await _entries.ListAsync(Me, new EntryQuery(shopId, stageId, fromUtc, toUtc, limit)));
+
+    /// <summary>
+    /// Paged history (stable order, cursor-based). fromUtc inclusive, toUtc EXCLUSIVE; send the previous response's nextCursor
+    /// as `cursor` to get the next page. `unavailableShops` lists shops whose database could not be read (page is incomplete).
+    /// </summary>
+    [HttpGet("page")]
+    [ProducesResponseType(typeof(EntryPage), 200)]
+    public async Task<IActionResult> Page([FromQuery] int? shopId, [FromQuery] int? stageId, [FromQuery] DateTime? fromUtc, [FromQuery] DateTime? toUtc, [FromQuery] int? limit, [FromQuery] string? cursor) =>
+        Map(await _entries.PageAsync(Me, new EntryPageQuery(shopId, stageId, fromUtc, toUtc, limit, cursor)));
 
     /// <summary>Entry ids are only unique within one shop database, so the shop is part of the route.</summary>
     [HttpGet("{shopId:int}/{id:long}")]
@@ -88,7 +134,7 @@ public sealed class AdminPhenomenaController : ApiControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePhenomenonRequest request) => Map(await _admin.UpdateAsync(Me, id, request));
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> SetStatus(int id, [FromBody] SetStatusRequest request) => Map(await _admin.SetStatusAsync(Me, id, request.IsActive));
+    public async Task<IActionResult> SetStatus(int id, [FromBody] SetStatusRequest request) => Map(await _admin.SetStatusAsync(Me, id, request));
 
     /// <summary>Allowed only for phenomena never used in any entry database; otherwise 409 and the client should deactivate.</summary>
     [HttpDelete("{id:int}")]
@@ -111,7 +157,7 @@ public sealed class AdminMachinesController : ApiControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMachineRequest request) => Map(await _machines.UpdateAsync(Me, id, request));
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> SetStatus(int id, [FromBody] SetStatusRequest request) => Map(await _machines.SetStatusAsync(Me, id, request.IsActive));
+    public async Task<IActionResult> SetStatus(int id, [FromBody] SetStatusRequest request) => Map(await _machines.SetStatusAsync(Me, id, request));
 
     /// <summary>Only for machines never used in a rejection entry; otherwise 409 `machine_in_use` and the client should deactivate.</summary>
     [HttpDelete("{id:int}")]
@@ -134,7 +180,7 @@ public sealed class AdminUsersController : ApiControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateUserRequest request) => Map(await _users.UpdateAsync(Me, id, request));
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> SetStatus(int id, [FromBody] SetStatusRequest request) => Map(await _users.SetStatusAsync(Me, id, request.IsActive));
+    public async Task<IActionResult> SetStatus(int id, [FromBody] SetStatusRequest request) => Map(await _users.SetStatusAsync(Me, id, request));
 
     [HttpPost("{id:int}/reset-password")]
     public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetPasswordRequest request) => Map(await _users.ResetPasswordAsync(Me, id, request), _ => NoContent());

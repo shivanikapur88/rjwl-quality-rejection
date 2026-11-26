@@ -7,6 +7,11 @@ using Quality.Core.Entities;
 namespace Quality.Core.Services;
 
 /// <summary>Administrator-only management of the rejection phenomena master. Every change is audited in the same transaction.</summary>
+/// <remarks>
+/// Review Q8: code allocation, the normalized-name check and the insert run under one lock on the stage row, and a code
+/// clash (e.g. from a manual insert) is retried with the next number. Review Q9: delete locks the phenomenon row exclusively
+/// BEFORE checking that no entry uses it. Stale screens: Update/SetStatus accept the Version the screen was built from.
+/// </remarks>
 public sealed class PhenomenaAdminService
 {
     public const int MaxNameLength = 200;
@@ -44,7 +49,7 @@ public sealed class PhenomenaAdminService
         }
         return new AdminPhenomenonDto(p.Id, p.PhenomenonCode, p.PhenomenonName, info.Stage.Id, info.Stage.StageCode, info.Stage.StageName,
             info.Shops, p.IsActive, p.CreatedBy, DateTime.SpecifyKind(p.CreatedAt, DateTimeKind.Utc), p.ModifiedBy,
-            p.ModifiedAt is null ? null : DateTime.SpecifyKind(p.ModifiedAt.Value, DateTimeKind.Utc));
+            p.ModifiedAt is null ? null : DateTime.SpecifyKind(p.ModifiedAt.Value, DateTimeKind.Utc), RowVersions.Encode(p.RowVer));
     }
 
     /// <summary>Shows active AND inactive items unless filtered. shopId narrows to stages mapped to that shop.</summary>
@@ -80,23 +85,42 @@ public sealed class PhenomenaAdminService
             return ServiceResult<AdminPhenomenonDto>.Fail(ErrorKind.Validation, "stage_not_in_shop", "The selected stage does not belong to the selected shop.");
 
         var norm = TextNormalizer.NormalizeName(name);
-        if (await _master.NormalizedNameExistsAsync(stage.Id, norm, null))
-            return ServiceResult<AdminPhenomenonDto>.Fail(ErrorKind.Conflict, "duplicate_name", $"'{name}' already exists for {stage.StageName}.");
+        var duplicate = ServiceResult<AdminPhenomenonDto>.Fail(ErrorKind.Conflict, "duplicate_name", $"'{name}' already exists for {stage.StageName}.");
+        if (await _master.NormalizedNameExistsAsync(stage.Id, norm, null)) return duplicate;
 
-        var p = new RejectionPhenomenon
+        for (var attempt = 1; ; attempt++)
         {
-            PhenomenonCode = await _master.NextPhenomenonCodeAsync(stage),
-            PhenomenonName = name, NormalizedName = norm, InspectionStageId = stage.Id, IsActive = req.IsActive,
-            CreatedBy = user.Id, CreatedAt = _time.GetUtcNow().UtcDateTime,
-        };
-        await _master.InTransactionAsync(async () =>
-        {
-            _master.AddPhenomenon(p);
-            await _master.SaveChangesAsync();   // assigns Id
-            _master.AddAudit(new AuditLogEntry { UserId = user.Id, Action = AuditActions.PhenomenonCreated, EntityType = Entity, EntityId = p.Id.ToString(), NewValue = Snapshot(p), Timestamp = p.CreatedAt });
-            await _master.SaveChangesAsync();
-        });
-        return ServiceResult<AdminPhenomenonDto>.Ok(await ToDtoAsync(p));
+            var p = new RejectionPhenomenon
+            {
+                PhenomenonName = name, NormalizedName = norm, InspectionStageId = stage.Id, IsActive = req.IsActive,
+                CreatedBy = user.Id, CreatedAt = _time.GetUtcNow().UtcDateTime,
+            };
+            var nameTaken = false;
+            try
+            {
+                await _master.InTransactionAsync(async () =>
+                {
+                    await _master.LockStageForPhenomenonChangesAsync(stage.Id);              // Q8: one allocation per stage at a time
+                    if (await _master.NormalizedNameExistsAsync(stage.Id, norm, null)) { nameTaken = true; return; }
+                    p.PhenomenonCode = await _master.NextPhenomenonCodeAsync(stage);
+                    _master.AddPhenomenon(p);
+                    await _master.SaveChangesAsync();   // assigns Id
+                    _master.AddAudit(new AuditLogEntry { UserId = user.Id, Action = AuditActions.PhenomenonCreated, EntityType = Entity, EntityId = p.Id.ToString(), NewValue = Snapshot(p), Timestamp = p.CreatedAt });
+                    await _master.SaveChangesAsync();
+                });
+            }
+            catch (UniqueViolationException ex) when (ex.Name == "UQ_RejectionPhenomena_Stage_Name")
+            {
+                return duplicate;
+            }
+            catch (UniqueViolationException) when (attempt < 3)
+            {
+                _master.Detach(p);
+                continue;   // code taken outside the lock (e.g. by a manual insert): allocate the next one
+            }
+            if (nameTaken) return duplicate;
+            return ServiceResult<AdminPhenomenonDto>.Ok(await ToDtoAsync(p));
+        }
     }
 
     public async Task<ServiceResult<AdminPhenomenonDto>> UpdateAsync(CurrentUser user, int id, UpdatePhenomenonRequest req)
@@ -106,6 +130,7 @@ public sealed class PhenomenaAdminService
         if (nameErr is not null) return ServiceResult<AdminPhenomenonDto>.Fail(ErrorKind.Validation, "name_invalid", nameErr);
         var p = await _master.GetPhenomenonAsync(id);
         if (p is null) return ServiceResult<AdminPhenomenonDto>.Fail(ErrorKind.NotFound, "phenomenon_not_found", "Phenomenon not found.");
+        if (ExpectVersion(p, req!.Version) is { } stale) return ServiceResult<AdminPhenomenonDto>.Fail(stale);
 
         if (string.Equals(p.PhenomenonName, name, StringComparison.Ordinal))
             return ServiceResult<AdminPhenomenonDto>.Ok(await ToDtoAsync(p));   // nothing to change
@@ -116,20 +141,31 @@ public sealed class PhenomenaAdminService
 
         var old = Snapshot(p);
         p.PhenomenonName = name; p.NormalizedName = norm; p.ModifiedBy = user.Id; p.ModifiedAt = _time.GetUtcNow().UtcDateTime;
-        await _master.InTransactionAsync(async () =>
+        try
         {
-            _master.AddAudit(new AuditLogEntry { UserId = user.Id, Action = AuditActions.PhenomenonEdited, EntityType = Entity, EntityId = p.Id.ToString(), OldValue = old, NewValue = Snapshot(p), Timestamp = p.ModifiedAt.Value });
-            await _master.SaveChangesAsync();
-        });
+            await _master.InTransactionAsync(async () =>
+            {
+                _master.AddAudit(new AuditLogEntry { UserId = user.Id, Action = AuditActions.PhenomenonEdited, EntityType = Entity, EntityId = p.Id.ToString(), OldValue = old, NewValue = Snapshot(p), Timestamp = p.ModifiedAt.Value });
+                await _master.SaveChangesAsync();
+            });
+        }
+        catch (UniqueViolationException)   // concurrent rename/create to the same name in this stage
+        {
+            return ServiceResult<AdminPhenomenonDto>.Fail(ErrorKind.Conflict, "duplicate_name", $"'{name}' already exists in this inspection stage.");
+        }
         return ServiceResult<AdminPhenomenonDto>.Ok(await ToDtoAsync(p));
     }
 
-    public async Task<ServiceResult<AdminPhenomenonDto>> SetStatusAsync(CurrentUser user, int id, bool isActive)
+    public Task<ServiceResult<AdminPhenomenonDto>> SetStatusAsync(CurrentUser user, int id, bool isActive) => SetStatusAsync(user, id, new SetStatusRequest(isActive));
+
+    public async Task<ServiceResult<AdminPhenomenonDto>> SetStatusAsync(CurrentUser user, int id, SetStatusRequest req)
     {
         var deny = RequireAdmin<AdminPhenomenonDto>(user); if (deny is not null) return deny;
+        var isActive = req.IsActive;
         var p = await _master.GetPhenomenonAsync(id);
         if (p is null) return ServiceResult<AdminPhenomenonDto>.Fail(ErrorKind.NotFound, "phenomenon_not_found", "Phenomenon not found.");
         if (p.IsActive == isActive) return ServiceResult<AdminPhenomenonDto>.Ok(await ToDtoAsync(p));
+        if (ExpectVersion(p, req.Version) is { } stale) return ServiceResult<AdminPhenomenonDto>.Fail(stale);
 
         var old = Snapshot(p);
         p.IsActive = isActive; p.ModifiedBy = user.Id; p.ModifiedAt = _time.GetUtcNow().UtcDateTime;
@@ -152,17 +188,27 @@ public sealed class PhenomenaAdminService
         var p = await _master.GetPhenomenonAsync(id);
         if (p is null) return ServiceResult<bool>.Fail(ErrorKind.NotFound, "phenomenon_not_found", "Phenomenon not found.");
 
-        foreach (var store in _router.All())
-            if (await store.IsPhenomenonUsedAsync(p.Id))
-                return ServiceResult<bool>.Fail(ErrorKind.Conflict, "phenomenon_in_use", "This phenomenon is used in saved rejection entries and cannot be deleted. Deactivate it instead.");
-
         var old = Snapshot(p);
+        var inUse = false;
         await _master.InTransactionAsync(async () =>
         {
+            await _master.LockPhenomenonExclusiveAsync(p.Id);                 // Q9: lock first ...
+            foreach (var store in _router.All())                             // ... then check every entry database
+                if (await store.IsPhenomenonUsedAsync(p.Id)) { inUse = true; return; }
             _master.RemovePhenomenon(p);
             _master.AddAudit(new AuditLogEntry { UserId = user.Id, Action = AuditActions.PhenomenonDeleted, EntityType = Entity, EntityId = p.Id.ToString(), OldValue = old, Timestamp = _time.GetUtcNow().UtcDateTime });
             await _master.SaveChangesAsync();
         });
+        if (inUse) return ServiceResult<bool>.Fail(ErrorKind.Conflict, "phenomenon_in_use", "This phenomenon is used in saved rejection entries and cannot be deleted. Deactivate it instead.");
         return ServiceResult<bool>.Ok(true);
+    }
+
+    private ServiceError? ExpectVersion(RejectionPhenomenon p, string? version)
+    {
+        var expected = RowVersions.Decode(version);
+        if (expected is null) return null;
+        if (!RowVersions.Matches(p.RowVer, expected)) return RowVersions.Stale();
+        _master.ExpectRowVersion(p, expected);
+        return null;
     }
 }

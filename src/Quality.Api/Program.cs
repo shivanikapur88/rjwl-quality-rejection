@@ -1,7 +1,9 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -43,6 +45,8 @@ builder.Services.AddSingleton<IdentityPasswordVerifier>();
 builder.Services.AddSingleton<IPasswordVerifier>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
 builder.Services.AddSingleton<IPasswordHashService>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
 builder.Services.AddSingleton<ITokenIssuer, JwtTokenIssuer>();
+builder.Services.AddSingleton<LoginThrottle>();
+builder.Services.AddHostedService<BootstrapAdmin>();   // retries in the background; the API starts even if SQL Server is down
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
 {
@@ -55,14 +59,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
     o.Events = new JwtBearerEvents
     {
-        // A deactivated user or changed role takes effect immediately, not at token expiry.
-        OnTokenValidated = async ctx =>
-        {
-            var db = ctx.HttpContext.RequestServices.GetRequiredService<MasterDbContext>();
-            int id = int.Parse(ctx.Principal!.FindFirst("sub")!.Value);
-            var u = await db.Users.AsNoTracking().Where(x => x.Id == id).Select(x => new { x.IsActive, Role = x.Role!.RoleName }).FirstOrDefaultAsync();
-            if (u is null || !u.IsActive || u.Role != ctx.Principal.FindFirst("role")?.Value) ctx.Fail("User no longer valid.");
-        },
+        // Deactivation, role change and password reset take effect immediately, not at token expiry (review Q2).
+        OnTokenValidated = TokenRevocation.ValidateAsync,
         // Lets the app tell "session expired" from "not allowed".
         OnChallenge = async ctx =>
         {
@@ -74,10 +72,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 });
 builder.Services.AddAuthorization();
+// Review Q4: the old single server-wide "login" window (10/minute for everybody) is gone. Failed attempts are counted per
+// client + login, per login and per client by LoginThrottle; this limiter only caps raw request volume PER CLIENT ADDRESS.
+// Generous by default: many tablets may sign in through one plant address at shift change.
+var loginRequestsPerMinute = cfg.GetValue("LoginThrottle:RequestsPerMinutePerClient", 300);
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
-    o.AddFixedWindowLimiter("login", w => { w.PermitLimit = 10; w.Window = TimeSpan.FromMinutes(1); w.QueueLimit = 0; });
+    o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = loginRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+// Behind a reverse proxy the client address must come from X-Forwarded-For, or every device would share one throttle bucket.
+var knownProxies = cfg.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? Array.Empty<string>();
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    foreach (var ip in knownProxies) o.KnownProxies.Add(IPAddress.Parse(ip));
 });
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -90,6 +101,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+if (knownProxies.Length > 0) app.UseForwardedHeaders();
 app.UseExceptionHandler(ErrorHandling.Configure);
 app.UseHttpsRedirection();
 if (app.Environment.IsDevelopment() || cfg.GetValue<bool>("Swagger:Enabled")) { app.UseSwagger(); app.UseSwaggerUI(); }
@@ -98,7 +110,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-await BootstrapAdmin.EnsureAsync(app.Services, cfg, app.Logger);
 app.Run();
 
 public partial class Program { }   // for WebApplicationFactory-based integration tests

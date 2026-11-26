@@ -17,6 +17,7 @@ public sealed class MasterDbContext : DbContext
     public DbSet<Machine> Machines => Set<Machine>();
     public DbSet<RejectionPhenomenon> RejectionPhenomena => Set<RejectionPhenomenon>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
+    public DbSet<LoginIdentifier> LoginIdentifiers => Set<LoginIdentifier>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -24,10 +25,12 @@ public sealed class MasterDbContext : DbContext
         b.Entity<Role>(e => { e.ToTable("Roles"); e.HasKey(x => x.Id); e.Property(x => x.Id).ValueGeneratedNever(); e.Property(x => x.RoleName).HasMaxLength(30); });
         b.Entity<User>(e =>
         {
-            e.ToTable("Users"); e.HasKey(x => x.Id);
+            // db/08 adds TR_Users_KeepActiveAdministrator; EF must know, so it does not use OUTPUT without INTO (refused on tables with triggers).
+            e.ToTable("Users", t => t.HasTrigger("TR_Users_KeepActiveAdministrator")); e.HasKey(x => x.Id);
             e.Property(x => x.EmployeeCode).HasMaxLength(30); e.Property(x => x.Username).HasMaxLength(50);
             e.Property(x => x.DisplayName).HasMaxLength(100); e.Property(x => x.PasswordHash).HasMaxLength(500);
-            e.Property(x => x.CreatedAt).HasColumnType("datetime2(0)");
+            e.Property(x => x.CreatedAt).HasColumnType("datetime2(0)"); e.Property(x => x.ModifiedAt).HasColumnType("datetime2(0)");
+            e.Property(x => x.RowVer).IsRowVersion();   // db/08: stale-screen protection
             e.HasOne(x => x.Role).WithMany().HasForeignKey(x => x.RoleId);
             e.HasMany(x => x.UserShops).WithOne().HasForeignKey(x => x.UserId);
         });
@@ -40,7 +43,16 @@ public sealed class MasterDbContext : DbContext
             e.HasOne(x => x.InspectionStage).WithMany().HasForeignKey(x => x.InspectionStageId);
         });
         b.Entity<UserShop>(e => { e.ToTable("UserShops"); e.HasKey(x => new { x.UserId, x.ShopId }); });
-        b.Entity<Machine>(e => { e.ToTable("Machines"); e.Property(x => x.MachineCode).HasMaxLength(30); e.Property(x => x.MachineName).HasMaxLength(100); });
+        b.Entity<Machine>(e =>
+        {
+            e.ToTable("Machines"); e.Property(x => x.MachineCode).HasMaxLength(30); e.Property(x => x.MachineName).HasMaxLength(100);
+            e.Property(x => x.ModifiedAt).HasColumnType("datetime2(0)"); e.Property(x => x.RowVer).IsRowVersion();   // db/08
+        });
+        b.Entity<LoginIdentifier>(e =>
+        {
+            e.ToTable("LoginIdentifiers"); e.HasKey(x => x.NormalizedIdentifier);   // db/08: one namespace for usernames and employee codes
+            e.Property(x => x.NormalizedIdentifier).HasMaxLength(50); e.Property(x => x.Kind).HasMaxLength(1).IsFixedLength().IsUnicode(false);
+        });
         b.Entity<RejectionPhenomenon>(e =>
         {
             e.ToTable("RejectionPhenomena");

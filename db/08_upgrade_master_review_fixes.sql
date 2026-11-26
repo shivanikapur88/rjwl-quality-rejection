@@ -1,0 +1,125 @@
+/* ============================================================================
+   08_upgrade_master_review_fixes.sql  -  master database (QualityMasterDB)
+
+   Run AFTER 01 and 03 (and 04), on a fresh install AND when upgrading an existing
+   database. Idempotent: every change is guarded, so re-running it is safe.
+   Does not delete or rewrite any existing business data.
+
+   What it adds (review findings in brackets):
+     1. qa.Users.TokenVersion   - bumped on password reset, deactivation and role
+                                  change; tokens carrying an older value are refused   [Q2]
+     2. qa.Users.ModifiedAt / RowVer, qa.Machines.ModifiedAt / RowVer
+                                - lets the API reject saves made from a stale screen   [stale edits]
+     3. qa.LoginIdentifiers     - ONE unique namespace for usernames and employee
+                                  codes (login accepts either)                          [Q5]
+     4. TR_Users_KeepActiveAdministrator
+                                - database backstop: no statement may leave the
+                                  system without an active administrator                [Q3]
+     5. CK_Users_EmployeeCode_Length - employee codes 2..30 characters                  [Q6]
+
+   If step 3 finds two users whose username/employee code collide (possible with
+   the earlier schema), it STOPS with error 50080 and lists them. Resolve the
+   collision (rename one account in qa.Users) and run the script again.
+   Tested against SQL Server 2022 (see docs/TEST_EVIDENCE.md).
+   ============================================================================ */
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+GO
+
+/* ---------- 1. Token version (session revocation) ---------- */
+IF COL_LENGTH(N'qa.Users', N'TokenVersion') IS NULL
+    ALTER TABLE qa.Users ADD TokenVersion int NOT NULL CONSTRAINT DF_Users_TokenVersion DEFAULT (0);
+GO
+
+/* ---------- 2. Version columns for stale-screen protection ---------- */
+IF COL_LENGTH(N'qa.Users', N'ModifiedAt') IS NULL
+    ALTER TABLE qa.Users ADD ModifiedAt datetime2(0) NULL;
+IF COL_LENGTH(N'qa.Users', N'RowVer') IS NULL
+    ALTER TABLE qa.Users ADD RowVer rowversion NOT NULL;
+IF COL_LENGTH(N'qa.Machines', N'ModifiedAt') IS NULL
+    ALTER TABLE qa.Machines ADD ModifiedAt datetime2(0) NULL;
+IF COL_LENGTH(N'qa.Machines', N'RowVer') IS NULL
+    ALTER TABLE qa.Machines ADD RowVer rowversion NOT NULL;
+GO
+
+/* ---------- 3. Shared login-identifier namespace ---------- */
+IF OBJECT_ID(N'qa.LoginIdentifiers', N'U') IS NULL
+CREATE TABLE qa.LoginIdentifiers (
+    -- UPPER(trimmed value): collation-independent uniqueness key across BOTH usernames and employee codes
+    NormalizedIdentifier nvarchar(50) NOT NULL CONSTRAINT PK_LoginIdentifiers PRIMARY KEY,
+    UserId               int          NOT NULL CONSTRAINT FK_LoginIdentifiers_Users REFERENCES qa.Users(Id),
+    -- 'U' = username, 'E' = employee code, 'B' = both (the user's username equals its employee code)
+    Kind                 char(1)      NOT NULL CONSTRAINT CK_LoginIdentifiers_Kind CHECK (Kind IN ('U', 'E', 'B'))
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_LoginIdentifiers_User' AND object_id = OBJECT_ID(N'qa.LoginIdentifiers'))
+    CREATE INDEX IX_LoginIdentifiers_User ON qa.LoginIdentifiers (UserId);
+GO
+
+-- Backfill for users created before this table existed.
+BEGIN TRANSACTION;
+    DECLARE @ids TABLE (NormalizedIdentifier nvarchar(50) NOT NULL, UserId int NOT NULL, Kind char(1) NOT NULL);
+    INSERT INTO @ids (NormalizedIdentifier, UserId, Kind)
+    SELECT UPPER(LTRIM(RTRIM(u.Username))), u.Id,
+           CASE WHEN UPPER(LTRIM(RTRIM(u.Username))) = UPPER(LTRIM(RTRIM(u.EmployeeCode))) THEN 'B' ELSE 'U' END
+    FROM qa.Users u
+    UNION ALL
+    SELECT UPPER(LTRIM(RTRIM(u.EmployeeCode))), u.Id, 'E'
+    FROM qa.Users u
+    WHERE UPPER(LTRIM(RTRIM(u.EmployeeCode))) <> UPPER(LTRIM(RTRIM(u.Username)));
+
+    IF EXISTS (SELECT NormalizedIdentifier FROM @ids GROUP BY NormalizedIdentifier HAVING COUNT(DISTINCT UserId) > 1)
+    BEGIN
+        SELECT i.NormalizedIdentifier AS CollidingIdentifier, u.Id AS UserId, u.Username, u.EmployeeCode, u.IsActive
+        FROM @ids i JOIN qa.Users u ON u.Id = i.UserId
+        WHERE i.NormalizedIdentifier IN (SELECT NormalizedIdentifier FROM @ids GROUP BY NormalizedIdentifier HAVING COUNT(DISTINCT UserId) > 1)
+        ORDER BY i.NormalizedIdentifier, u.Id;
+        ROLLBACK TRANSACTION;
+        THROW 50080, N'Two or more users share a username/employee code (listed above). Rename one of each pair in qa.Users, then re-run 08.', 1;
+    END;
+
+    INSERT INTO qa.LoginIdentifiers (NormalizedIdentifier, UserId, Kind)
+    SELECT i.NormalizedIdentifier, i.UserId, i.Kind
+    FROM @ids i
+    WHERE NOT EXISTS (SELECT 1 FROM qa.LoginIdentifiers x WHERE x.NormalizedIdentifier = i.NormalizedIdentifier);
+COMMIT TRANSACTION;
+GO
+
+/* ---------- 4. Database backstop: always keep one active administrator ---------- */
+-- The API already serialises role changes/deactivations with locks (see EfMasterData.LockActiveAdministratorsAsync).
+-- This trigger catches anything else (manual SQL, a future code path). READCOMMITTEDLOCK makes the check a locking
+-- read even if READ_COMMITTED_SNAPSHOT is ON, so two concurrent demotions cannot both see "the other one is still active".
+CREATE OR ALTER TRIGGER qa.TR_Users_KeepActiveAdministrator ON qa.Users
+AFTER UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Only statements that REMOVE an active administrator (demotion or deactivation) need the check;
+    -- ordinary edits of an administrator row (name, password reset) return here and take no extra locks.
+    IF NOT EXISTS (SELECT 1 FROM deleted d JOIN qa.Roles r ON r.Id = d.RoleId
+                   WHERE r.RoleName = N'Administrator' AND d.IsActive = 1
+                     AND NOT EXISTS (SELECT 1 FROM inserted i JOIN qa.Roles r2 ON r2.Id = i.RoleId
+                                     WHERE i.Id = d.Id AND r2.RoleName = N'Administrator' AND i.IsActive = 1))
+        RETURN;
+    IF NOT EXISTS (SELECT 1 FROM qa.Users u WITH (READCOMMITTEDLOCK) JOIN qa.Roles r ON r.Id = u.RoleId
+                   WHERE r.RoleName = N'Administrator' AND u.IsActive = 1)
+        THROW 50090, N'At least one active administrator must remain.', 1;
+END;
+GO
+
+/* ---------- 5. Employee code length matches validation (2..30) ---------- */
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Users_EmployeeCode_Length' AND parent_object_id = OBJECT_ID(N'qa.Users'))
+    ALTER TABLE qa.Users WITH CHECK ADD CONSTRAINT CK_Users_EmployeeCode_Length CHECK (LEN(EmployeeCode) BETWEEN 2 AND 30);
+GO
+
+/* ---------- 6. Schema version marker ---------- */
+IF OBJECT_ID(N'qa.SchemaVersions', N'U') IS NULL
+CREATE TABLE qa.SchemaVersions (
+    Script    nvarchar(100) NOT NULL CONSTRAINT PK_SchemaVersions PRIMARY KEY,
+    AppliedAt datetime2(0)  NOT NULL CONSTRAINT DF_SchemaVersions_AppliedAt DEFAULT (SYSUTCDATETIME())
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM qa.SchemaVersions WHERE Script = N'08_upgrade_master_review_fixes')
+    INSERT INTO qa.SchemaVersions (Script) VALUES (N'08_upgrade_master_review_fixes');
+GO
+PRINT N'08_upgrade_master_review_fixes.sql complete.';

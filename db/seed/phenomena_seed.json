@@ -1,1349 +1,1349 @@
 {
- "source": "Rejection_Phinomina.xlsx",
- "stages": {
-  "GDC_SHOP": {
-   "header": "GDC SHOP",
-   "name": "GDC Shop",
-   "raw": 25,
-   "imported": 25,
-   "skipped": 0
-  },
-  "CNC_SHOP": {
-   "header": "CNC SHOP",
-   "name": "CNC Shop",
-   "raw": 53,
-   "imported": 52,
-   "skipped": 1
-  },
-  "PRE_TREATMENT": {
-   "header": "Pre-treatment Inspection",
-   "name": "Pre-treatment Inspection",
-   "raw": 34,
-   "imported": 34,
-   "skipped": 0
-  },
-  "FINAL": {
-   "header": "FINAL Inspection",
-   "name": "FINAL Inspection",
-   "raw": 34,
-   "imported": 34,
-   "skipped": 0
-  }
- },
- "rows": [
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A2",
-   "original": "Bore B/H",
-   "normalized": "BORE B/H",
-   "code": "GDC_SHOP-001",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A3",
-   "original": "Spoke B.H",
-   "normalized": "SPOKE B.H",
-   "code": "GDC_SHOP-002",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A4",
-   "original": "Rim Non Filling",
-   "normalized": "RIM NON FILLING",
-   "code": "GDC_SHOP-003",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A5",
-   "original": "Hub Non Filling",
-   "normalized": "HUB NON FILLING",
-   "code": "GDC_SHOP-004",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A6",
-   "original": "Pin Deep",
-   "normalized": "PIN DEEP",
-   "code": "GDC_SHOP-005",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A7",
-   "original": "CI Ring Crack",
-   "normalized": "CI RING CRACK",
-   "code": "GDC_SHOP-006",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A8",
-   "original": "Spk Non-Filling",
-   "normalized": "SPK NON-FILLING",
-   "code": "GDC_SHOP-007",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A9",
-   "original": "Spoke Bend",
-   "normalized": "SPOKE BEND",
-   "code": "GDC_SHOP-008",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A10",
-   "original": "Cold Shot",
-   "normalized": "COLD SHOT",
-   "code": "GDC_SHOP-009",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A11",
-   "original": "Gate Broken",
-   "normalized": "GATE BROKEN",
-   "code": "GDC_SHOP-010",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A12",
-   "original": "Hub Bend",
-   "normalized": "HUB BEND",
-   "code": "GDC_SHOP-011",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A13",
-   "original": "Riser Cut",
-   "normalized": "RISER CUT",
-   "code": "GDC_SHOP-012",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A14",
-   "original": "Gas Block",
-   "normalized": "GAS BLOCK",
-   "code": "GDC_SHOP-013",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A15",
-   "original": "Casting Jam",
-   "normalized": "CASTING JAM",
-   "code": "GDC_SHOP-014",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A16",
-   "original": "Hub B/H",
-   "normalized": "HUB B/H",
-   "code": "GDC_SHOP-015",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A17",
-   "original": "CI Ring Shift",
-   "normalized": "CI RING SHIFT",
-   "code": "GDC_SHOP-016",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A18",
-   "original": "CI Ring Flash",
-   "normalized": "CI RING FLASH",
-   "code": "GDC_SHOP-017",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A19",
-   "original": "Rim Bend/Casting bend",
-   "normalized": "RIM BEND/CASTING BEND",
-   "code": "GDC_SHOP-018",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A20",
-   "original": "Dent",
-   "normalized": "DENT",
-   "code": "GDC_SHOP-019",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A21",
-   "original": "Shrinkage",
-   "normalized": "SHRINKAGE",
-   "code": "GDC_SHOP-020",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A22",
-   "original": "Side Mould M/M",
-   "normalized": "SIDE MOULD M/M",
-   "code": "GDC_SHOP-021",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A23",
-   "original": "Riser Non Filling",
-   "normalized": "RISER NON FILLING",
-   "code": "GDC_SHOP-022",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A24",
-   "original": "Sand Drop",
-   "normalized": "SAND DROP",
-   "code": "GDC_SHOP-023",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A25",
-   "original": "Engraving Not Visible",
-   "normalized": "ENGRAVING NOT VISIBLE",
-   "code": "GDC_SHOP-024",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "GDC_SHOP",
-   "cell": "A26",
-   "original": "Others",
-   "normalized": "OTHERS",
-   "code": "GDC_SHOP-025",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B2",
-   "original": "BEARING BORE O/S",
-   "normalized": "BEARING BORE O/S",
-   "code": "CNC_SHOP-001",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B3",
-   "original": "CHATTERING",
-   "normalized": "CHATTERING",
-   "code": "CNC_SHOP-002",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B4",
-   "original": "DIMENSION NG",
-   "normalized": "DIMENSION NG",
-   "code": "CNC_SHOP-003",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B5",
-   "original": "POWER CUT",
-   "normalized": "POWER CUT",
-   "code": "CNC_SHOP-004",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B6",
-   "original": "WALL THICKNESS NG",
-   "normalized": "WALL THICKNESS NG",
-   "code": "CNC_SHOP-005",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B7",
-   "original": "SETTING",
-   "normalized": "SETTING",
-   "code": "CNC_SHOP-006",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B8",
-   "original": "DENT",
-   "normalized": "DENT",
-   "code": "CNC_SHOP-007",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B9",
-   "original": "VALVE HOLE OUT",
-   "normalized": "VALVE HOLE OUT",
-   "code": "CNC_SHOP-008",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B10",
-   "original": "M/C STEP",
-   "normalized": "M/C STEP",
-   "code": "CNC_SHOP-009",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B11",
-   "original": "INSERT BROKEN",
-   "normalized": "INSERT BROKEN",
-   "code": "CNC_SHOP-010",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B12",
-   "original": "OVALITY",
-   "normalized": "OVALITY",
-   "code": "CNC_SHOP-011",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B13",
-   "original": "CI RING CHIP OFF",
-   "normalized": "CI RING CHIP OFF",
-   "code": "CNC_SHOP-012",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B14",
-   "original": "M/C SHIFT",
-   "normalized": "M/C SHIFT",
-   "code": "CNC_SHOP-013",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B15",
-   "original": "WHEEL SLIP",
-   "normalized": "WHEEL SLIP",
-   "code": "CNC_SHOP-014",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B16",
-   "original": "CI RING DIA O/S",
-   "normalized": "CI RING DIA O/S",
-   "code": "CNC_SHOP-015",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B17",
-   "original": "RIM UNCLEAN",
-   "normalized": "RIM UNCLEAN",
-   "code": "CNC_SHOP-016",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B18",
-   "original": "OPERATION MISS",
-   "normalized": "OPERATION MISS",
-   "code": "CNC_SHOP-017",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B19",
-   "original": "RUN OUT NG",
-   "normalized": "RUN OUT NG",
-   "code": "CNC_SHOP-018",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B20",
-   "original": "VMC OUT",
-   "normalized": "VMC OUT",
-   "code": "CNC_SHOP-019",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B21",
-   "original": "C.I. RING UNCLEAN",
-   "normalized": "C.I. RING UNCLEAN",
-   "code": "CNC_SHOP-020",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B22",
-   "original": "C.I. RING SHIFT",
-   "normalized": "C.I. RING SHIFT",
-   "code": "CNC_SHOP-021",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B23",
-   "original": "C.I. RING CRACK",
-   "normalized": "C.I. RING CRACK",
-   "code": "CNC_SHOP-022",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B24",
-   "original": "C.I. RING BROKEN",
-   "normalized": "C.I. RING BROKEN",
-   "code": "CNC_SHOP-023",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B25",
-   "original": "C.I. RING BLOW HOLE",
-   "normalized": "C.I. RING BLOW HOLE",
-   "code": "CNC_SHOP-024",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B26",
-   "original": "B.H ON RIM",
-   "normalized": "B.H ON RIM",
-   "code": "CNC_SHOP-025",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B27",
-   "original": "RIM PROFILE UNCLEAN",
-   "normalized": "RIM PROFILE UNCLEAN",
-   "code": "CNC_SHOP-026",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B28",
-   "original": "HUB BEND",
-   "normalized": "HUB BEND",
-   "code": "CNC_SHOP-027",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B29",
-   "original": "B.H. ON HUB",
-   "normalized": "B.H. ON HUB",
-   "code": "CNC_SHOP-028",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B30",
-   "original": "PIN DEEP",
-   "normalized": "PIN DEEP",
-   "code": "CNC_SHOP-029",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B31",
-   "original": "LUG HEIGHT  O/S /UNCLEAN",
-   "normalized": "LUG HEIGHT O/S /UNCLEAN",
-   "code": "CNC_SHOP-030",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B32",
-   "original": "OD UNCLEAN",
-   "normalized": "OD UNCLEAN",
-   "code": "CNC_SHOP-031",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B33",
-   "original": "NON FILLING",
-   "normalized": "NON FILLING",
-   "code": "CNC_SHOP-032",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B34",
-   "original": "RISER CUT",
-   "normalized": "RISER CUT",
-   "code": "CNC_SHOP-033",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B35",
-   "original": "BORE SHIFT",
-   "normalized": "BORE SHIFT",
-   "code": "CNC_SHOP-034",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B36",
-   "original": "SPOKE B/H",
-   "normalized": "SPOKE B/H",
-   "code": "CNC_SHOP-035",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B37",
-   "original": "COLD SHOT",
-   "normalized": "COLD SHOT",
-   "code": "CNC_SHOP-036",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B38",
-   "original": "CASTING CRACK",
-   "normalized": "CASTING CRACK",
-   "code": "CNC_SHOP-037",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B39",
-   "original": "BORE BLOW HOLE",
-   "normalized": "BORE BLOW HOLE",
-   "code": "CNC_SHOP-038",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B40",
-   "original": "AIR LEAKAGE",
-   "normalized": "AIR LEAKAGE",
-   "code": "CNC_SHOP-039",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B41",
-   "original": "POROSITY",
-   "normalized": "POROSITY",
-   "code": "CNC_SHOP-040",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B42",
-   "original": "DENT",
-   "normalized": "DENT",
-   "code": null,
-   "status": "SKIPPED_DUPLICATE",
-   "duplicateOf": "B8"
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B43",
-   "original": "SHRINKAGE",
-   "normalized": "SHRINKAGE",
-   "code": "CNC_SHOP-041",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B44",
-   "original": "HARDNESS LOW",
-   "normalized": "HARDNESS LOW",
-   "code": "CNC_SHOP-042",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B45",
-   "original": "BORE FACE U/C",
-   "normalized": "BORE FACE U/C",
-   "code": "CNC_SHOP-043",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B46",
-   "original": "RISER FACE UNCLEAN",
-   "normalized": "RISER FACE UNCLEAN",
-   "code": "CNC_SHOP-044",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B47",
-   "original": "OVER DIE COAT",
-   "normalized": "OVER DIE COAT",
-   "code": "CNC_SHOP-045",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B48",
-   "original": "GAS BLOCK",
-   "normalized": "GAS BLOCK",
-   "code": "CNC_SHOP-046",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B49",
-   "original": "CATCHING",
-   "normalized": "CATCHING",
-   "code": "CNC_SHOP-047",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B50",
-   "original": "RUN OUT",
-   "normalized": "RUN OUT",
-   "code": "CNC_SHOP-048",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B51",
-   "original": "SPOKE BEND",
-   "normalized": "SPOKE BEND",
-   "code": "CNC_SHOP-049",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B52",
-   "original": "PAINT PEEL OFF",
-   "normalized": "PAINT PEEL OFF",
-   "code": "CNC_SHOP-050",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B53",
-   "original": "OVER DFT",
-   "normalized": "OVER DFT",
-   "code": "CNC_SHOP-051",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "CNC_SHOP",
-   "cell": "B54",
-   "original": "OTHERS",
-   "normalized": "OTHERS",
-   "code": "CNC_SHOP-052",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C2",
-   "original": "C.I. RING UNCLEAN",
-   "normalized": "C.I. RING UNCLEAN",
-   "code": "PRE_TREATMENT-001",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C3",
-   "original": "C.I. RING SHIFT",
-   "normalized": "C.I. RING SHIFT",
-   "code": "PRE_TREATMENT-002",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C4",
-   "original": "C.I. RING CRACK",
-   "normalized": "C.I. RING CRACK",
-   "code": "PRE_TREATMENT-003",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C5",
-   "original": "C.I. RING BROKEN",
-   "normalized": "C.I. RING BROKEN",
-   "code": "PRE_TREATMENT-004",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C6",
-   "original": "C.I. RING BLOW HOLE",
-   "normalized": "C.I. RING BLOW HOLE",
-   "code": "PRE_TREATMENT-005",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C7",
-   "original": "B.H ON RIM",
-   "normalized": "B.H ON RIM",
-   "code": "PRE_TREATMENT-006",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C8",
-   "original": "RIM PROFILE UNCLEAN",
-   "normalized": "RIM PROFILE UNCLEAN",
-   "code": "PRE_TREATMENT-007",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C9",
-   "original": "HUB BEND",
-   "normalized": "HUB BEND",
-   "code": "PRE_TREATMENT-008",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C10",
-   "original": "B.H. ON HUB",
-   "normalized": "B.H. ON HUB",
-   "code": "PRE_TREATMENT-009",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C11",
-   "original": "PIN DEEP",
-   "normalized": "PIN DEEP",
-   "code": "PRE_TREATMENT-010",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C12",
-   "original": "LUG HEIGHT  O/S /UNCLEAN",
-   "normalized": "LUG HEIGHT O/S /UNCLEAN",
-   "code": "PRE_TREATMENT-011",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C13",
-   "original": "OD UNCLEAN",
-   "normalized": "OD UNCLEAN",
-   "code": "PRE_TREATMENT-012",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C14",
-   "original": "NON FILLING",
-   "normalized": "NON FILLING",
-   "code": "PRE_TREATMENT-013",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C15",
-   "original": "RISER CUT",
-   "normalized": "RISER CUT",
-   "code": "PRE_TREATMENT-014",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C16",
-   "original": "BORE SHIFT",
-   "normalized": "BORE SHIFT",
-   "code": "PRE_TREATMENT-015",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C17",
-   "original": "SPOKE B/H",
-   "normalized": "SPOKE B/H",
-   "code": "PRE_TREATMENT-016",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C18",
-   "original": "COLD SHOT",
-   "normalized": "COLD SHOT",
-   "code": "PRE_TREATMENT-017",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C19",
-   "original": "CASTING CRACK",
-   "normalized": "CASTING CRACK",
-   "code": "PRE_TREATMENT-018",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C20",
-   "original": "BORE BLOW HOLE",
-   "normalized": "BORE BLOW HOLE",
-   "code": "PRE_TREATMENT-019",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C21",
-   "original": "AIR LEAKAGE",
-   "normalized": "AIR LEAKAGE",
-   "code": "PRE_TREATMENT-020",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C22",
-   "original": "POROSITY",
-   "normalized": "POROSITY",
-   "code": "PRE_TREATMENT-021",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C23",
-   "original": "DENT",
-   "normalized": "DENT",
-   "code": "PRE_TREATMENT-022",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C24",
-   "original": "SHRINKAGE",
-   "normalized": "SHRINKAGE",
-   "code": "PRE_TREATMENT-023",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C25",
-   "original": "HARDNESS LOW",
-   "normalized": "HARDNESS LOW",
-   "code": "PRE_TREATMENT-024",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C26",
-   "original": "BORE FACE U/C",
-   "normalized": "BORE FACE U/C",
-   "code": "PRE_TREATMENT-025",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C27",
-   "original": "RISER FACE UNCLEAN",
-   "normalized": "RISER FACE UNCLEAN",
-   "code": "PRE_TREATMENT-026",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C28",
-   "original": "OVER DIE COAT",
-   "normalized": "OVER DIE COAT",
-   "code": "PRE_TREATMENT-027",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C29",
-   "original": "GAS BLOCK",
-   "normalized": "GAS BLOCK",
-   "code": "PRE_TREATMENT-028",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C30",
-   "original": "CATCHING",
-   "normalized": "CATCHING",
-   "code": "PRE_TREATMENT-029",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C31",
-   "original": "RUN OUT",
-   "normalized": "RUN OUT",
-   "code": "PRE_TREATMENT-030",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C32",
-   "original": "SPOKE BEND",
-   "normalized": "SPOKE BEND",
-   "code": "PRE_TREATMENT-031",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C33",
-   "original": "PAINT PEEL OFF",
-   "normalized": "PAINT PEEL OFF",
-   "code": "PRE_TREATMENT-032",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C34",
-   "original": "OVER DFT",
-   "normalized": "OVER DFT",
-   "code": "PRE_TREATMENT-033",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "PRE_TREATMENT",
-   "cell": "C35",
-   "original": "OTHERS",
-   "normalized": "OTHERS",
-   "code": "PRE_TREATMENT-034",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D2",
-   "original": "C.I. RING UNCLEAN",
-   "normalized": "C.I. RING UNCLEAN",
-   "code": "FINAL-001",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D3",
-   "original": "C.I. RING SHIFT",
-   "normalized": "C.I. RING SHIFT",
-   "code": "FINAL-002",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D4",
-   "original": "C.I. RING CRACK",
-   "normalized": "C.I. RING CRACK",
-   "code": "FINAL-003",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D5",
-   "original": "C.I. RING BROKEN",
-   "normalized": "C.I. RING BROKEN",
-   "code": "FINAL-004",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D6",
-   "original": "C.I. RING BLOW HOLE",
-   "normalized": "C.I. RING BLOW HOLE",
-   "code": "FINAL-005",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D7",
-   "original": "B.H ON RIM",
-   "normalized": "B.H ON RIM",
-   "code": "FINAL-006",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D8",
-   "original": "RIM PROFILE UNCLEAN",
-   "normalized": "RIM PROFILE UNCLEAN",
-   "code": "FINAL-007",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D9",
-   "original": "HUB BEND",
-   "normalized": "HUB BEND",
-   "code": "FINAL-008",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D10",
-   "original": "B.H. ON HUB",
-   "normalized": "B.H. ON HUB",
-   "code": "FINAL-009",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D11",
-   "original": "PIN DEEP",
-   "normalized": "PIN DEEP",
-   "code": "FINAL-010",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D12",
-   "original": "LUG HEIGHT  O/S /UNCLEAN",
-   "normalized": "LUG HEIGHT O/S /UNCLEAN",
-   "code": "FINAL-011",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D13",
-   "original": "OD UNCLEAN",
-   "normalized": "OD UNCLEAN",
-   "code": "FINAL-012",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D14",
-   "original": "NON FILLING",
-   "normalized": "NON FILLING",
-   "code": "FINAL-013",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D15",
-   "original": "RISER CUT",
-   "normalized": "RISER CUT",
-   "code": "FINAL-014",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D16",
-   "original": "BORE SHIFT",
-   "normalized": "BORE SHIFT",
-   "code": "FINAL-015",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D17",
-   "original": "SPOKE B/H",
-   "normalized": "SPOKE B/H",
-   "code": "FINAL-016",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D18",
-   "original": "COLD SHOT",
-   "normalized": "COLD SHOT",
-   "code": "FINAL-017",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D19",
-   "original": "CASTING CRACK",
-   "normalized": "CASTING CRACK",
-   "code": "FINAL-018",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D20",
-   "original": "BORE BLOW HOLE",
-   "normalized": "BORE BLOW HOLE",
-   "code": "FINAL-019",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D21",
-   "original": "AIR LEAKAGE",
-   "normalized": "AIR LEAKAGE",
-   "code": "FINAL-020",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D22",
-   "original": "POROSITY",
-   "normalized": "POROSITY",
-   "code": "FINAL-021",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D23",
-   "original": "DENT",
-   "normalized": "DENT",
-   "code": "FINAL-022",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D24",
-   "original": "SHRINKAGE",
-   "normalized": "SHRINKAGE",
-   "code": "FINAL-023",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D25",
-   "original": "HARDNESS LOW",
-   "normalized": "HARDNESS LOW",
-   "code": "FINAL-024",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D26",
-   "original": "BORE FACE U/C",
-   "normalized": "BORE FACE U/C",
-   "code": "FINAL-025",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D27",
-   "original": "RISER FACE UNCLEAN",
-   "normalized": "RISER FACE UNCLEAN",
-   "code": "FINAL-026",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D28",
-   "original": "OVER DIE COAT",
-   "normalized": "OVER DIE COAT",
-   "code": "FINAL-027",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D29",
-   "original": "GAS BLOCK",
-   "normalized": "GAS BLOCK",
-   "code": "FINAL-028",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D30",
-   "original": "CATCHING",
-   "normalized": "CATCHING",
-   "code": "FINAL-029",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D31",
-   "original": "RUN OUT",
-   "normalized": "RUN OUT",
-   "code": "FINAL-030",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D32",
-   "original": "SPOKE BEND",
-   "normalized": "SPOKE BEND",
-   "code": "FINAL-031",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D33",
-   "original": "PAINT PEEL OFF",
-   "normalized": "PAINT PEEL OFF",
-   "code": "FINAL-032",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D34",
-   "original": "OVER DFT",
-   "normalized": "OVER DFT",
-   "code": "FINAL-033",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  },
-  {
-   "stageCode": "FINAL",
-   "cell": "D35",
-   "original": "OTHERS",
-   "normalized": "OTHERS",
-   "code": "FINAL-034",
-   "status": "IMPORTED",
-   "duplicateOf": null
-  }
- ]
+  "source": "Rejection_Phinomina.xlsx",
+  "stages": {
+    "GDC_SHOP": {
+      "header": "GDC SHOP",
+      "name": "GDC Shop",
+      "raw": 25,
+      "imported": 25,
+      "skipped": 0
+    },
+    "CNC_SHOP": {
+      "header": "CNC SHOP",
+      "name": "CNC Shop",
+      "raw": 53,
+      "imported": 52,
+      "skipped": 1
+    },
+    "PRE_TREATMENT": {
+      "header": "Pre-treatment Inspection",
+      "name": "Pre-treatment Inspection",
+      "raw": 34,
+      "imported": 34,
+      "skipped": 0
+    },
+    "FINAL": {
+      "header": "FINAL Inspection",
+      "name": "FINAL Inspection",
+      "raw": 34,
+      "imported": 34,
+      "skipped": 0
+    }
+  },
+  "rows": [
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A2",
+      "original": "Bore B/H",
+      "normalized": "BORE B/H",
+      "code": "GDC_SHOP-001",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A3",
+      "original": "Spoke B.H",
+      "normalized": "SPOKE B.H",
+      "code": "GDC_SHOP-002",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A4",
+      "original": "Rim Non Filling",
+      "normalized": "RIM NON FILLING",
+      "code": "GDC_SHOP-003",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A5",
+      "original": "Hub Non Filling",
+      "normalized": "HUB NON FILLING",
+      "code": "GDC_SHOP-004",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A6",
+      "original": "Pin Deep",
+      "normalized": "PIN DEEP",
+      "code": "GDC_SHOP-005",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A7",
+      "original": "CI Ring Crack",
+      "normalized": "CI RING CRACK",
+      "code": "GDC_SHOP-006",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A8",
+      "original": "Spk Non-Filling",
+      "normalized": "SPK NON-FILLING",
+      "code": "GDC_SHOP-007",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A9",
+      "original": "Spoke Bend",
+      "normalized": "SPOKE BEND",
+      "code": "GDC_SHOP-008",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A10",
+      "original": "Cold Shot",
+      "normalized": "COLD SHOT",
+      "code": "GDC_SHOP-009",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A11",
+      "original": "Gate Broken",
+      "normalized": "GATE BROKEN",
+      "code": "GDC_SHOP-010",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A12",
+      "original": "Hub Bend",
+      "normalized": "HUB BEND",
+      "code": "GDC_SHOP-011",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A13",
+      "original": "Riser Cut",
+      "normalized": "RISER CUT",
+      "code": "GDC_SHOP-012",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A14",
+      "original": "Gas Block",
+      "normalized": "GAS BLOCK",
+      "code": "GDC_SHOP-013",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A15",
+      "original": "Casting Jam",
+      "normalized": "CASTING JAM",
+      "code": "GDC_SHOP-014",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A16",
+      "original": "Hub B/H",
+      "normalized": "HUB B/H",
+      "code": "GDC_SHOP-015",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A17",
+      "original": "CI Ring Shift",
+      "normalized": "CI RING SHIFT",
+      "code": "GDC_SHOP-016",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A18",
+      "original": "CI Ring Flash",
+      "normalized": "CI RING FLASH",
+      "code": "GDC_SHOP-017",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A19",
+      "original": "Rim Bend/Casting bend",
+      "normalized": "RIM BEND/CASTING BEND",
+      "code": "GDC_SHOP-018",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A20",
+      "original": "Dent",
+      "normalized": "DENT",
+      "code": "GDC_SHOP-019",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A21",
+      "original": "Shrinkage",
+      "normalized": "SHRINKAGE",
+      "code": "GDC_SHOP-020",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A22",
+      "original": "Side Mould M/M",
+      "normalized": "SIDE MOULD M/M",
+      "code": "GDC_SHOP-021",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A23",
+      "original": "Riser Non Filling",
+      "normalized": "RISER NON FILLING",
+      "code": "GDC_SHOP-022",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A24",
+      "original": "Sand Drop",
+      "normalized": "SAND DROP",
+      "code": "GDC_SHOP-023",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A25",
+      "original": "Engraving Not Visible",
+      "normalized": "ENGRAVING NOT VISIBLE",
+      "code": "GDC_SHOP-024",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "GDC_SHOP",
+      "cell": "A26",
+      "original": "Others",
+      "normalized": "OTHERS",
+      "code": "GDC_SHOP-025",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B2",
+      "original": "BEARING BORE O/S",
+      "normalized": "BEARING BORE O/S",
+      "code": "CNC_SHOP-001",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B3",
+      "original": "CHATTERING",
+      "normalized": "CHATTERING",
+      "code": "CNC_SHOP-002",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B4",
+      "original": "DIMENSION NG",
+      "normalized": "DIMENSION NG",
+      "code": "CNC_SHOP-003",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B5",
+      "original": "POWER CUT",
+      "normalized": "POWER CUT",
+      "code": "CNC_SHOP-004",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B6",
+      "original": "WALL THICKNESS NG",
+      "normalized": "WALL THICKNESS NG",
+      "code": "CNC_SHOP-005",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B7",
+      "original": "SETTING",
+      "normalized": "SETTING",
+      "code": "CNC_SHOP-006",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B8",
+      "original": "DENT",
+      "normalized": "DENT",
+      "code": "CNC_SHOP-007",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B9",
+      "original": "VALVE HOLE OUT",
+      "normalized": "VALVE HOLE OUT",
+      "code": "CNC_SHOP-008",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B10",
+      "original": "M/C STEP",
+      "normalized": "M/C STEP",
+      "code": "CNC_SHOP-009",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B11",
+      "original": "INSERT BROKEN",
+      "normalized": "INSERT BROKEN",
+      "code": "CNC_SHOP-010",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B12",
+      "original": "OVALITY",
+      "normalized": "OVALITY",
+      "code": "CNC_SHOP-011",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B13",
+      "original": "CI RING CHIP OFF",
+      "normalized": "CI RING CHIP OFF",
+      "code": "CNC_SHOP-012",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B14",
+      "original": "M/C SHIFT",
+      "normalized": "M/C SHIFT",
+      "code": "CNC_SHOP-013",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B15",
+      "original": "WHEEL SLIP",
+      "normalized": "WHEEL SLIP",
+      "code": "CNC_SHOP-014",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B16",
+      "original": "CI RING DIA O/S",
+      "normalized": "CI RING DIA O/S",
+      "code": "CNC_SHOP-015",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B17",
+      "original": "RIM UNCLEAN",
+      "normalized": "RIM UNCLEAN",
+      "code": "CNC_SHOP-016",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B18",
+      "original": "OPERATION MISS",
+      "normalized": "OPERATION MISS",
+      "code": "CNC_SHOP-017",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B19",
+      "original": "RUN OUT NG",
+      "normalized": "RUN OUT NG",
+      "code": "CNC_SHOP-018",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B20",
+      "original": "VMC OUT",
+      "normalized": "VMC OUT",
+      "code": "CNC_SHOP-019",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B21",
+      "original": "C.I. RING UNCLEAN",
+      "normalized": "C.I. RING UNCLEAN",
+      "code": "CNC_SHOP-020",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B22",
+      "original": "C.I. RING SHIFT",
+      "normalized": "C.I. RING SHIFT",
+      "code": "CNC_SHOP-021",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B23",
+      "original": "C.I. RING CRACK",
+      "normalized": "C.I. RING CRACK",
+      "code": "CNC_SHOP-022",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B24",
+      "original": "C.I. RING BROKEN",
+      "normalized": "C.I. RING BROKEN",
+      "code": "CNC_SHOP-023",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B25",
+      "original": "C.I. RING BLOW HOLE",
+      "normalized": "C.I. RING BLOW HOLE",
+      "code": "CNC_SHOP-024",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B26",
+      "original": "B.H ON RIM",
+      "normalized": "B.H ON RIM",
+      "code": "CNC_SHOP-025",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B27",
+      "original": "RIM PROFILE UNCLEAN",
+      "normalized": "RIM PROFILE UNCLEAN",
+      "code": "CNC_SHOP-026",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B28",
+      "original": "HUB BEND",
+      "normalized": "HUB BEND",
+      "code": "CNC_SHOP-027",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B29",
+      "original": "B.H. ON HUB",
+      "normalized": "B.H. ON HUB",
+      "code": "CNC_SHOP-028",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B30",
+      "original": "PIN DEEP",
+      "normalized": "PIN DEEP",
+      "code": "CNC_SHOP-029",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B31",
+      "original": "LUG HEIGHT  O/S /UNCLEAN",
+      "normalized": "LUG HEIGHT O/S /UNCLEAN",
+      "code": "CNC_SHOP-030",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B32",
+      "original": "OD UNCLEAN",
+      "normalized": "OD UNCLEAN",
+      "code": "CNC_SHOP-031",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B33",
+      "original": "NON FILLING",
+      "normalized": "NON FILLING",
+      "code": "CNC_SHOP-032",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B34",
+      "original": "RISER CUT",
+      "normalized": "RISER CUT",
+      "code": "CNC_SHOP-033",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B35",
+      "original": "BORE SHIFT",
+      "normalized": "BORE SHIFT",
+      "code": "CNC_SHOP-034",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B36",
+      "original": "SPOKE B/H",
+      "normalized": "SPOKE B/H",
+      "code": "CNC_SHOP-035",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B37",
+      "original": "COLD SHOT",
+      "normalized": "COLD SHOT",
+      "code": "CNC_SHOP-036",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B38",
+      "original": "CASTING CRACK",
+      "normalized": "CASTING CRACK",
+      "code": "CNC_SHOP-037",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B39",
+      "original": "BORE BLOW HOLE",
+      "normalized": "BORE BLOW HOLE",
+      "code": "CNC_SHOP-038",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B40",
+      "original": "AIR LEAKAGE",
+      "normalized": "AIR LEAKAGE",
+      "code": "CNC_SHOP-039",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B41",
+      "original": "POROSITY",
+      "normalized": "POROSITY",
+      "code": "CNC_SHOP-040",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B42",
+      "original": "DENT",
+      "normalized": "DENT",
+      "code": null,
+      "status": "SKIPPED_DUPLICATE",
+      "duplicateOf": "B8"
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B43",
+      "original": "SHRINKAGE",
+      "normalized": "SHRINKAGE",
+      "code": "CNC_SHOP-041",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B44",
+      "original": "HARDNESS LOW",
+      "normalized": "HARDNESS LOW",
+      "code": "CNC_SHOP-042",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B45",
+      "original": "BORE FACE U/C",
+      "normalized": "BORE FACE U/C",
+      "code": "CNC_SHOP-043",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B46",
+      "original": "RISER FACE UNCLEAN",
+      "normalized": "RISER FACE UNCLEAN",
+      "code": "CNC_SHOP-044",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B47",
+      "original": "OVER DIE COAT",
+      "normalized": "OVER DIE COAT",
+      "code": "CNC_SHOP-045",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B48",
+      "original": "GAS BLOCK",
+      "normalized": "GAS BLOCK",
+      "code": "CNC_SHOP-046",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B49",
+      "original": "CATCHING",
+      "normalized": "CATCHING",
+      "code": "CNC_SHOP-047",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B50",
+      "original": "RUN OUT",
+      "normalized": "RUN OUT",
+      "code": "CNC_SHOP-048",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B51",
+      "original": "SPOKE BEND",
+      "normalized": "SPOKE BEND",
+      "code": "CNC_SHOP-049",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B52",
+      "original": "PAINT PEEL OFF",
+      "normalized": "PAINT PEEL OFF",
+      "code": "CNC_SHOP-050",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B53",
+      "original": "OVER DFT",
+      "normalized": "OVER DFT",
+      "code": "CNC_SHOP-051",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "CNC_SHOP",
+      "cell": "B54",
+      "original": "OTHERS",
+      "normalized": "OTHERS",
+      "code": "CNC_SHOP-052",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C2",
+      "original": "C.I. RING UNCLEAN",
+      "normalized": "C.I. RING UNCLEAN",
+      "code": "PRE_TREATMENT-001",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C3",
+      "original": "C.I. RING SHIFT",
+      "normalized": "C.I. RING SHIFT",
+      "code": "PRE_TREATMENT-002",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C4",
+      "original": "C.I. RING CRACK",
+      "normalized": "C.I. RING CRACK",
+      "code": "PRE_TREATMENT-003",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C5",
+      "original": "C.I. RING BROKEN",
+      "normalized": "C.I. RING BROKEN",
+      "code": "PRE_TREATMENT-004",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C6",
+      "original": "C.I. RING BLOW HOLE",
+      "normalized": "C.I. RING BLOW HOLE",
+      "code": "PRE_TREATMENT-005",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C7",
+      "original": "B.H ON RIM",
+      "normalized": "B.H ON RIM",
+      "code": "PRE_TREATMENT-006",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C8",
+      "original": "RIM PROFILE UNCLEAN",
+      "normalized": "RIM PROFILE UNCLEAN",
+      "code": "PRE_TREATMENT-007",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C9",
+      "original": "HUB BEND",
+      "normalized": "HUB BEND",
+      "code": "PRE_TREATMENT-008",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C10",
+      "original": "B.H. ON HUB",
+      "normalized": "B.H. ON HUB",
+      "code": "PRE_TREATMENT-009",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C11",
+      "original": "PIN DEEP",
+      "normalized": "PIN DEEP",
+      "code": "PRE_TREATMENT-010",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C12",
+      "original": "LUG HEIGHT  O/S /UNCLEAN",
+      "normalized": "LUG HEIGHT O/S /UNCLEAN",
+      "code": "PRE_TREATMENT-011",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C13",
+      "original": "OD UNCLEAN",
+      "normalized": "OD UNCLEAN",
+      "code": "PRE_TREATMENT-012",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C14",
+      "original": "NON FILLING",
+      "normalized": "NON FILLING",
+      "code": "PRE_TREATMENT-013",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C15",
+      "original": "RISER CUT",
+      "normalized": "RISER CUT",
+      "code": "PRE_TREATMENT-014",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C16",
+      "original": "BORE SHIFT",
+      "normalized": "BORE SHIFT",
+      "code": "PRE_TREATMENT-015",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C17",
+      "original": "SPOKE B/H",
+      "normalized": "SPOKE B/H",
+      "code": "PRE_TREATMENT-016",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C18",
+      "original": "COLD SHOT",
+      "normalized": "COLD SHOT",
+      "code": "PRE_TREATMENT-017",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C19",
+      "original": "CASTING CRACK",
+      "normalized": "CASTING CRACK",
+      "code": "PRE_TREATMENT-018",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C20",
+      "original": "BORE BLOW HOLE",
+      "normalized": "BORE BLOW HOLE",
+      "code": "PRE_TREATMENT-019",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C21",
+      "original": "AIR LEAKAGE",
+      "normalized": "AIR LEAKAGE",
+      "code": "PRE_TREATMENT-020",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C22",
+      "original": "POROSITY",
+      "normalized": "POROSITY",
+      "code": "PRE_TREATMENT-021",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C23",
+      "original": "DENT",
+      "normalized": "DENT",
+      "code": "PRE_TREATMENT-022",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C24",
+      "original": "SHRINKAGE",
+      "normalized": "SHRINKAGE",
+      "code": "PRE_TREATMENT-023",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C25",
+      "original": "HARDNESS LOW",
+      "normalized": "HARDNESS LOW",
+      "code": "PRE_TREATMENT-024",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C26",
+      "original": "BORE FACE U/C",
+      "normalized": "BORE FACE U/C",
+      "code": "PRE_TREATMENT-025",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C27",
+      "original": "RISER FACE UNCLEAN",
+      "normalized": "RISER FACE UNCLEAN",
+      "code": "PRE_TREATMENT-026",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C28",
+      "original": "OVER DIE COAT",
+      "normalized": "OVER DIE COAT",
+      "code": "PRE_TREATMENT-027",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C29",
+      "original": "GAS BLOCK",
+      "normalized": "GAS BLOCK",
+      "code": "PRE_TREATMENT-028",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C30",
+      "original": "CATCHING",
+      "normalized": "CATCHING",
+      "code": "PRE_TREATMENT-029",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C31",
+      "original": "RUN OUT",
+      "normalized": "RUN OUT",
+      "code": "PRE_TREATMENT-030",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C32",
+      "original": "SPOKE BEND",
+      "normalized": "SPOKE BEND",
+      "code": "PRE_TREATMENT-031",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C33",
+      "original": "PAINT PEEL OFF",
+      "normalized": "PAINT PEEL OFF",
+      "code": "PRE_TREATMENT-032",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C34",
+      "original": "OVER DFT",
+      "normalized": "OVER DFT",
+      "code": "PRE_TREATMENT-033",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "PRE_TREATMENT",
+      "cell": "C35",
+      "original": "OTHERS",
+      "normalized": "OTHERS",
+      "code": "PRE_TREATMENT-034",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D2",
+      "original": "C.I. RING UNCLEAN",
+      "normalized": "C.I. RING UNCLEAN",
+      "code": "FINAL-001",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D3",
+      "original": "C.I. RING SHIFT",
+      "normalized": "C.I. RING SHIFT",
+      "code": "FINAL-002",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D4",
+      "original": "C.I. RING CRACK",
+      "normalized": "C.I. RING CRACK",
+      "code": "FINAL-003",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D5",
+      "original": "C.I. RING BROKEN",
+      "normalized": "C.I. RING BROKEN",
+      "code": "FINAL-004",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D6",
+      "original": "C.I. RING BLOW HOLE",
+      "normalized": "C.I. RING BLOW HOLE",
+      "code": "FINAL-005",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D7",
+      "original": "B.H ON RIM",
+      "normalized": "B.H ON RIM",
+      "code": "FINAL-006",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D8",
+      "original": "RIM PROFILE UNCLEAN",
+      "normalized": "RIM PROFILE UNCLEAN",
+      "code": "FINAL-007",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D9",
+      "original": "HUB BEND",
+      "normalized": "HUB BEND",
+      "code": "FINAL-008",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D10",
+      "original": "B.H. ON HUB",
+      "normalized": "B.H. ON HUB",
+      "code": "FINAL-009",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D11",
+      "original": "PIN DEEP",
+      "normalized": "PIN DEEP",
+      "code": "FINAL-010",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D12",
+      "original": "LUG HEIGHT  O/S /UNCLEAN",
+      "normalized": "LUG HEIGHT O/S /UNCLEAN",
+      "code": "FINAL-011",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D13",
+      "original": "OD UNCLEAN",
+      "normalized": "OD UNCLEAN",
+      "code": "FINAL-012",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D14",
+      "original": "NON FILLING",
+      "normalized": "NON FILLING",
+      "code": "FINAL-013",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D15",
+      "original": "RISER CUT",
+      "normalized": "RISER CUT",
+      "code": "FINAL-014",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D16",
+      "original": "BORE SHIFT",
+      "normalized": "BORE SHIFT",
+      "code": "FINAL-015",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D17",
+      "original": "SPOKE B/H",
+      "normalized": "SPOKE B/H",
+      "code": "FINAL-016",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D18",
+      "original": "COLD SHOT",
+      "normalized": "COLD SHOT",
+      "code": "FINAL-017",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D19",
+      "original": "CASTING CRACK",
+      "normalized": "CASTING CRACK",
+      "code": "FINAL-018",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D20",
+      "original": "BORE BLOW HOLE",
+      "normalized": "BORE BLOW HOLE",
+      "code": "FINAL-019",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D21",
+      "original": "AIR LEAKAGE",
+      "normalized": "AIR LEAKAGE",
+      "code": "FINAL-020",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D22",
+      "original": "POROSITY",
+      "normalized": "POROSITY",
+      "code": "FINAL-021",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D23",
+      "original": "DENT",
+      "normalized": "DENT",
+      "code": "FINAL-022",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D24",
+      "original": "SHRINKAGE",
+      "normalized": "SHRINKAGE",
+      "code": "FINAL-023",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D25",
+      "original": "HARDNESS LOW",
+      "normalized": "HARDNESS LOW",
+      "code": "FINAL-024",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D26",
+      "original": "BORE FACE U/C",
+      "normalized": "BORE FACE U/C",
+      "code": "FINAL-025",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D27",
+      "original": "RISER FACE UNCLEAN",
+      "normalized": "RISER FACE UNCLEAN",
+      "code": "FINAL-026",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D28",
+      "original": "OVER DIE COAT",
+      "normalized": "OVER DIE COAT",
+      "code": "FINAL-027",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D29",
+      "original": "GAS BLOCK",
+      "normalized": "GAS BLOCK",
+      "code": "FINAL-028",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D30",
+      "original": "CATCHING",
+      "normalized": "CATCHING",
+      "code": "FINAL-029",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D31",
+      "original": "RUN OUT",
+      "normalized": "RUN OUT",
+      "code": "FINAL-030",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D32",
+      "original": "SPOKE BEND",
+      "normalized": "SPOKE BEND",
+      "code": "FINAL-031",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D33",
+      "original": "PAINT PEEL OFF",
+      "normalized": "PAINT PEEL OFF",
+      "code": "FINAL-032",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D34",
+      "original": "OVER DFT",
+      "normalized": "OVER DFT",
+      "code": "FINAL-033",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    },
+    {
+      "stageCode": "FINAL",
+      "cell": "D35",
+      "original": "OTHERS",
+      "normalized": "OTHERS",
+      "code": "FINAL-034",
+      "status": "IMPORTED",
+      "duplicateOf": null
+    }
+  ]
 }

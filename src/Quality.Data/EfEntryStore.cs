@@ -32,7 +32,12 @@ public sealed class EfEntryStore : IEntryStore
         if (f.InspectorId is int i) q = q.Where(e => e.InspectorId == i);
         if (f.StageId is int s) q = q.Where(e => e.InspectionStageId == s);
         if (f.FromUtc is DateTime from) q = q.Where(e => e.ServerCreatedAt >= from);
-        if (f.ToUtc is DateTime to) q = q.Where(e => e.ServerCreatedAt <= to);
+        if (f.ToUtc is DateTime to) q = f.ToInclusive ? q.Where(e => e.ServerCreatedAt <= to) : q.Where(e => e.ServerCreatedAt < to);
+        if (f.CursorTimeUtc is DateTime ct)
+        {
+            var idBelow = f.CursorIdBelow;
+            q = q.Where(e => e.ServerCreatedAt < ct || (e.ServerCreatedAt == ct && e.Id < idBelow));
+        }
         return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(f.Limit).ToListAsync();
     }
 
@@ -59,5 +64,12 @@ public sealed class EntryStoreRouter : IEntryStoreRouter, IDisposable
     }
 
     public IReadOnlyList<IEntryStore> All() => _connectionStrings.Keys.Select(For).ToList();
+    public IReadOnlyCollection<string> Keys => _connectionStrings.Keys.ToList();
+
+    public async Task<bool> CanConnectAsync(string key, CancellationToken ct)
+    {
+        For(key);   // throws if not configured
+        return await _open[key].Db.Database.CanConnectAsync(ct);
+    }
     public void Dispose() { foreach (var (db, _) in _open.Values) db.Dispose(); _open.Clear(); }
 }

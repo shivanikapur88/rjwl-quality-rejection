@@ -19,7 +19,20 @@ public class User
     public Role? Role { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
+    /// <summary>Bumped on password reset, deactivation and role change. Tokens carry it ("tv" claim); an older value is refused (review Q2).</summary>
+    public int TokenVersion { get; set; }
+    public DateTime? ModifiedAt { get; set; }
+    public byte[]? RowVer { get; set; }
     public List<UserShop> UserShops { get; set; } = new();
+}
+
+/// <summary>One row per login name (username and employee code share one namespace, review Q5). Key = UPPER(trimmed value).</summary>
+public class LoginIdentifier
+{
+    public string NormalizedIdentifier { get; set; } = "";
+    public int UserId { get; set; }
+    /// <summary>'U' username, 'E' employee code, 'B' both (username equals employee code).</summary>
+    public string Kind { get; set; } = "U";
 }
 
 public class Shop
@@ -63,6 +76,8 @@ public class Machine
     public string MachineName { get; set; } = "";
     public int ShopId { get; set; }
     public bool IsActive { get; set; } = true;
+    public DateTime? ModifiedAt { get; set; }
+    public byte[]? RowVer { get; set; }
 }
 
 public class RejectionPhenomenon
