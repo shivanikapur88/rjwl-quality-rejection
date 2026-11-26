@@ -176,9 +176,13 @@ public sealed class CorrectionsViewModel : BaseViewModel
 
     public override Task OnAppearingAsync() { OnPropertyChanged(nameof(Heading)); return LoadAsync(); }
 
+    private int _loadSeq;
+
     public Task LoadAsync() => RunBusyAsync(async () =>
     {
+        var seq = Interlocked.Increment(ref _loadSeq);   // overlapping loads (checkbox, pull-to-refresh): only the latest may fill the list
         var r = await _api.GetCorrectionsAsync(_showDecided ? "all" : "Pending");
+        if (seq != Volatile.Read(ref _loadSeq)) return;
         if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
         Items.Clear();
         var decider = _session.IsSupervisor || _session.IsAdministrator;
@@ -245,28 +249,39 @@ public sealed class SummaryViewModel : BaseViewModel
 
     public override async Task OnAppearingAsync()
     {
-        if (_day != default) { await LoadAsync(); return; }
+        // The calendar is re-read every time the screen appears: "today" moves on at the start of the first shift.
         await RunBusyAsync(async () =>
         {
             var c = await _api.GetCalendarAsync();
             if (!c.IsSuccess) { ErrorMessage = c.Error!.Message; return; }
-            _today = _day = c.Value!.ProductionDate;
-            ShiftOptions.Clear(); ShiftOptions.Add(new Option(null, "All shifts"));
-            for (var i = 0; i < c.Value.Shifts.Count; i++) ShiftOptions.Add(new Option(i, $"{c.Value.Shifts[i].ShiftName} (from {c.Value.Shifts[i].StartTime})"));
-            _shift = ShiftOptions.FirstOrDefault(o => o.Name.StartsWith("Shift " + c.Value.CurrentShift, StringComparison.Ordinal)) ?? ShiftOptions[0];
-            OnPropertyChanged(nameof(SelectedShift));
+            var firstTime = _day == default;
+            _today = c.Value!.ProductionDate;
+            if (firstTime || _day > _today) _day = _today;
             _shiftCodes = c.Value.Shifts.Select(s => s.ShiftCode).ToList();
+            if (firstTime)
+            {
+                ShiftOptions.Clear(); ShiftOptions.Add(new Option(null, "All shifts"));
+                for (var i = 0; i < c.Value.Shifts.Count; i++) ShiftOptions.Add(new Option(i, $"{c.Value.Shifts[i].ShiftName} (from {c.Value.Shifts[i].StartTime})"));
+                var current = _shiftCodes.IndexOf(c.Value.CurrentShift);   // by code, not by display name
+                _shift = current >= 0 ? ShiftOptions[current + 1] : ShiftOptions[0];
+                OnPropertyChanged(nameof(SelectedShift));
+            }
         });
-        if (_day != default) await LoadAsync();
+        await LoadAsync();
     }
+
+    private int _loadSeq;
 
     private List<string> _shiftCodes = new();
 
-    public Task LoadAsync() => RunBusyAsync(async () =>
+    public Task LoadAsync() => _day == default ? Task.CompletedTask : RunBusyAsync(async () =>   // no calendar yet: nothing to ask for
     {
         OnPropertyChanged(nameof(DayText));
+        var day = _day;
         var code = _shift?.Id is int i && i < _shiftCodes.Count ? _shiftCodes[i] : null;
-        var r = await _api.GetTotalsAsync(_day, _day, code, top: 5);
+        var seq = Interlocked.Increment(ref _loadSeq);
+        var r = await _api.GetTotalsAsync(day, day, code, top: 5);
+        if (seq != Volatile.Read(ref _loadSeq)) return;   // a later tap (day or shift) started another load: its result wins
         if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
         var d = r.Value!;
         TotalText = d.Total.Quantity.ToString("N0", CultureInfo.CurrentCulture);

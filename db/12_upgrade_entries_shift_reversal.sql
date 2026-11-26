@@ -40,6 +40,17 @@ GO
 /* ---------- backfill existing rows (plant time = UTC + @OffsetMinutes) ---------- */
 DECLARE @OffsetMinutes int = 330;                         -- India Standard Time (UTC+05:30)
 DECLARE @A time(0) = '06:00', @B time(0) = '14:00', @C time(0) = '22:00';   -- = qa.ShiftDefinitions seed
+-- Where the master database is this database (PRE/FINAL), refuse to backfill with values that differ from qa.ShiftDefinitions.
+-- (Dynamic SQL: the table does not exist in GDC_AndonDB/MachineShopDB, and SQL Server would resolve the name even inside a skipped IF.)
+IF OBJECT_ID(N'qa.ShiftDefinitions', N'U') IS NOT NULL AND EXISTS (SELECT 1 FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL)
+    EXEC sp_executesql N'
+        IF (SELECT STRING_AGG(ShiftCode + ''='' + CONVERT(varchar(5), StartTime, 108), '','') WITHIN GROUP (ORDER BY SortOrder) FROM qa.ShiftDefinitions WHERE IsActive = 1)
+           <> CONCAT(''A='', CONVERT(varchar(5), @A, 108), '',B='', CONVERT(varchar(5), @B, 108), '',C='', CONVERT(varchar(5), @C, 108))
+            THROW 50013, N''The backfill shift times in this script differ from qa.ShiftDefinitions. Edit @A/@B/@C (and the codes) to match, then run again.'', 1;',
+        N'@A time(0), @B time(0), @C time(0)', @A = @A, @B = @B, @C = @C;
+DECLARE @msg nvarchar(200) = CONCAT(N'Backfill parameters: UTC offset ', @OffsetMinutes, N' min; A ', CONVERT(varchar(5), @A, 108), N', B ', CONVERT(varchar(5), @B, 108), N', C ', CONVERT(varchar(5), @C, 108),
+    N'; rows to fill: ', (SELECT COUNT(*) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL));
+PRINT @msg;
 WHILE 1 = 1
 BEGIN
     UPDATE TOP (5000) e

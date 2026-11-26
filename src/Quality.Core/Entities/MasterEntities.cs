@@ -145,6 +145,8 @@ public class EntryCorrection
     public DateTime? DecidedAt { get; set; }
     public string? DecisionNote { get; set; }
     public long? ReplacementEntryId { get; set; }
+    /// <summary>SubmissionId the replacement entry will get; random, fixed at request time, never sent to clients.</summary>
+    public Guid ReplacementSubmissionId { get; set; }
     public byte[]? RowVer { get; set; }
 
     /// <summary>No proposal at all: the entry should simply not count.</summary>

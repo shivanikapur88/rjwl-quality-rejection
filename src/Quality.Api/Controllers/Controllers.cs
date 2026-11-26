@@ -28,6 +28,9 @@ public sealed class HealthController : ControllerBase
         var components = new Dictionary<string, string>();
         components["master"] = await CanConnect(() => master.Database.CanConnectAsync(ct));
         foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(() => router.CanConnectAsync(key, ct));
+        // Round 2: entries are stamped with shifts from qa.ShiftDefinitions; a fallback calendar means those are not being used.
+        var calendar = await HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>().GetAsync();
+        components["shifts"] = calendar.IsFallback ? "unavailable" : "ok";
         var ok = components.Values.All(v => v == "ok");
         return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components));
 
@@ -204,6 +207,11 @@ public sealed class CorrectionsController : ApiControllerBase
     [HttpGet("corrections")]
     public async Task<IActionResult> List([FromQuery] string? status = CorrectionStatus.Pending, [FromQuery] int? shopId = null) =>
         Map(await _svc.ListAsync(Me, string.Equals(status, "all", StringComparison.OrdinalIgnoreCase) ? null : status, shopId));
+
+    /// <summary>Number of requests in the caller's scope (for badges and the dashboard tile); one query, no entry reads.</summary>
+    [HttpGet("corrections/count")]
+    public async Task<IActionResult> Count([FromQuery] string? status = CorrectionStatus.Pending) =>
+        Map(await _svc.CountAsync(Me, string.Equals(status, "all", StringComparison.OrdinalIgnoreCase) ? null : status));
 
     [HttpPost("corrections/{id:long}/approve"), Authorize(Roles = RoleNames.Supervisor + "," + RoleNames.Administrator)]
     public async Task<IActionResult> Approve(long id, [FromBody] CorrectionDecisionRequest? request) => Map(await _svc.ApproveAsync(Me, id, request));

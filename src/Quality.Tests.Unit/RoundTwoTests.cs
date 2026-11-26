@@ -37,6 +37,8 @@ public sealed class ShiftCalendarTests
         Assert.Equal((new DateOnly(2026, 11, 25), "N"), cal.Resolve(Utc(26, 1, 0)));   // 06:30 IST
         Assert.Equal((new DateOnly(2026, 11, 26), "D"), cal.Resolve(Utc(26, 7, 0)));   // 12:30 IST (inactive X ignored)
         Assert.Throws<InvalidOperationException>(() => new ShiftCalendar(Array.Empty<ShiftDefinition>(), Ist));
+        Assert.True(cal.IsKnownShift("X"));   // retired shift codes stay queryable (review #3)
+        Assert.False(cal.IsKnownShift("Z"));
     }
 }
 
@@ -51,8 +53,6 @@ public sealed class QrPayloadTests
     public void Label_round_trips_and_replacement_ids_are_deterministic()
     {
         Assert.Equal(42, MachineLookupService.ParsePayload(MachineLookupService.LabelPayload(42)));
-        Assert.Equal(EntryCorrectionService.ReplacementSubmissionId(9), EntryCorrectionService.ReplacementSubmissionId(9));
-        Assert.NotEqual(EntryCorrectionService.ReplacementSubmissionId(9), EntryCorrectionService.ReplacementSubmissionId(10));
     }
 }
 
@@ -159,6 +159,29 @@ public sealed partial class MobileViewModelTests
         Assert.Contains("fromDate=2026-11-26", _http.Calls.Last().Path);
         await vm.PreviousDayCommand.ExecuteAsync();
         Assert.Contains("fromDate=2026-11-25", _http.Calls.Last().Path);
+    }
+
+    [Fact]
+    public async Task Summary_ignores_a_slow_response_from_an_earlier_tap()
+    {
+        await _session.StartAsync(new LoginResponse("tok", DateTime.UtcNow.AddHours(8), 3, "S1", "Sup", "Supervisor"));
+        var day = new DateOnly(2026, 11, 26);
+        var slow = new TaskCompletionSource<HttpResponseMessage>();
+        ReportDto Rep(int q) => new(day, day, null, new ReportTotal(q, 1), Array.Empty<ShopTotalDto>(), Array.Empty<DayShiftTotalDto>(), Array.Empty<PhenomenonTotalDto>(), Array.Empty<MachineTotalDto>(), Array.Empty<string>());
+        _http.Respond = r => r.RequestUri!.AbsolutePath.EndsWith("/calendar")
+            ? Task.FromResult(Json(HttpStatusCode.OK, new CalendarDto(day, "A", "Asia/Kolkata", new[] { new ShiftDto("A", "Shift A", "06:00") })))
+            : r.RequestUri.Query.Contains("2026-11-25") ? slow.Task                       // day-1: answers late
+            : Task.FromResult(Json(HttpStatusCode.OK, Rep(r.RequestUri.Query.Contains("2026-11-24") ? 24 : 26)));
+        var vm = new SummaryViewModel(_api);
+        await vm.OnAppearingAsync();
+        // (The same button cannot run twice at once - AsyncCommand blocks it - but "‹" then "›" can overlap.)
+        var first = vm.PreviousDayCommand.ExecuteAsync();    // -> 25 Nov (slow)
+        var second = vm.NextDayCommand.ExecuteAsync();       // -> back to 26 Nov, answers at once
+        await second;
+        slow.SetResult(Json(HttpStatusCode.OK, Rep(25)));
+        await first;
+        Assert.Equal("26", vm.TotalText);                    // not overwritten by the late 25 Nov answer
+        Assert.StartsWith(day.ToString("ddd dd MMM yyyy", System.Globalization.CultureInfo.CurrentCulture), vm.DayText);
     }
 
     [Fact]

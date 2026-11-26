@@ -177,9 +177,10 @@ public sealed class Round2Tests(SqlFixture f) : SqlTest(f)
         {
             var store = router.For("GDC");
             var orig = (await store.GetByIdAsync(e.Id))!;
+            var replacementId = Guid.NewGuid();
             Quality.Core.Entities.QualityRejectionEntry Make() => new()
             {
-                SubmissionId = EntryCorrectionService.ReplacementSubmissionId(999_000 + e.Id), ShopId = orig.ShopId, ShopCode = orig.ShopCode, InspectionStageId = orig.InspectionStageId,
+                SubmissionId = replacementId, ShopId = orig.ShopId, ShopCode = orig.ShopCode, InspectionStageId = orig.InspectionStageId,
                 StageCode = orig.StageCode, StageName = orig.StageName, MachineId = orig.MachineId, MachineCode = orig.MachineCode, MachineName = orig.MachineName,
                 RejectionPhenomenonId = orig.RejectionPhenomenonId, PhenomenonNameSnapshot = orig.PhenomenonNameSnapshot, Quantity = 1,
                 InspectorId = orig.InspectorId, InspectorEmployeeCode = orig.InspectorEmployeeCode, ServerCreatedAt = DateTime.UtcNow,
@@ -190,6 +191,64 @@ public sealed class Round2Tests(SqlFixture f) : SqlTest(f)
             Assert.Equal(a!.Id, b!.Id);
             await Assert.ThrowsAsync<CorrectionConflictException>(() => store.ApplyCorrectionAsync(orig.ShopId, orig.Id, 123_456_789, DateTime.UtcNow, null));
         }
+    }
+
+    // ---------------- independent-review fixes ----------------
+    /// <summary>Review #1: the entry-database half of an approval committed, the master half did not. Reject/withdraw must not win.</summary>
+    [Fact]
+    public async Task Half_applied_approval_is_completed_as_approved_not_rejected_or_withdrawn()
+    {
+        var c = await SetupAsync("GDC");
+        foreach (var how in new[] { "reject", "withdraw" })
+        {
+            var e = await PostEntry(c, qty: 6);
+            var corr = (await (await c.Inspector.PostAsJsonAsync($"/api/rejection-entries/{c.Shop.Id}/{e.Id}/corrections", new CorrectionRequest("was 3", Quantity: 3))).Content.ReadFromJsonAsync<CorrectionDto>())!;
+            var repId = await SqlFixture.Scalar<Guid>(F.MasterCs, $"SELECT ReplacementSubmissionId FROM qa.EntryCorrections WHERE Id = {corr.Id}");
+            // Simulate the failure: apply in the entry database only.
+            var (scope, router) = F.Scoped<IEntryStoreRouter>();
+            using (scope)
+            {
+                var orig = (await router.For("GDC").GetByIdAsync(e.Id))!;
+                orig.Id = 0; orig.SubmissionId = repId; orig.Quantity = 3; orig.CorrectsEntryId = e.Id; orig.ReversedAt = null; orig.ReversedByCorrectionId = null;
+                await router.For("GDC").ApplyCorrectionAsync(c.Shop.Id, e.Id, corr.Id, DateTime.UtcNow, orig);
+            }
+            var r = how == "reject"
+                ? await c.Supervisor.PostAsJsonAsync($"/api/corrections/{corr.Id}/reject", new CorrectionDecisionRequest("no"))
+                : await c.Inspector.PostAsync($"/api/corrections/{corr.Id}/withdraw", null);
+            Assert.Equal("correction_already_applied", await Code(r));
+            var row = await SqlFixture.Rows(F.MasterCs, $"SELECT Status, ReplacementEntryId FROM qa.EntryCorrections WHERE Id = {corr.Id}");
+            Assert.Equal("Approved", (string)row[0][0]);
+            Assert.False(row[0][1] is DBNull);
+        }
+    }
+
+    /// <summary>Review #6: an ordinary entry carrying the replacement's SubmissionId must never be adopted as the replacement.</summary>
+    [Fact]
+    public async Task A_pre_claimed_replacement_id_is_refused_and_nothing_is_reversed()
+    {
+        var c = await SetupAsync("CNC");
+        var e = await PostEntry(c, qty: 5);
+        var corr = (await (await c.Inspector.PostAsJsonAsync($"/api/rejection-entries/{c.Shop.Id}/{e.Id}/corrections", new CorrectionRequest("was 1", Quantity: 1))).Content.ReadFromJsonAsync<CorrectionDto>())!;
+        var repId = await SqlFixture.Scalar<Guid>(F.MasterCs, $"SELECT ReplacementSubmissionId FROM qa.EntryCorrections WHERE Id = {corr.Id}");
+        Assert.Equal(HttpStatusCode.Created, (await c.Inspector.PostAsJsonAsync("/api/rejection-entries",
+            new CreateEntryRequest(repId, c.Shop.Id, c.Stage.Id, c.Machines[0].Id, c.Phenomena[0].Id, 9, "squatter"))).StatusCode);
+        var r = await c.Supervisor.PostAsJsonAsync($"/api/corrections/{corr.Id}/approve", new CorrectionDecisionRequest(null));
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.False((await c.Inspector.GetFromJsonAsync<EntryDto>($"/api/rejection-entries/{c.Shop.Id}/{e.Id}"))!.IsReversed);   // rolled back
+        Assert.Equal("Pending", await SqlFixture.Scalar<string>(F.MasterCs, $"SELECT Status FROM qa.EntryCorrections WHERE Id = {corr.Id}"));
+        // The replacement id is never sent to clients.
+        Assert.DoesNotContain(repId.ToString(), await (await c.Supervisor.GetAsync("/api/corrections?status=all")).Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Count_endpoint_matches_the_list_in_scope()
+    {
+        var c = await SetupAsync("FINAL");
+        var e = await PostEntry(c);
+        await c.Inspector.PostAsJsonAsync($"/api/rejection-entries/{c.Shop.Id}/{e.Id}/corrections", new CorrectionRequest("count me"));
+        Assert.Equal(1, await c.Inspector.GetFromJsonAsync<int>("/api/corrections/count"));   // inspector: own only
+        var listed = (await c.Supervisor.GetFromJsonAsync<List<CorrectionDto>>("/api/corrections"))!.Count;
+        Assert.Equal(listed, await c.Supervisor.GetFromJsonAsync<int>("/api/corrections/count"));
     }
 
     // ---------------- #4 / #6 reports ----------------

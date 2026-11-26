@@ -36,16 +36,19 @@ public sealed class ShiftCalendarProvider : IShiftCalendarProvider
                 using var scope = _scopes.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
                 var shifts = await db.ShiftDefinitions.AsNoTracking().ToListAsync();
-                _cached = shifts.Count == 0 ? ShiftCalendar.Default(_zone) : new ShiftCalendar(shifts, _zone);
+                // An empty or unusable table (e.g. every shift inactive) throws or falls back; both are flagged for readiness.
+                _cached = shifts.Count == 0 ? Fallback() : new ShiftCalendar(shifts, _zone);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _log.LogWarning(ex, "Could not read qa.ShiftDefinitions; using the {Which} shift calendar.", _cached is null ? "default" : "last loaded");
-                _cached ??= ShiftCalendar.Default(_zone);
+                _cached ??= Fallback();   // reported by /api/health/ready
             }
             _loadedAt = now;
             return _cached;
         }
         finally { _gate.Release(); }
     }
+
+    private ShiftCalendar Fallback() => new(ShiftCalendar.Default(_zone).Shifts, _zone) { IsFallback = true };
 }

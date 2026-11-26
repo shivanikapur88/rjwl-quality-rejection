@@ -146,7 +146,7 @@ public sealed class SecurityTests(SqlFixture f) : SqlTest(f)
         var r = await F.Client().GetAsync("/api/health/ready");
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var dto = await r.Content.ReadFromJsonAsync<ReadinessDto>();
-        Assert.Equal(new[] { "entries:CNC", "entries:FINAL", "entries:GDC", "entries:PRE", "master" }, dto!.Components.Keys.OrderBy(k => k));
+        Assert.Equal(new[] { "entries:CNC", "entries:FINAL", "entries:GDC", "entries:PRE", "master", "shifts" }, dto!.Components.Keys.OrderBy(k => k));
         Assert.All(dto.Components.Values, v => Assert.Equal("ok", v));
     }
 

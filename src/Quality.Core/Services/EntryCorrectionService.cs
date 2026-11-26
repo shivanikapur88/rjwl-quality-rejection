@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Quality.Core.Abstractions;
 using Quality.Core.Common;
@@ -61,6 +59,8 @@ public sealed class EntryCorrectionService
             RequestedAt = _time.GetUtcNow().UtcDateTime, Reason = reason, Status = CorrectionStatus.Pending,
             ProposedMachineId = req.MachineId, ProposedPhenomenonId = req.PhenomenonId, ProposedQuantity = req.Quantity,
             ProposedRemarks = req.Remarks is null ? null : RejectionEntryService.CleanRemarks(req.Remarks) ?? "",
+            // Random and server-side (never sent to clients), so nobody can pre-claim it with an ordinary entry (Fable review #6).
+            ReplacementSubmissionId = Guid.NewGuid(),
         };
         if (!c.IsReverseOnly)
         {
@@ -116,7 +116,15 @@ public sealed class EntryCorrectionService
             { refused = new(ErrorKind.Conflict, "correction_not_pending", "This request has already been decided or withdrawn. Refresh the list."); return; }
             var old = Snapshot(c);
             var now = _time.GetUtcNow().UtcDateTime;
-            original = await store.GetByIdAsync(c.EntryId);
+            original = await store.GetByIdAsync(c.EntryId);   // also for reject: we must know whether an earlier approval was half-applied
+            if (original is not null && original.ShopId == c.ShopId && original.ReversedByCorrectionId == c.Id)
+            {
+                // An earlier approval committed in the entry database but not here (failure between the two databases).
+                // Finish it as Approved whatever was asked now; a reject or withdraw would contradict the data (Fable review #1).
+                await CompleteHalfAppliedAsync(c, store, user.Id, now, old);
+                if (!approve) refused = new(ErrorKind.Conflict, "correction_already_applied", "This correction had already been applied; it is now recorded as approved.");
+                return;
+            }
             if (approve)
             {
                 if (original is null || original.ShopId != c.ShopId)
@@ -141,7 +149,25 @@ public sealed class EntryCorrectionService
             await _master.SaveChangesAsync();
         });
         if (refused is not null) return ServiceResult<CorrectionDto>.Fail(refused);
-        return ServiceResult<CorrectionDto>.Ok(await ToDtoAsync(c!, shop, await store.GetByIdAsync(c!.EntryId)));
+        return ServiceResult<CorrectionDto>.Ok(await ToDtoAsync(c!, shop, await TryGetEntryAsync(store, c!.EntryId)));
+    }
+
+    /// <summary>Records an approval whose entry-database part had already committed (see DecideAsync).</summary>
+    private async Task CompleteHalfAppliedAsync(EntryCorrection c, IEntryStore store, int actor, DateTime now, string old)
+    {
+        var replacement = c.IsReverseOnly ? null : await store.FindBySubmissionIdAsync(c.ReplacementSubmissionId);
+        c.Status = CorrectionStatus.Approved; c.DecidedBy ??= actor; c.DecidedAt = now;
+        c.DecisionNote ??= "Completed automatically: the approval had already been applied to the entry.";
+        c.ReplacementEntryId = replacement?.Id;
+        _master.AddAudit(Audit(actor, AuditActions.CorrectionApproved, c, old));
+        await _master.SaveChangesAsync();
+    }
+
+    /// <summary>A read after a committed decision must not turn the success into an error (Fable review #8).</summary>
+    private static async Task<QualityRejectionEntry?> TryGetEntryAsync(IEntryStore store, long id)
+    {
+        try { return await store.GetByIdAsync(id); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
     }
 
     // ------------------------------------------------------------------ withdraw
@@ -150,12 +176,20 @@ public sealed class EntryCorrectionService
         var peek = await _master.GetCorrectionAsync(id);
         if (peek is null || peek.RequestedBy != user.Id) return Fail<CorrectionDto>(ErrorKind.NotFound, "correction_not_found", "Correction request not found.");
         var shop = await _master.GetShopAsync(peek.ShopId);
+        var store = _router.For(shop!.EntryStoreKey);
         ServiceError? refused = null; EntryCorrection? c = null;
         await _master.InTransactionAsync(async () =>
         {
             c = await _master.GetCorrectionLockedAsync(id);
             if (c is null || c.Status != CorrectionStatus.Pending) { refused = new(ErrorKind.Conflict, "correction_not_pending", "This request has already been decided."); return; }
             var old = Snapshot(c);
+            var original = await store.GetByIdAsync(c.EntryId);
+            if (original is not null && original.ShopId == c.ShopId && original.ReversedByCorrectionId == c.Id)
+            {
+                await CompleteHalfAppliedAsync(c, store, c.RequestedBy, _time.GetUtcNow().UtcDateTime, old);
+                refused = new(ErrorKind.Conflict, "correction_already_applied", "This correction had already been approved and applied.");
+                return;
+            }
             c.Status = CorrectionStatus.Withdrawn; c.DecidedBy = user.Id; c.DecidedAt = _time.GetUtcNow().UtcDateTime;
             _master.AddAudit(Audit(user.Id, AuditActions.CorrectionWithdrawn, c, old));
             await _master.SaveChangesAsync();
@@ -191,6 +225,14 @@ public sealed class EntryCorrectionService
         return ServiceResult<IReadOnlyList<CorrectionDto>>.Ok(result);
     }
 
+    public async Task<ServiceResult<int>> CountAsync(CurrentUser user, string? status)
+    {
+        if (status is not null && status is not (CorrectionStatus.Pending or CorrectionStatus.Approved or CorrectionStatus.Rejected or CorrectionStatus.Withdrawn))
+            return Fail<int>(ErrorKind.Validation, "status_invalid", "Unknown status.");
+        var shops = await _guard.AccessibleShopsAsync(user);
+        return ServiceResult<int>.Ok(await _master.CountCorrectionsAsync(shops.Select(s => s.Id).ToList(), user.IsInspector ? user.Id : null, status));
+    }
+
     // ------------------------------------------------------------------ helpers
     private async Task<ServiceError?> ValidateProposalAsync(EntryCorrection c, QualityRejectionEntry entry, Shop shop, bool lockRows)
     {
@@ -217,7 +259,7 @@ public sealed class EntryCorrectionService
         var p = (await _master.GetPhenomenonAsync(c.ProposedPhenomenonId ?? o.RejectionPhenomenonId))!;
         return new QualityRejectionEntry
         {
-            SubmissionId = ReplacementSubmissionId(c.Id),   // deterministic: a retried approval cannot insert twice
+            SubmissionId = c.ReplacementSubmissionId,   // fixed per request: a retried approval cannot insert twice
             ShopId = o.ShopId, ShopCode = o.ShopCode, InspectionStageId = o.InspectionStageId, StageCode = o.StageCode, StageName = o.StageName,
             MachineId = m.Id, MachineCode = m.MachineCode, MachineName = m.MachineName,
             RejectionPhenomenonId = p.Id, PhenomenonNameSnapshot = p.PhenomenonName,
@@ -230,9 +272,6 @@ public sealed class EntryCorrectionService
             CorrectsEntryId = o.Id,
         };
     }
-
-    public static Guid ReplacementSubmissionId(long correctionId) =>
-        new(SHA256.HashData(Encoding.UTF8.GetBytes("rjwl-qr-correction:" + correctionId)).AsSpan(0, 16));
 
     private static string Snapshot(EntryCorrection c) => JsonSerializer.Serialize(new
     {

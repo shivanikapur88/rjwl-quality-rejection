@@ -36,9 +36,9 @@
     if (el('shift').value) q.set('shiftCode', el('shift').value);
     document.body.classList.add('busy');
     try {
-      const [r, pending] = await Promise.all([api('/api/reports/totals?' + q), api('/api/corrections?status=Pending').catch(() => null)]);
+      const [r, pending] = await Promise.all([api('/api/reports/totals?' + q), api('/api/corrections/count?status=Pending').catch(() => null)]);
       render(r);
-      text(el('tPending'), pending ? fmt(pending.length) : '–');
+      text(el('tPending'), pending === null ? '–' : fmt(pending));
     } catch (e) { showError(e); }
     finally { document.body.classList.remove('busy'); }
   }
@@ -58,7 +58,12 @@
   function renderTrend(r) {
     const host = el('trend'); host.replaceChildren();
     const days = []; for (let d = r.fromDate; d <= r.toDate; d = addDays(d, 1)) days.push(d);
-    const shown = r.shiftCode ? shifts.filter(s => s.shiftCode === r.shiftCode) : shifts;
+    // Series = configured shifts plus any older shift codes still present in the data (a renamed or retired shift must not vanish).
+    const known = shifts.map(s => s.shiftCode);
+    const extra = [...new Set(r.byDayShift.map(t => t.shiftCode))].filter(c => !known.includes(c)).sort()
+      .map(c => ({ shiftCode: c, shiftName: `Shift ${c} (retired)` }));
+    const shown = [...shifts, ...extra].filter(s => !r.shiftCode || s.shiftCode === r.shiftCode)
+      .filter(s => known.includes(s.shiftCode) || r.byDayShift.some(t => t.shiftCode === s.shiftCode));
     const val = (d, s) => { const x = r.byDayShift.find(t => t.productionDate === d && t.shiftCode === s); return x ? x.quantity : 0; };
     const totals = days.map(d => shown.reduce((a, s) => a + val(d, s.shiftCode), 0));
     const max = Math.max(1, ...totals);
@@ -131,7 +136,8 @@
     t.append(tb); host.append(t);
   }
 
-  const slot = s => SHIFT_SLOTS[Math.max(0, shifts.findIndex(x => x.shiftCode === s.shiftCode)) % SHIFT_SLOTS.length];
+  // Fixed slot per shift code: configured shifts in sort order, retired codes after them (4th slot, then neutral).
+  const slot = s => { const i = shifts.findIndex(x => x.shiftCode === s.shiftCode); return i >= 0 ? SHIFT_SLOTS[i % SHIFT_SLOTS.length] : '--series-other'; };
   function niceMax(v) { const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
   function barPath(x, y, w, h, r) {   // rounded top corners only, anchored to the baseline
     r = Math.min(r, w / 2, h);

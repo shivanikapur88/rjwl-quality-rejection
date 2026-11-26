@@ -109,6 +109,15 @@ public sealed class EfMasterData : IMasterData
         return await q.OrderByDescending(c => c.RequestedAt).ThenByDescending(c => c.Id).Take(limit).ToListAsync();
     }
 
+    public Task<int> CountCorrectionsAsync(IReadOnlyCollection<int>? shopIds, int? requestedBy, string? status)
+    {
+        var q = _db.EntryCorrections.AsNoTracking().AsQueryable();
+        if (shopIds is not null) q = q.Where(c => shopIds.Contains(c.ShopId));
+        if (requestedBy is int u) q = q.Where(c => c.RequestedBy == u);
+        if (status is not null) q = q.Where(c => c.Status == status);
+        return q.CountAsync();
+    }
+
     public async Task<IReadOnlyList<EntryCorrection>> GetCorrectionsForEntriesAsync(int shopId, IReadOnlyCollection<long> entryIds)
     {
         if (entryIds.Count == 0) return Array.Empty<EntryCorrection>();

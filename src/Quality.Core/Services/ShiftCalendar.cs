@@ -16,9 +16,16 @@ public sealed class ShiftCalendar
     public IReadOnlyList<ShiftDefinition> Shifts { get; }
     public TimeZoneInfo Zone => _zone;
 
+    /// <summary>Every shift code ever defined (active or not): old entries keep the code they were saved with.</summary>
+    public IReadOnlySet<string> AllCodes { get; }
+    /// <summary>True when built from the default because qa.ShiftDefinitions could not be read or was unusable.</summary>
+    public bool IsFallback { get; init; }
+
     public ShiftCalendar(IEnumerable<ShiftDefinition> shifts, TimeZoneInfo zone)
     {
-        Shifts = shifts.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ToList();
+        var all = shifts.ToList();
+        AllCodes = all.Select(s => s.ShiftCode).ToHashSet(StringComparer.Ordinal);
+        Shifts = all.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ToList();
         if (Shifts.Count == 0) throw new InvalidOperationException("No active shifts are defined (qa.ShiftDefinitions).");
         if (Shifts.Select(s => s.StartTime).Distinct().Count() != Shifts.Count) throw new InvalidOperationException("Two shifts start at the same time.");
         _zone = zone;
@@ -48,7 +55,7 @@ public sealed class ShiftCalendar
         return (productionDate, code);
     }
 
-    public bool IsKnownShift(string? code) => code is not null && Shifts.Any(s => s.ShiftCode == code);
+    public bool IsKnownShift(string? code) => code is not null && AllCodes.Contains(code);
 }
 
 /// <summary>Supplies the current calendar (shift definitions are read from the master database and cached).</summary>

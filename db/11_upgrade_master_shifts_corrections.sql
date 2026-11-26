@@ -60,6 +60,11 @@ CREATE TABLE qa.EntryCorrections (
                                                 OR (Status <> N'Pending' AND DecidedAt IS NOT NULL))
 );
 GO
+-- SubmissionId of the replacement entry: random, fixed when the request is made, never exposed to clients
+-- (a predictable value could be pre-claimed by an ordinary entry; found in the independent review).
+IF COL_LENGTH(N'qa.EntryCorrections', N'ReplacementSubmissionId') IS NULL
+    ALTER TABLE qa.EntryCorrections ADD ReplacementSubmissionId uniqueidentifier NOT NULL CONSTRAINT DF_EntryCorrections_ReplacementSubmissionId DEFAULT (NEWID());
+GO
 -- At most one OPEN request and at most one APPROVED correction per entry.
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_EntryCorrections_OnePending' AND object_id = OBJECT_ID(N'qa.EntryCorrections'))
     CREATE UNIQUE INDEX UX_EntryCorrections_OnePending ON qa.EntryCorrections (ShopId, EntryId) WHERE Status = N'Pending';

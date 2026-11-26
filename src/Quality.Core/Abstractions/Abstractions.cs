@@ -46,6 +46,7 @@ public interface IMasterData
     Task<EntryCorrection?> GetCorrectionAsync(long id);
     /// <summary>Requests filtered by shop set (null = all), requester (null = anyone) and status (null = any); newest first.</summary>
     Task<IReadOnlyList<EntryCorrection>> ListCorrectionsAsync(IReadOnlyCollection<int>? shopIds, int? requestedBy, string? status, int limit);
+    Task<int> CountCorrectionsAsync(IReadOnlyCollection<int>? shopIds, int? requestedBy, string? status);
     /// <summary>Latest request per entry for the given entries of one shop (to show "correction pending/approved" in history).</summary>
     Task<IReadOnlyList<EntryCorrection>> GetCorrectionsForEntriesAsync(int shopId, IReadOnlyCollection<long> entryIds);
     Task<IReadOnlyDictionary<int, string>> GetUserCodesAsync(IReadOnlyCollection<int> userIds);

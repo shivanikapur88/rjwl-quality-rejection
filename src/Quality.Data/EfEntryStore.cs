@@ -73,6 +73,8 @@ public sealed class EfEntryStore : IEntryStore
         if (replacement is not null)
         {
             saved = await _db.Entries.AsNoTracking().FirstOrDefaultAsync(e => e.SubmissionId == replacement.SubmissionId);   // retry: already inserted
+            if (saved is not null && (saved.ShopId != shopId || saved.CorrectsEntryId != entryId))
+                throw new CorrectionConflictException("The replacement id is already used by another entry.");   // never adopt a foreign row
             if (saved is null)
             {
                 _db.Entries.Add(replacement);
