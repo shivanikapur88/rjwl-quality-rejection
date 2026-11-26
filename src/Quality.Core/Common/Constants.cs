@@ -46,4 +46,5 @@ public static class AuditActions
     public const string CorrectionApproved = "CORRECTION_APPROVED";
     public const string CorrectionRejected = "CORRECTION_REJECTED";
     public const string CorrectionWithdrawn = "CORRECTION_WITHDRAWN";
+    public const string ProductionCountsImported = "PRODUCTION_COUNTS_IMPORTED";
 }

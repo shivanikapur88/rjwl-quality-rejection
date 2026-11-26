@@ -238,8 +238,27 @@ public sealed class ReportsController : ApiControllerBase
     /// <summary>Totals for production days fromDate..toDate (inclusive; default today), optional shop and shift. Supervisor/administrator.</summary>
     [HttpGet("totals")]
     [ProducesResponseType(typeof(ReportDto), 200)]
-    public async Task<IActionResult> Totals([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode, [FromQuery] int? top) =>
-        Map(await _reports.RangeAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, top)));
+    public async Task<IActionResult> Totals([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode, [FromQuery] int? top,
+        [FromQuery] int? machineId, [FromQuery] int? phenomenonId, [FromQuery] bool compare = false) =>
+        Map(await _reports.RangeAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, top, machineId, phenomenonId, compare)));
+
+    /// <summary>Round 3 drill-down: the entries behind a selection (same filters as totals; reversed excluded), newest first.</summary>
+    [HttpGet("entries")]
+    [ProducesResponseType(typeof(ReportEntriesDto), 200)]
+    public async Task<IActionResult> Entries([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode,
+        [FromQuery] int? machineId, [FromQuery] int? phenomenonId, [FromQuery] int? limit) =>
+        Map(await _reports.EntriesAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, null, machineId, phenomenonId), limit));
+}
+
+/// <summary>Round 3, #8: production counts for the rejection rate (administrators).</summary>
+[ApiController, Route("api/admin/production-counts"), Authorize(Roles = RoleNames.Administrator)]
+public sealed class ProductionCountsController : ApiControllerBase
+{
+    /// <summary>Validate (dryRun = true, the default) or apply an upload. All-or-nothing; problems are listed by row.</summary>
+    [HttpPost, RequestSizeLimit(2_000_000)]
+    [ProducesResponseType(typeof(ProductionCountResult), 200)]
+    public async Task<IActionResult> Upload([FromBody] ProductionCountUpload request, [FromServices] ProductionCountService svc) =>
+        Map(await svc.UploadAsync(Me, request));
 }
 
 /// <summary>Feature #8: machine QR codes.</summary>

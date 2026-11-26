@@ -20,6 +20,7 @@ public sealed class MasterDbContext : DbContext
     public DbSet<LoginIdentifier> LoginIdentifiers => Set<LoginIdentifier>();
     public DbSet<ShiftDefinition> ShiftDefinitions => Set<ShiftDefinition>();
     public DbSet<EntryCorrection> EntryCorrections => Set<EntryCorrection>();
+    public DbSet<ProductionCount> ProductionCounts => Set<ProductionCount>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -76,6 +77,12 @@ public sealed class MasterDbContext : DbContext
             e.Property(x => x.Status).HasMaxLength(10);
             e.Property(x => x.RequestedAt).HasColumnType("datetime2(3)"); e.Property(x => x.DecidedAt).HasColumnType("datetime2(3)");
             e.Property(x => x.RowVer).IsRowVersion();
+        });
+        b.Entity<ProductionCount>(e =>   // db/13
+        {
+            e.ToTable("ProductionCounts"); e.Property(x => x.ProductionDate).HasColumnType("date");
+            e.Property(x => x.ShiftCode).HasMaxLength(10); e.Property(x => x.Source).HasMaxLength(50);
+            e.Property(x => x.UpdatedAt).HasColumnType("datetime2(3)");
         });
         b.Entity<AuditLogEntry>(e =>
         {

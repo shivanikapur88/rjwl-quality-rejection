@@ -44,6 +44,7 @@ builder.Services.AddScoped<UserAdminService>();
 builder.Services.AddScoped<EntryCorrectionService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<MachineLookupService>();
+builder.Services.AddScoped<ProductionCountService>();   // round 3
 builder.Services.AddSingleton(new CorrectionOptions(cfg.GetValue("Corrections:MaxAgeDays", 30)));
 builder.Services.AddSingleton<IShiftCalendarProvider, ShiftCalendarProvider>();
 builder.Services.AddSingleton<IdentityPasswordVerifier>();

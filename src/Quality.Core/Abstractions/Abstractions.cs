@@ -51,6 +51,12 @@ public interface IMasterData
     Task<IReadOnlyList<EntryCorrection>> GetCorrectionsForEntriesAsync(int shopId, IReadOnlyCollection<long> entryIds);
     Task<IReadOnlyDictionary<int, string>> GetUserCodesAsync(IReadOnlyCollection<int> userIds);
 
+    // ---- production counts (round 3, #8) ----
+    Task<IReadOnlyList<ProductionCount>> GetProductionCountsAsync(IReadOnlyCollection<int> shopIds, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId);
+    /// <summary>Tracked rows for the given machines and day range (for an upsert inside <see cref="InTransactionAsync"/>, with update locks).</summary>
+    Task<IReadOnlyList<ProductionCount>> GetProductionCountsForUpdateAsync(IReadOnlyCollection<int> machineIds, DateOnly fromDate, DateOnly toDate);
+    void AddProductionCount(ProductionCount c);
+
     // ---- machine administration ----
     Task<IReadOnlyList<Machine>> GetMachinesAsync(int? shopId, bool? isActive, string? search);   // ordered by shop, code
     Task<Machine?> GetMachineForEditAsync(int machineId);                                        // tracked
@@ -133,6 +139,9 @@ public interface IEntryStore
     /// </summary>
     /// <exception cref="CorrectionConflictException">entry missing, or already reversed by another correction</exception>
     Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? replacement);
+
+    /// <summary>NON-reversed entries of one shop for production days fromDate..toDate (drill-down list), newest first, at most <paramref name="limit"/>.</summary>
+    Task<IReadOnlyList<QualityRejectionEntry>> ListForReportAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId, int? phenomenonId, int limit);
 }
 
 public sealed record EntryAggregateRow(DateOnly ProductionDate, string ShiftCode, int MachineId, string MachineCode, string MachineName,

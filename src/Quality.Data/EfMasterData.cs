@@ -109,6 +109,28 @@ public sealed class EfMasterData : IMasterData
         return await q.OrderByDescending(c => c.RequestedAt).ThenByDescending(c => c.Id).Take(limit).ToListAsync();
     }
 
+    public async Task<IReadOnlyList<ProductionCount>> GetProductionCountsAsync(IReadOnlyCollection<int> shopIds, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId)
+    {
+        var q = _db.ProductionCounts.AsNoTracking().Where(p => shopIds.Contains(p.ShopId) && p.ProductionDate >= fromDate && p.ProductionDate <= toDate);
+        if (shiftCode is not null) q = q.Where(p => p.ShiftCode == shiftCode);
+        if (machineId is int m) q = q.Where(p => p.MachineId == m);
+        return await q.ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<ProductionCount>> GetProductionCountsForUpdateAsync(IReadOnlyCollection<int> machineIds, DateOnly fromDate, DateOnly toDate)
+    {
+        RequireTransaction();
+        // UPDLOCK+HOLDLOCK on the day range: two uploads covering the same days are serialised instead of colliding on the unique key.
+        // (Uploads are rare; locking the whole day range keeps the query fully parameterised.)
+        var rows = await _db.ProductionCounts
+            .FromSqlInterpolated($"SELECT * FROM qa.ProductionCounts WITH (UPDLOCK, HOLDLOCK) WHERE ProductionDate BETWEEN {fromDate} AND {toDate}")
+            .ToListAsync();
+        var wanted = machineIds.ToHashSet();
+        return rows.Where(r => wanted.Contains(r.MachineId)).ToList();
+    }
+
+    public void AddProductionCount(ProductionCount c) => _db.ProductionCounts.Add(c);
+
     public Task<int> CountCorrectionsAsync(IReadOnlyCollection<int>? shopIds, int? requestedBy, string? status)
     {
         var q = _db.EntryCorrections.AsNoTracking().AsQueryable();

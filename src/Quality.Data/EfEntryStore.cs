@@ -58,6 +58,16 @@ public sealed class EfEntryStore : IEntryStore
             r.RejectionPhenomenonId, r.Phenomenon ?? "", r.Quantity, r.Entries)).ToList();
     }
 
+    public async Task<IReadOnlyList<QualityRejectionEntry>> ListForReportAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId, int? phenomenonId, int limit)
+    {
+        var q = _db.Entries.AsNoTracking().Where(e => e.ShopId == shopId && e.ReversedAt == null
+            && e.ProductionDate != null && e.ProductionDate >= fromDate && e.ProductionDate <= toDate);
+        if (shiftCode is not null) q = q.Where(e => e.ShiftCode == shiftCode);
+        if (machineId is int m) q = q.Where(e => e.MachineId == m);
+        if (phenomenonId is int p) q = q.Where(e => e.RejectionPhenomenonId == p);
+        return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(limit).ToListAsync();
+    }
+
     public async Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? replacement)
     {
         await using var tx = await _db.Database.BeginTransactionAsync();
