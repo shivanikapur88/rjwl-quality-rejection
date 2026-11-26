@@ -51,7 +51,7 @@ The round-2 diff (`484f52d..459f3d0`) was reviewed read-only by a separate Claud
 | 1 | High | An approval could be committed in the entry database but not the master (failure between the two). A later **reject or withdraw** would then win, leaving the entry reversed while the request said Rejected or Withdrawn. A re-approval could also be blocked if the proposed machine had been deactivated in the meantime. | Decide and withdraw first check whether this request already reversed the entry. If so they complete it as **Approved** (no re-validation) and return 409 `correction_already_applied` to a reject or withdraw. | `Half_applied_approval_is_completed_as_approved_not_rejected_or_withdrawn` |
 | 2 | Medium | The app's summary and corrections screens had no guard against overlapping loads, so a slow earlier response could show another day's totals. | A sequence number on each load; only the latest result is applied. | `Summary_ignores_a_slow_response_from_an_earlier_tap` (fails without the fix) |
 | 3 | Medium | Renamed or retired shift codes vanished from the dashboard trend and could not be queried. | Known codes include inactive shifts; the dashboard adds a "(retired)" series for codes found in the data. | unit `Custom_two_shift_pattern_and_validation` |
-| 4 | Medium | Entries saved by the old API during an upgrade have no production day and are not counted. | Runbook step 7b: re-run db/12 after the switch (it fills only empty rows). | documented |
+| 4 | Medium | Entries saved by the old API during an upgrade have no production day and are not counted. | Runbook section 2 step 10: re-run db/12 after the switch (it fills only empty rows). | documented |
 | 5 | Medium | The db/12 backfill hard-codes the IST offset and shift times. | The script prints its parameters and row count, and in QualityMasterDB refuses (50013) if they differ from `qa.ShiftDefinitions`. | run with `sqlcmd`: mismatch refused, match applied |
 | 6 | Low-medium | The replacement entry's SubmissionId was derived from the sequential request id, so an inspector could pre-claim it with an ordinary entry. Approval would then adopt the wrong row. | Random id stored on the request at request time and never sent to clients; the entry store refuses any existing row that is not this correction's replacement. | `A_pre_claimed_replacement_id_is_refused_and_nothing_is_reversed` |
 | 7 | Low | The dashboard loaded up to 200 requests (with entry look-ups) just to show a count. | `GET /api/corrections/count`. | `Count_endpoint_matches_the_list_in_scope` |
@@ -109,3 +109,64 @@ A separate reviewer read the round-3 code (drill-down, comparison, Pareto, produ
 | 13 | Low | Missing tests (JavaScript, limits, scope of `entries`, partial availability). | Added the server tests named above (limits, 403 on another shop's entries, partial availability). **Not added:** automated JavaScript tests and concurrent-upload tests; the dashboard was checked in a real browser instead. | — |
 
 Also fixed while checking: the chart's y-axis now uses whole-number steps (ticks read 0, 10, 20, 30, 40 rather than 13 and 38).
+
+## Second full application review (Sonnet 5.5)
+
+After round 3, three independent reviewers (Claude Sonnet 5.5) read the whole application without seeing my conclusions: server code, database scripts, and the Android app with the dashboard and documents. **None found a high-severity defect in the code.** The one high finding was in the database runbook. Every finding was checked against the code; the fixes are below.
+
+### Database (scripts and runbook)
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| D1 | **High** | The runbook gave the API only `SELECT, INSERT` in GDC_AndonDB and MachineShopDB, but approving a correction updates the entry there: every GDC/CNC approval would fail with a permission error. The tests ran as `sa`, so they could not see it. | New `db/15_api_permissions.sql`, table by table. The **whole integration suite now runs the API as a login with exactly these rights**. | With the old grants, 6 correction tests fail; with 15, all pass |
+| D2 | Medium | The upgrade steps omitted 13 and the PRE/FINAL entries table (02c). | Upgrade section rewritten and renumbered: 02c when missing, 09/12 in all three databases, 13, 15. | `tools/test-upgrade-path.sh` now also runs 11, 12, 13 twice and checks the backfill |
+| D3 | Medium | Re-running 04 after a workbook change or an administrator's rename failed on a duplicate code. | A new name takes the next free code of its stage when its workbook code is taken; the post-check verifies names. | integration `Rerunning_the_seed_after_a_seeded_phenomenon_was_renamed_gives_the_old_name_a_new_code` |
+| D4 | Medium | Deleting a machine with production counts (or a correction proposal) gave a foreign-key 500. | The delete check covers production counts and correction requests → 409 `machine_in_use` / `phenomenon_in_use`. Foreign keys added for proposed machine and phenomenon (db/11). | integration `Report_and_upload_limits_are_enforced` |
+| D5 | Medium | The master grant allowed UPDATE/DELETE on the audit log and saved entries. | db/15: audit log SELECT/INSERT only; entries only the two reversal columns. | — |
+| D6 | Low | db/12 rounded 05:59:59.7 up to 06:00 (shift A on the previous day). | Compared at millisecond precision. | the backfill test has the boundary case |
+| D7 | Low | db/12 rescanned the table per batch and could escalate to a table lock. | Walks the key in 4,000-row id ranges; filtered index for rows still without a production day. | — |
+| D8 | Low | Runbook overstated rollback and "nothing is deleted". | Reworded. | — |
+| D9 | Low | Constraint gaps. | Added: proposal foreign keys; one replacement per corrected entry (unique index). Documented, not added: `ProductionCounts.ShopId` vs the machine's shop (checked by the upload and the feed template), shift-code foreign keys, one shop per stage. | — |
+| D10 | Low (plausible) | The administrator trigger scanned all users. | Index on `(RoleId, IsActive)`. | — |
+| D11 | Low (plausible) | The upload lock could become table-wide. | One query per machine with the predicate inside the hinted query, in machine order. | — |
+| D12 | Low | db/10: untrimmed DEV-/EXAMPLE- checks; case-only renames ignored. | Fixed. | — |
+| D13 | Low | 08 never removed stale identifier rows. | 08 resynchronises them with `qa.Users`. | upgrade-path script |
+| D14 | Low (plausible) | 06 leaves old PRE/FINAL entries under the GDC/CNC shops. | Documented in the runbook; a migration needs a business decision. | — |
+| D15 | Low | No `-f 65001` (UTF-8) in the runbook. | Added (all scripts are ASCII today). | — |
+| D16 | Low | Test tooling: no assertions, fixed temp path, no production-name guard, incomplete re-run. | Fixed. | — |
+
+### Server
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| S1 | Medium | 30 failures from the shared plant address blocked every sign-in from the plant. | Logins already known on that address are exempt from the per-address cap (they keep their own 5-per-5-minutes limit). | unit `One_bad_tablet_on_the_shared_plant_address_does_not_block_known_users` |
+| S2 | Medium | Anonymous `/api/health/ready` opened 5 connections per call, scanned for rows without a production day and showed counts and file names. | Rate-limited, cached 10 s, filtered index, generic warning text. | integration readiness test |
+| S3 | Medium | Correction list: about 800 queries for 200 requests; a down database stalled every row. | One entry query per shop, one each for users, machines and phenomena; a failing store is tried once. The 200 cap stays documented. | existing correction tests |
+| S4 | Low | Accent/width variants of a login had separate throttle buckets. | Keys are folded. | unit `Accent_variants_of_a_login_share_one_bucket` |
+| S5 | Low | Two aliases (username, employee code) give two per-login buckets. | **Not changed**: per-client and per-client+login limits still apply; documented. | — |
+| S6 | Low | Anonymous 30 MB login bodies. | 8 KB limit; identifiers over 50 and passwords over 128 characters refused before any lookup. | — |
+| S7 | Low | Body too large reported as 400. | 413 `request_too_large`. | unit |
+| S8 | Low | Rejections on a shift with 0 produced raised the rate. | Such combinations are outside the rate and lower its coverage (decision #13 to confirm). | integration upload test |
+| S9 | Low | Report names depended on row order after a rename. | Current master names. | — |
+| S10 | Low | Save response time had more precision than the stored value; SubmissionId uniqueness is per entry database. | Times cut to milliseconds. The per-database uniqueness is documented (each id is generated per intended entry). | — |
+| S11 | Low | Delete "in use" checks missed production counts and proposals. | = D4. | — |
+| S12 | Low | A retry after losing the shop assignment answers 403 although the entry was saved. | **Not changed**: assignment is checked first by design; documented. | — |
+| S13 | Low | Lookup distinguishes "other shop" from "not found". | **Not changed**: the inspector needs the clear "this machine belongs to another shop" message; ids are sequential and printed on labels anyway. | — |
+
+### Android app, dashboard and documents
+
+| # | Severity | Finding | Fix | Evidence (unit tests) |
+|---|---|---|---|---|
+| C1 | Medium | Changing the server address ended the session but left the user on Home with every call failing. | Signs out and goes to sign-in. | `Changing_the_server_host_signs_out_and_returns_to_sign_in` |
+| C2 | Medium | Summary showed the previous day's numbers under the new date after a failed load. | Totals cleared when the day or shift changes. | `Summary_failed_load_of_another_day_does_not_show_the_old_numbers` |
+| C3 | Medium | An exception in a button command could close the app. | Caught and logged; scan page and navigation guarded. | `An_exception_in_a_command_does_not_escape_Execute` |
+| C4 | Medium | Labels page: two quick "Show" clicks mixed two shops' labels; expired session gave a script error. | Sequence guard; sign-in shown on expiry. | browser check |
+| C5 | Medium | Certificate problems reported as "no network". | Own message: "The server's security certificate is not trusted on this device. Contact IT." | `Untrusted_certificate_is_not_reported_as_no_connection` |
+| C6 | Medium | My entries: refresh and "Load more" could overlap and duplicate rows. | Only the latest load applies. | `Refresh_drops_a_slow_load_more_page_and_owns_the_busy_state` |
+| C7 | Low | Draft could be restored twice, or lost after a failed load. | Restored once, after the list loaded. | `Entry_draft_is_restored_once_and_only_after_the_phenomena_loaded` |
+| C8 | Low | A stored `http://` address was used as is. | Re-validated before every request; nothing is sent. | `A_stored_http_address_is_refused_before_the_token_is_sent` |
+| C9 | Low | Scan of a machine in a shop with several stages lost the machine. | The machine is kept. | `Scan_of_a_machine_in_a_shop_with_several_stages_keeps_the_machine` |
+| C10 | Low | Correction request answered "already pending" left the form open. | Form closes and the entry reloads. | `Correction_already_pending_closes_the_form_and_shows_the_pending_entry` |
+| C11 | Low | Rate shown at full prominence at low coverage; same-named phenomena of two shops looked identical; template machine codes did not exist. | Warning below 80% coverage; shop shown when several shops are in view; template uses placeholders. | — |
+| C12 | Low | Not changed: sign-out leaves the previous user's lists until the next load; chart colours rely on the table view for accessibility; Back does not step through dashboard filters; CSV fields containing line breaks. | Documented here. | — |
+| C13 | Docs | Stale statements: shifts "not implemented", 14 pages, 77/49 tests, API table without round 2/3, "Save" vs "Save entry", 30 days vs 30 production days, debug certificate wording, full-review #10 closed too generously. | Corrected (#10 is now really fixed by C1). | — |

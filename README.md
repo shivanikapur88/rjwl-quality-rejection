@@ -43,8 +43,8 @@ src/
   Quality.Core/           entities, DTOs, all business rules and authorization decisions
   Quality.Data/           EF Core mappings, locking, entry-database routing
   Quality.Api/            HTTP endpoints, JWT, login throttling, error mapping, readiness
-  Quality.Mobile.Core/    API client, session, navigation abstractions, 14 view-models   (recovered)
-  Quality.Mobile/         Android app: 14 pages, styles, platform services, manifest      (recovered)
+  Quality.Mobile.Core/    API client, session, navigation abstractions, 18 view-models (14 recovered, 4 added in round 2)
+  Quality.Mobile/         Android app: 18 pages (14 recovered, 4 added), styles, platform services, manifest
   Quality.Api/wwwroot/dashboard/  web dashboard (production-count upload for administrators) and QR label printing (no external libraries)
   Quality.Tests.Unit/     77 tests (rules, shifts, throttling, SQL-script checks, app logic through the real API client)
   Quality.Tests.Integration/  49 tests against real SQL Server (HTTP, concurrency, corrections, reports, scripts, reference data)

@@ -6,7 +6,7 @@ This document replaces the scattered statements in the supplied README, `Phase2_
 
 | Topic | Supplied documents said | Position (and evidence) |
 |---|---|---|
-| Mobile pages | Short report: 11 pages | **14 pages**: Login, Home, Stage, Machine, Entry form, Confirmation, My entries, Settings, Admin phenomena, Phenomenon editor, Admin machines, Machine editor, Admin users, User editor. Registered in `MauiProgram.cs` and present in the supplied build. |
+| Mobile pages | Short report: 11 pages | **14 pages** as recovered (round 2 added 4: entry detail, corrections, shift summary, QR scan, so 18 now): Login, Home, Stage, Machine, Entry form, Confirmation, My entries, Settings, Admin phenomena, Phenomenon editor, Admin machines, Machine editor, Admin users, User editor. Registered in `MauiProgram.cs` and present in the supplied build. |
 | Framework | ".NET 8, upgrade pending"; mobile already `net10.0-android` | **Everything on .NET 10** (LTS, supported to Nov 2028). .NET 8 left support on 10 Nov 2026. MAUI 10 support ends earlier than .NET 10's; plan the move to MAUI 11 (see [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)). |
 | User management | "No user-management screen" **and** in-app user management | **In-app user management exists** (Admin users + User editor) and is part of the scope. |
 | PRE/FINAL entries | Early design: undecided | **Both in `QualityMasterDB`**, one shared table `qa.QualityRejectionEntries`, separated by `ShopId`/`ShopCode` (CHECK constraint allows only PRE/FINAL there). |
@@ -96,7 +96,7 @@ Request (`POST /api/rejection-entries`): `SubmissionId, ShopId, StageId, Machine
 | `GET /api/rejection-entries?…&limit` (supplied, kept for compatibility) | At most `limit` newest entries (max 200); **not** a complete history. Fails with 503 if any store is unreachable. |
 | `GET /api/rejection-entries/{shopId}/{id}` | One entry. The shop is part of the key (ids are only unique per database, and PRE/FINAL share a table). |
 
-**Time:** stored as UTC (`datetime2(3)`, server clock). `fromUtc` is inclusive; `toUtc` is **exclusive** in the paged endpoint (inclusive in the legacy one). Query times may carry `Z` or an offset (`+05:30`) and are converted to UTC; times without a zone are taken as UTC. The app shows times in the device's local time zone. No shift or production-day logic exists (the CNC 05:59 reset is not applied); see [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md).
+**Time:** stored as UTC (`datetime2(3)`, server clock). `fromUtc` is inclusive; `toUtc` is **exclusive** in the paged endpoint (inclusive in the legacy one). Query times may carry `Z` or an offset (`+05:30`) and are converted to UTC; times without a zone are taken as UTC. The app shows times in the device's local time zone. From round 2 every entry also gets a production day and shift from the shift calendar (section 12.1); the CNC collector's 05:59 reset is not used.
 
 ## 8. Administration and audit
 
@@ -117,11 +117,12 @@ Safeguards: no self-deactivation or self-demotion; at least one active administr
 | Method and path | Who | Notes |
 |---|---|---|
 | `GET /api/health` | anyone | process is up (liveness) |
-| `GET /api/health/ready` (**new**) | anyone | 200 if the master and all four entry stores are reachable, otherwise 503; reports only `ok`/`unavailable` per component |
+| `GET /api/health/ready` (**new**) | anyone (rate-limited, cached 10 s) | 200 if the master and all four entry stores are reachable, otherwise 503; reports only `ok`/`unavailable` per component |
 | `POST /api/auth/login` | anyone | username **or** employee code; 429 `too_many_attempts` with `Retry-After` after repeated failures |
 | `GET /api/shops`, `/shops/{id}/stages`, `/shops/{id}/stages/{id}/machines`, `/…/phenomena` | signed in | only assigned shops; active items only |
 | `POST /api/rejection-entries` | inspector | 201 new / 200 replay |
 | `GET /api/rejection-entries`, `/page`, `/{shopId}/{id}` | signed in | role-scoped (section 7) |
+| Round 2/3: `/api/corrections` (+ `/count`, `{id}/approve`, `/reject`, `/withdraw`), `/api/reports/calendar`, `/totals`, `/entries`, `/api/machines/lookup`, `/api/admin/machines/{id}/qr.svg`, `POST /api/admin/production-counts` | by role | see sections 12 and 13 |
 | `/api/admin/phenomena`, `/api/admin/machines`, `/api/admin/users` (+ `PATCH {id}/status`, `POST users/{id}/reset-password`, `DELETE`) | administrator | section 8 |
 
 Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `unauthenticated`/`token_expired` 401, `forbidden`/`shop_not_assigned` 403, `*_not_found` 404, conflicts 409 (`concurrent_edit`, `concurrent_change`, `duplicate*`, `last_admin`, `*_in_use`, `*_inactive`, `submission_*`), `value_too_long` 400, `too_many_attempts` 429, `database_unavailable`/`store_not_configured` 503, `server_error` 500. **Only real connectivity problems** are reported as 503 (previously every constraint error was "database unavailable"). Bodies never contain SQL text, stack traces or secrets.
@@ -130,14 +131,15 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 
 * **Tokens:** HS256 JWT, 480 minutes by default, claims `sub`, `emp`, `role`, `tv` (token version). Every request re-checks: user exists, is active, still has that role, and `tv` equals `Users.TokenVersion`. Password reset, deactivation and role change increase `TokenVersion`, so **all earlier tokens stop working immediately**, and reactivating or changing the role back does not revive them. Tokens with missing or malformed claims get 401, not 500.
 * **Login throttling:**
-  * Failed attempts are counted per client address + login (5 in 5 min) and per client address (30 in 15 min).
+  * Failed attempts are counted per client address + login (5 in 5 min) and per client address (30 in 15 min). A login that has already signed in successfully from that address (within 30 days) is exempt from the per-address cap, so one faulty tablet behind the plant's shared address cannot block everybody.
+  * Login keys ignore case, accents and full-width forms. Identifiers longer than 50 characters, passwords longer than 128 and request bodies over 8 KB are refused without a database lookup.
   * Per login (10 in 15 min), counted **only for clients that have not signed in as that login before** (within 30 days). Someone guessing from elsewhere therefore cannot lock the real user out of their usual device.
   * Checking and counting are one atomic step, so a parallel burst cannot slip past.
   * A success clears that login's counters.
   * There is also a generous raw cap of 300 login requests/minute per address (configurable).
   * Counters are in memory, per API instance. Behind a reverse proxy, set `ReverseProxy:KnownProxies` so the real client address is used; otherwise a warning is logged.
 * **Passwords:** ASP.NET Core `PasswordHasher` (PBKDF2, salted). One generic message for unknown user, wrong password and inactive account.
-* **Device:** token in Android Keystore-backed storage, backup disabled, cleartext HTTP disabled; debug builds accept the development certificate only for `10.0.2.2`/`localhost`.
+* **Device:** token in Android Keystore-backed storage, backup disabled, cleartext HTTP disabled; debug builds skip certificate validation for `10.0.2.2`/`localhost` only (any certificate there, not just the development one); release builds always validate. A certificate failure is reported as "The server's security certificate is not trusted on this device", not as a network error.
 
 ## 11. App behaviour on network problems (online-only, as designed)
 

@@ -12,25 +12,25 @@
 1. **Home** → tap your shop. You only see shops assigned to you.
 2. **Stage** is skipped automatically when the shop has only one stage (true for all four shops today).
 3. **Machine** → choose the machine (only active machines are listed).
-4. **Rejection entry:** search and choose the phenomenon, set the quantity (1-9,999; type it or use + / −), and add remarks if needed (up to 500 characters). Tap **Save** once.
+4. **Rejection entry:** search and choose the phenomenon, set the quantity (1-9,999; type it or use + / −), and add remarks if needed (up to 500 characters). Tap **Save entry** once.
 5. **Confirmation** shows what the server saved: shop, stage, machine, phenomenon, quantity, remarks and server time. Tap **Record another** for the next one.
 
 **If something goes wrong**
 
 | You see | What it means | What to do |
 |---|---|---|
-| "…may not have been saved. Tap Save again - it will not create a duplicate." | The network failed and the app does not know if the server got it | Tap **Save** again (the form is still filled). It can never create two entries. |
+| "…may not have been saved. Tap Save again - it will not create a duplicate." | The network failed and the app does not know if the server got it | Tap **Save entry** again (the form is still filled). It can never create two entries. |
 | "Already saved earlier – no duplicate created" on the confirmation | Your earlier attempt did reach the server | Nothing; it is saved once |
 | "The selected rejection phenomenon is no longer active" | An administrator just deactivated it | The list reloads; choose again |
 | "Machine no longer active" | An administrator just deactivated the machine | You are taken back to the refreshed machine list |
-| Session expired while saving | Your sign-in ended during the save | Sign in again as the **same** user; the entry reopens with the same details. Tap **Save**; it cannot duplicate. |
+| Session expired while saving | Your sign-in ended during the save | Sign in again as the **same** user; the entry reopens with the same details. Tap **Save entry**; it cannot duplicate. |
 | "An earlier attempt of this entry may already be saved with different details" | You changed the form after an uncertain save | Check **My entries** before saving again |
 
-**Closing the app** with an unsaved entry discards it (the app works online only). If you had already tapped Save, check **My entries**.
+**Closing the app** with an unsaved entry discards it (the app works online only). If you had already tapped Save entry, check **My entries**.
 
 **My entries** lists your own entries, newest first. Pull down to refresh; tap **Load more** at the bottom for older ones. If a box says some shops' entries "could not be loaded right now", the list is **incomplete**; try again later.
 
-**Fixing a mistake:** entries are never edited. Open **My entries**, tap the entry, then **Request correction**. Give a reason, and either choose **Remove this entry** or **Correct the details** (phenomenon, machine, quantity, remarks). Your supervisor approves or rejects it. Until then the entry stays as it is and shows "Correction requested". **My correction requests** on Home shows your requests; you can withdraw one while it is waiting. Entries older than 30 days cannot be corrected from the app.
+**Fixing a mistake:** entries are never edited. Open **My entries**, tap the entry, then **Request correction**. Give a reason, and either choose **Remove this entry** or **Correct the details** (phenomenon, machine, quantity, remarks). Your supervisor approves or rejects it. Until then the entry stays as it is and shows "Correction requested". **My correction requests** on Home shows your requests; you can withdraw one while it is waiting. Entries from more than 30 production days ago cannot be corrected from the app.
 
 **Scan machine QR** (Home): point the camera at the label on the machine and the entry form opens for it. Allow camera access the first time. If a label is damaged or not recognised, choose the machine from the list as before.
 

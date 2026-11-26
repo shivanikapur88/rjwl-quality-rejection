@@ -9,6 +9,10 @@
 # The SQLCMD variable must run sqlcmd (v18 tools) and accept -d <db> -i <file> -b.
 set -euo pipefail
 PREFIX="${1:-QRTEST}"; RCSI="${2:-ON}"
+# Guard: the script DROPS <prefix>_Master/_Gdc/_Cnc. Refuse prefixes that look like the production database names.
+case "$(echo "$PREFIX" | tr '[:lower:]' '[:upper:]')" in
+  QUALITYMASTERDB*|GDC_ANDONDB*|MACHINESHOPDB*|"") echo "Refusing prefix '$PREFIX': it looks like a production database name." >&2; exit 2;;
+esac
 DB_DIR="$(cd "$(dirname "$0")/../db" && pwd)"
 : "${SQLCMD:?Set SQLCMD to the sqlcmd command line for the test server}"
 
@@ -38,4 +42,7 @@ for db in Gdc Cnc; do
 done
 # Re-run everything that claims to be idempotent: must succeed and change nothing.
 for f in 01_master_schema 03_seed_reference 04_seed_phenomena 08_upgrade_master_review_fixes 09_upgrade_entries_indexes 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts; do run "$M" "$DB_DIR/$f.sql"; done
+run "${PREFIX}_Gdc" "$DB_DIR/02a_entries_schema_GDC_AndonDB.sql"; run "${PREFIX}_Cnc" "$DB_DIR/02b_entries_schema_MachineShopDB.sql"
+for db in Gdc Cnc; do for f in 09_upgrade_entries_indexes 12_upgrade_entries_shift_reversal; do run "${PREFIX}_$db" "$DB_DIR/$f.sql"; done; done
+# db/15 (API permissions) needs a server login and is run by the integration tests with a temporary one; see the runbook.
 echo "Fresh install + idempotent re-run complete."

@@ -1,6 +1,6 @@
 # Database runbook
 
-**Do not run every script in filename order against every database.** Each script says which database it belongs to. All scripts are idempotent unless stated otherwise, and none deletes business data. Use `sqlcmd -b` so a script stops at its first error. Review every script before running it in production, and take a backup first (section 5).
+**Do not run every script in filename order against every database.** Each script says which database it belongs to. All scripts are idempotent unless stated otherwise. None deletes entries, users or masters; `06` removes the old shop-to-stage mappings it replaces, and `08` resynchronises the derived login-identifier rows with `qa.Users`. Use `sqlcmd -b` so a script stops at its first error, and `-f 65001` so the files are read as UTF-8 (all scripts are ASCII today; a future workbook with characters such as "°" would need it). Review every script before running it in production, and take a backup first (section 5).
 
 `<I>` = SQL Server instance. Use `-E` for Windows authentication, or `-U … -P …`.
 
@@ -24,6 +24,7 @@
 | `12_upgrade_entries_shift_reversal.sql` | **each** entry DB | **yes** | **yes** | production date + shift, reversal markers; **backfills existing rows** (IST, A/B/C times written in the script) |
 | `13_upgrade_master_production_counts.sql` | QualityMasterDB | **yes** | **yes** | `qa.ProductionCounts` for the rejection rate |
 | `14_production_counts_feed_TEMPLATE.sql` | QualityMasterDB | no | when a feed is agreed | **template**: read-only feed of production counts from the production systems; fill in the source names first |
+| `15_api_permissions.sql` | **each** of the three databases | **yes** | **yes** | least-privilege rights for the API login (`@ApiUser`, default `qr_api`); replaces the older schema-wide grants |
 
 All scripts set `QUOTED_IDENTIFIER ON` themselves where needed. `sqlcmd` starts with it OFF, and SQL Server then refuses the filtered indexes in 11; a unit test now checks this for every script.
 
@@ -58,15 +59,14 @@ SELECT s.StageCode, COUNT(*) FROM qa.RejectionPhenomena p JOIN qa.InspectionStag
 -- GDC_SHOP 25, CNC_SHOP 52, PRE_TREATMENT 34, FINAL 34
 SELECT Script, AppliedAt FROM qa.SchemaVersions;   -- 08_upgrade_master_review_fixes
 ```
-6. API database login (least privilege; the API never needs DDL rights):
-```sql
--- QualityMasterDB
-CREATE USER [qr_api] FOR LOGIN [qr_api];
-GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::qa TO [qr_api];
--- GDC_AndonDB and MachineShopDB
-CREATE USER [qr_api] FOR LOGIN [qr_api];
-GRANT SELECT, INSERT ON SCHEMA::qa TO [qr_api];
+6. API database login (least privilege; the API never needs DDL rights). The DBA creates the server login once (`CREATE LOGIN [qr_api] ...`, or a Windows/domain account), then:
+```bash
+sqlcmd -S <I> -E -b -d QualityMasterDB -i db/15_api_permissions.sql
+sqlcmd -S <I> -E -b -d GDC_AndonDB     -i db/15_api_permissions.sql
+sqlcmd -S <I> -E -b -d MachineShopDB   -i db/15_api_permissions.sql
 ```
+   It grants table by table and prints the result. In the master: read access to every `qa` table; writes only where the API maintains data; `qa.AuditLog` is append-only (SELECT, INSERT). In every entries table: SELECT, INSERT, and UPDATE of **only** `ReversedAt` and `ReversedByCorrectionId` (approved corrections). In GDC_AndonDB and MachineShopDB nothing else is granted. The integration tests run the API as a login with exactly these rights.
+   **Earlier versions of this runbook granted `SELECT, INSERT` on the whole `qa` schema in GDC_AndonDB and MachineShopDB. That is not enough: approving a GDC or CNC correction failed with a permission error.** Running 15 fixes it and removes the old schema-wide grants.
 7. Start the API with the `Bootstrap:*` settings to create the first administrator, then remove them ([BUILD_AND_DEPLOY.md](BUILD_AND_DEPLOY.md)).
 
 This exact order is what `tools/create-test-databases.sh` and the integration-test fixture run (on SQL Server 2022), followed by a second run of every idempotent script.
@@ -77,15 +77,17 @@ Plan a short maintenance window. **Every user must sign in again once** after th
 
 1. Back up all three databases (section 5).
 2. Stop the API (application pool / service).
-3. If the master still has the old two-shop layout: `06_migration_four_shops.sql`, then `03_seed_reference.sql`. **Never 05.**
+3. If the master still has the old two-shop layout: `06_migration_four_shops.sql`, then `03_seed_reference.sql`. **Never 05.** Note: entries the old layout saved for the PRE/FINAL stages under the GDC/CNC shops stay in GDC_AndonDB/MachineShopDB under those shops; they are not moved to the new PRE/FINAL shops. Decide with the business whether they must be migrated (not done by any script).
+   If `QualityMasterDB` has no `qa.QualityRejectionEntries` table yet (installations before PRE/FINAL had their own shops), run `02c_entries_schema_PRE_FINAL.sql` in it now: steps 6 and 7 need it.
 4. If an entries table has no `Quantity` column: `07_migration_add_quantity.sql` in that database. Old rows get quantity **1**. That is an assumption, not a recovered fact: confirm it with the business, or correct the rows afterwards.
 5. `08_upgrade_master_review_fixes.sql` in QualityMasterDB.
    * If it stops with **error 50080**, two users share a username/employee code (possible with the old schema). It lists them. Rename one account of each pair in `qa.Users`, then run 08 again. The column additions from the first run are kept; that is harmless.
-6. `09_upgrade_entries_indexes.sql` in **each** entry database.
-6b. `11_upgrade_master_shifts_corrections.sql` in QualityMasterDB, then `12_upgrade_entries_shift_reversal.sql` in **each** entry database. 12 fills `ProductionDate`/`ShiftCode` for existing entries from their server time, using IST (UTC+05:30) and the A/B/C start times written at the top of the script. If the plant's shifts differ, edit those values **and** `qa.ShiftDefinitions` to match before running it. In QualityMasterDB the script refuses to run if they differ (error 50013), and it prints the parameters and row count it uses. On large tables it works in batches of 5,000 rows.
-7b. **After the new API is running, run 12 once more in each entry database.** It fills only rows that are still empty, i.e. any saved by the old API during the switch. Reports count only rows with a production day.
-7. Deploy the new API, start it, check `GET /api/health/ready` returns 200, then sign in.
-8. `04_seed_phenomena.sql`: re-run **only** if the workbook was intentionally changed. It inserts missing (stage, name) pairs and never renames or deletes. Phenomena maintained by administrators stay as they are.
+6. `09_upgrade_entries_indexes.sql` in **each** entry database: GDC_AndonDB, MachineShopDB **and QualityMasterDB** (PRE/FINAL).
+7. `11_upgrade_master_shifts_corrections.sql` in QualityMasterDB, then `12_upgrade_entries_shift_reversal.sql` in **each** entry database (the same three), then `13_upgrade_master_production_counts.sql` in QualityMasterDB. 12 fills `ProductionDate`/`ShiftCode` for existing entries from their server time, using IST (UTC+05:30) and the A/B/C start times written at the top of the script. If the plant's shifts differ, edit those values **and** `qa.ShiftDefinitions` to match before running it. In QualityMasterDB the script refuses to run if they differ (error 50013), and it prints the parameters and row count it uses. On large tables it works through the table in id ranges of 4,000 rows (below SQL Server's lock-escalation threshold), committing each range; if it stops, run it again and it continues with the rows still empty.
+8. `15_api_permissions.sql` in each of the three databases (fresh-install step 6).
+9. Deploy the new API, start it, check `GET /api/health/ready` returns 200, then sign in.
+10. **After the new API is running, run 12 once more in each entry database.** It fills only rows that are still empty, i.e. any saved by the old API during the switch. Reports count only rows with a production day; `/api/health/ready` warns while such rows exist.
+11. `04_seed_phenomena.sql`: re-run **only** if the workbook was intentionally changed. It inserts missing (stage, name) pairs and never renames or deletes. A new name gets its workbook code if that code is free, otherwise the next free code of its stage (for example after an administrator renamed a seeded phenomenon, the original name comes back as a new phenomenon: deactivate it if it is not wanted).
 
 `tools/test-upgrade-path.sh` repeats this upgrade on a scratch database: old schema, old users including a collision, an entries table without `Quantity`.
 
@@ -102,7 +104,7 @@ Administrators can also add or edit machines in the app (Admin → Machines) ins
 
 | Situation | Action |
 |---|---|
-| A script stopped with an error | Scripts use `SET XACT_ABORT ON`; data-changing batches roll back as a whole. Read the message, fix the cause, run the **same** script again (idempotent). Do not continue with the next script. |
+| A script stopped with an error | Scripts use `SET XACT_ABORT ON`, and the batches that must be all-or-nothing (03, 04, 06, 08's identifier backfill, 10) run in a transaction. The backfills in 07 and 12 commit as they go (12 per id range), and schema changes are separate batches. In every case: read the message, fix the cause and run the **same** script again; it continues where it stopped. Do not continue with the next script. |
 | 08 error 50080 | Section 2, step 5. |
 | 08 error 50090 ("At least one active administrator must remain") | A statement tried to remove the last active administrator. Reactivate or create an administrator first. |
 | Seed check 50001 | Some seeded codes are missing (03 not run, or rows were renamed/deleted by hand). Compare with `db/seed/phenomena_seed.json`. |
