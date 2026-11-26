@@ -128,7 +128,7 @@ else
 }
 app.UseExceptionHandler(ErrorHandling.Configure);
 app.UseHttpsRedirection();
-// Feature #6: read-only web dashboard (static files under wwwroot/dashboard) with a strict content-security policy:
+// Feature #6: web dashboard (read-only, plus the administrators' production-count upload from round 3) (static files under wwwroot/dashboard) with a strict content-security policy:
 // only this site's own scripts/styles, no inline script, no framing. The pages call the same API with the same roles.
 app.Use(async (ctx, next) =>
 {

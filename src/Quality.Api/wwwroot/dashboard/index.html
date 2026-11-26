@@ -43,7 +43,8 @@
         </div>
         <button type="submit" class="primary">Show</button>
       </form>
-      <div id="chips" class="chips" aria-label="Drill-down filters"></div>
+      <div id="chips" class="chips" role="group" aria-label="Active filters" tabindex="-1"></div>
+      <p id="announce" class="sr-only" aria-live="polite"></p>
 
       <p id="status" class="muted" aria-live="polite"></p>
       <p id="incomplete" class="warning" role="status" hidden></p>
@@ -59,7 +60,7 @@
       <div class="grid">
         <section class="card wide">
           <h2>Rejected parts by production day and shift</h2>
-          <p class="muted small">Click a day to see only that day.</p>
+          <p class="muted small">Click a day to see only that day (or use the day buttons in "Show as table").</p>
           <div id="legend" class="legend"></div>
           <div id="trend" class="chart" role="img" aria-label="Stacked bar chart of rejected parts per production day, split by shift"></div>
           <details><summary>Show as table</summary><div id="trendTable"></div></details>

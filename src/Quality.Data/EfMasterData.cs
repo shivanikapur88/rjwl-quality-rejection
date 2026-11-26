@@ -120,13 +120,14 @@ public sealed class EfMasterData : IMasterData
     public async Task<IReadOnlyList<ProductionCount>> GetProductionCountsForUpdateAsync(IReadOnlyCollection<int> machineIds, DateOnly fromDate, DateOnly toDate)
     {
         RequireTransaction();
-        // UPDLOCK+HOLDLOCK on the day range: two uploads covering the same days are serialised instead of colliding on the unique key.
-        // (Uploads are rare; locking the whole day range keeps the query fully parameterised.)
-        var rows = await _db.ProductionCounts
+        // UPDLOCK+HOLDLOCK on the (machine, day) key ranges of the upload, through the unique index that leads on MachineId:
+        // two uploads (or an upload and the feed) touching the same machine and days are serialised instead of colliding on the
+        // unique key; uploads for other machines are not blocked. The machine filter is composed by EF, so it stays parameterised.
+        var ids = machineIds.ToList();
+        return await _db.ProductionCounts
             .FromSqlInterpolated($"SELECT * FROM qa.ProductionCounts WITH (UPDLOCK, HOLDLOCK) WHERE ProductionDate BETWEEN {fromDate} AND {toDate}")
+            .Where(p => ids.Contains(p.MachineId))
             .ToListAsync();
-        var wanted = machineIds.ToHashSet();
-        return rows.Where(r => wanted.Contains(r.MachineId)).ToList();
     }
 
     public void AddProductionCount(ProductionCount c) => _db.ProductionCounts.Add(c);

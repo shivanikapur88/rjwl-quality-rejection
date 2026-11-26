@@ -9,11 +9,14 @@ namespace Quality.Core.Services;
 /// Features #4 (app shift summary) and #6 (web dashboard): rejected-part totals by production day and shift, shop, phenomenon
 /// and machine. Supervisors see their assigned shops, administrators all shops; inspectors have no access.
 /// Reversed entries (approved corrections) are excluded; replacement entries are included.
-/// These are COUNTS of rejected parts. No rejection percentage is computed: production counts are not available (decision #13).
+/// Totals are COUNTS of rejected parts. A rejection rate (rejected ÷ produced) is added only where production counts exist
+/// (qa.ProductionCounts, round 3), always with its coverage; the counting rules still need RJWL's sign-off (decision #13).
 /// </summary>
 public sealed class ReportService
 {
     public const int MaxDays = 92, DefaultTop = 10, MaxTop = 50, MaxEntries = 200;
+    /// <summary>Earliest report date: keeps the previous-period arithmetic (from - days) far from DateOnly.MinValue.</summary>
+    public static readonly DateOnly MinDate = new(2000, 1, 1);
     private readonly IEntryStoreRouter _router; private readonly ShopAccessGuard _guard; private readonly TimeProvider _time;
     private readonly IShiftCalendarProvider _calendar; private readonly IMasterData _master;
 
@@ -39,6 +42,7 @@ public sealed class ReportService
         var today = cal.Resolve(_time.GetUtcNow().UtcDateTime).ProductionDate;
         var to = q.ToDate ?? today; var from = q.FromDate ?? to;
         if (from > to) return (null, Bad("date_range_invalid", "The start date must not be after the end date."));
+        if (from < MinDate) return (null, Bad("date_range_invalid", $"Choose dates from {MinDate:yyyy-MM-dd} onwards."));
         if (to.DayNumber - from.DayNumber + 1 > MaxDays) return (null, Bad("date_range_too_long", $"Choose at most {MaxDays} days."));
         var shift = string.IsNullOrWhiteSpace(q.ShiftCode) ? null : q.ShiftCode.Trim();
         if (shift is not null && !cal.IsKnownShift(shift)) return (null, Bad("shift_invalid", "Unknown shift."));
@@ -86,7 +90,11 @@ public sealed class ReportService
             var days = to.DayNumber - from.DayNumber + 1;
             prevTo = from.AddDays(-1); prevFrom = from.AddDays(-days);
             var (prev, prevUnavailable) = await LoadAsync(shops, prevFrom.Value, prevTo.Value, shift, q.MachineId, q.PhenomenonId);
+            // A shop that could not be read in EITHER period is left out of BOTH, so the comparison and every total cover
+            // the same shops (otherwise one period would include it and the other not).
             unavailable = unavailable.Union(prevUnavailable).ToList();
+            rows = rows.Where(r => !unavailable.Contains(r.Shop.ShopCode)).ToList();
+            prev = prev.Where(r => !unavailable.Contains(r.Shop.ShopCode)).ToList();
             prevQty = prev.Sum(r => r.Row.Quantity); prevEntries = prev.Sum(r => r.Row.Entries);
             prevPhen = prev.GroupBy(r => r.Row.PhenomenonId).ToDictionary(g => g.Key, g => g.Sum(r => r.Row.Quantity));
             prevMachine = prev.GroupBy(r => r.Row.MachineId).ToDictionary(g => g.Key, g => g.Sum(r => r.Row.Quantity));
@@ -94,11 +102,11 @@ public sealed class ReportService
 
         // ---- production counts for the rejection rate (round 3, #8) ----
         var counts = await _master.GetProductionCountsAsync(shops.Where(s => !unavailable.Contains(s.ShopCode)).Select(s => s.Id).ToList(), from, to, shift, q.MachineId);
-        var produced = counts.GroupBy(c => (c.MachineId, c.ProductionDate, c.ShiftCode)).ToDictionary(g => g.Key, g => g.Sum(c => c.ProducedQuantity));
+        var produced = counts.GroupBy(c => (c.MachineId, c.ProductionDate, c.ShiftCode)).ToDictionary(g => g.Key, g => g.Sum(c => (long)c.ProducedQuantity));
         RateDto? Rate(IEnumerable<(Shop Shop, EntryAggregateRow Row)> rejected, Func<ProductionCount, bool> inScope)
         {
             var list = rejected.ToList();
-            var prod = counts.Where(inScope).Sum(c => c.ProducedQuantity);
+            var prod = counts.Where(inScope).Sum(c => (long)c.ProducedQuantity);   // long: many max-size rows would overflow int
             var hasCounts = counts.Any(inScope);
             if (!hasCounts) return null;   // no production data at all for this scope: no rate, not a zero rate
             var withProd = list.Where(r => produced.ContainsKey((r.Row.MachineId, r.Row.ProductionDate, r.Row.ShiftCode))).Sum(r => r.Row.Quantity);
@@ -114,7 +122,7 @@ public sealed class ReportService
             }).ToList();
         var byDay = rows.GroupBy(r => (r.Row.ProductionDate, r.Row.ShiftCode))
             .Select(g => new DayShiftTotalDto(g.Key.ProductionDate, g.Key.ShiftCode, g.Sum(r => r.Row.Quantity), g.Sum(r => r.Row.Entries),
-                counts.Where(c => c.ProductionDate == g.Key.ProductionDate && c.ShiftCode == g.Key.ShiftCode) is var dc && dc.Any() ? dc.Sum(c => c.ProducedQuantity) : null))
+                counts.Where(c => c.ProductionDate == g.Key.ProductionDate && c.ShiftCode == g.Key.ShiftCode) is var dc && dc.Any() ? dc.Sum(c => (long)c.ProducedQuantity) : null))
             .OrderBy(d => d.ProductionDate).ThenBy(d => d.ShiftCode, StringComparer.Ordinal).ToList();
         var allPhen = rows.GroupBy(r => r.Row.PhenomenonId).ToList();
         var phen = allPhen

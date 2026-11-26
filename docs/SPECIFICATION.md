@@ -20,7 +20,9 @@ This document replaces the scattered statements in the supplied README, `Phase2_
 
 **Added in round 2 (approved by the owner, 26 Nov 2026):** entry corrections, shift and production date, the app's shift summary, machine QR codes, and a read-only web dashboard. See section 12.
 
-**Not added (outside the documented scope; listed so nobody assumes they exist):** offline entry or a local queue, a web *administration* portal, an audit-viewing screen, photos, dashboards beyond the read-only one, exports, PLC integration, and rejection percentages. Each needs a business decision first ([BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)).
+**Added in round 3 (approved by the owner, 26 Nov 2026):** dashboard drill-down, comparison with the previous period, Pareto, and a rejection rate where production counts exist (administrators upload them on the dashboard). See section 13.
+
+**Not added (outside the documented scope; listed so nobody assumes they exist):** offline entry or a local queue, a web *administration* portal, an audit-viewing screen, photos, dashboard functions beyond those in sections 12-13, exports, and PLC integration. Each needs a business decision first ([BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)).
 
 **Outside this application:** the CNC production collector and the ShopMonitor dashboard. The scripts add only schema `qa` and the table `qa.QualityRejectionEntries` to `GDC_AndonDB` and `MachineShopDB`; nothing else in those databases is touched.
 
@@ -164,7 +166,7 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 ### 12.3 Reports and the app's shift summary (#4)
 * `GET /api/reports/totals?fromDate&toDate&shopId&shiftCode&top` (supervisor: assigned shops; administrator: all; inspectors: 403). Production days are inclusive, at most 92 per request.
 * Returns totals, per shop, per day+shift, top phenomena and top machines, plus `unavailableShops` (the result is incomplete if any are listed). Reversed entries are excluded.
-* These are **counts of rejected parts**. No rejection percentage is computed, because there is no production count (decision #13).
+* These are **counts of rejected parts**. From round 3 a rejection rate is added only where production counts exist (§13.4); its counting rules still need sign-off (decision #13).
 * The app's **Shift summary** shows one production day (today and the current shift by default; previous/next day; shift picker).
 
 ### 12.4 Machine QR codes (#8)
@@ -172,13 +174,15 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 * Administrators print labels at `/dashboard/labels.html` (SVG from `GET /api/admin/machines/{id}/qr.svg`).
 * Inspectors tap **Scan machine QR**. `GET /api/machines/lookup?code=…` checks shop assignment (403), active machine (409 `machine_inactive`) and label format (400 `qr_invalid`), then the entry form opens for that machine. The camera permission is requested the first time the scan screen opens.
 
-### 12.5 Read-only web dashboard (#6)
+### 12.5 Web dashboard (#6)
+
+Read-only for supervisors. From round 3, administrators can also upload production counts on it (§13.4).
 * Served by the API at `/dashboard/`. Supervisors and administrators sign in with their normal credentials; same roles and shop scope as the API.
 * Shows: rejected parts and entries, waiting correction requests, a stacked bar chart per production day by shift (with a table view), top phenomena with share of rejected parts, top machines, and totals by shop.
 * Plain HTML/JS with no external libraries, so it works on an offline plant network. Strict Content-Security-Policy: own scripts only, no inline script, no framing. The token is kept in the browser tab's session storage and cleared on sign-out or expiry.
 
 
-## 13. Round 3: dashboard insights and rejection rate (approved 27 Nov 2026)
+## 13. Round 3: dashboard insights and rejection rate (approved 26 Nov 2026)
 
 ### 13.1 Drill-down
 * Click a **day** in the chart, a **phenomenon** in the Pareto, a **machine** or a **shop** to filter the whole dashboard to it.
@@ -197,8 +201,10 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 
 ### 13.4 Rejection rate (#8)
 * **This system does not measure production.** Parts produced per machine, production day and shift are stored in `qa.ProductionCounts` (db/13), from either:
-  * an administrator's **CSV upload** on the dashboard (`shop,machine,date,shift,produced`). `POST /api/admin/production-counts` checks the whole file first (unknown shop, machine not in the shop, unknown shift, future date, quantity 0–1,000,000, duplicate rows). It saves nothing if any row is wrong, offers a dry run first, upserts by machine+day+shift, and is audited;
+  * an administrator's **CSV upload** on the dashboard (`shop,machine,date,shift,produced`). `POST /api/admin/production-counts` checks the whole file first (unknown shop, machine not in the shop, unknown shift, future date, quantity 0–1,000,000, duplicate rows; at most 5,000 rows; dates from 400 days ago to today; shift codes as configured, which the dashboard upper-cases). Problems are reported by the **line of the file**. It saves nothing if any row is wrong, offers a dry run first, upserts by machine+day+shift, and is audited;
   * an **automatic feed** from the production systems, using the read-only `db/14_production_counts_feed_TEMPLATE.sql`. The source names must be filled in with the owners of those systems.
+* If a shop's entries cannot be read in **either** period, that shop is left out of **both** periods and of every total, and the dashboard says so. Report dates start at 2000-01-01.
+* `ProductionCounts.ShopId` is stored with each row; the upload checks that the machine belongs to that shop. A feed built from `db/14` must keep the same rule (the template joins on the machine's shop).
 * **Rate** = rejected parts on machine+day+shift combinations that have a production count ÷ produced parts in scope.
 * Each rate comes with its **coverage**: the share of rejected parts it is based on. With no production data, the dashboard says so instead of showing 0%.
 * Rates are shown for the total, each shop and each machine.

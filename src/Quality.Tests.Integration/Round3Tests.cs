@@ -1,7 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Quality.Core.Abstractions;
 using Quality.Core.Dtos;
+using Quality.Core.Entities;
 
 namespace Quality.Tests.Integration;
 
@@ -80,7 +84,8 @@ public sealed class Round3Tests(SqlFixture f) : SqlTest(f)
     [Fact]
     public async Task Production_counts_upload_is_validated_all_or_nothing_and_drives_the_rate()
     {
-        var day = new DateOnly(2026, 1, 12);   // in the past: uploads for future days are refused
+        // In the past (future days are refused) but within the 400-day window, relative to today so the test does not expire.
+        var day = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30);
         var (m1, m2, sup, admin, gdc) = await SeedAsync("b", day);
         string Code1(int m) => m == m1 ? "R3b-1" : "R3b-2";
         ProductionCountRow Row(int m, DateOnly d, string s, int q) => new("GDC", Code1(m), d, s, q);
@@ -128,5 +133,74 @@ public sealed class Round3Tests(SqlFixture f) : SqlTest(f)
         // Only administrators upload.
         Assert.Equal(HttpStatusCode.Forbidden, (await sup.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(rows))).StatusCode);
         Assert.Equal("rows_required", await Code(await admin.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(Array.Empty<ProductionCountRow>()))));
+    }
+
+    [Fact]
+    public async Task A_shop_unreadable_in_one_period_is_left_out_of_both_periods()
+    {
+        var day = new DateOnly(2032, 7, 20);
+        var (_, _, _, _, gdc) = await SeedAsync("c", day);
+        // The GDC database fails only for the PREVIOUS period (reads that start before 'day').
+        await using var factory = F.CreateFactory(new Dictionary<string, string?>()).WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+        {
+            var original = services.Last(d => d.ServiceType == typeof(IEntryStoreRouter));
+            services.Remove(original);
+            services.AddScoped<IEntryStoreRouter>(sp => new FailingBeforeRouter((IEntryStoreRouter)original.ImplementationFactory!(sp), "GDC", day));
+        }));
+        var http = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+        http.DefaultRequestHeaders.Authorization = new("Bearer", await F.AdminTokenAsync());
+        var r = (await http.GetFromJsonAsync<ReportDto>($"/api/reports/totals?fromDate={day:yyyy-MM-dd}&toDate={day.AddDays(1):yyyy-MM-dd}&compare=true"))!;
+        Assert.Contains("GDC", r.UnavailableShops);
+        // Before the fix GDC's current rows (10 parts) stayed in the totals while the previous period lacked GDC.
+        Assert.DoesNotContain(r.TopMachines, m => m.ShopCode == "GDC");
+        Assert.DoesNotContain(r.Shops, s => s.ShopId == gdc.Id);
+        Assert.Equal(r.ByDayShift.Sum(d => d.Quantity), r.Total.Quantity);
+        Assert.All(r.TopMachines, m => Assert.NotEqual("GDC", m.ShopCode));
+    }
+
+    [Fact]
+    public async Task Report_and_upload_limits_are_enforced()
+    {
+        var admin = F.Client(await F.AdminTokenAsync());
+        // Dates before 2000-01-01 are refused (the previous-period arithmetic used to throw a 500 near DateOnly.MinValue).
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/api/reports/totals?fromDate=0001-01-01&toDate=0001-01-02&compare=true")).StatusCode);
+        // Entries for a shop outside the supervisor's scope: 403, not an empty list.
+        var shops = await F.ShopsAsync();
+        var (_, su, spw) = await F.CreateUserAsync("Supervisor", "PRE");
+        var sup = F.Client(await F.LoginAsync(su, spw));
+        Assert.Equal(HttpStatusCode.Forbidden, (await sup.GetAsync($"/api/reports/entries?shopId={shops["GDC"].Id}")).StatusCode);
+        // Upload limits: more than 5000 rows, and a day more than 400 days ago.
+        var many = Enumerable.Range(0, Quality.Core.Services.ProductionCountService.MaxRows + 1).Select(i => new ProductionCountRow("GDC", "X", new DateOnly(2026, 1, 1), "A", 1)).ToArray();
+        Assert.Equal("too_many_rows", await Code(await admin.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(many))));
+        var old = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-401);
+        var gdcMachine = (await (await admin.PostAsJsonAsync("/api/admin/machines", new CreateMachineRequest(shops["GDC"].Id, "R3L-1", "R3L-1 name", true))).Content.ReadFromJsonAsync<AdminMachineDto>())!;
+        var res = (await (await admin.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(new[] { new ProductionCountRow("GDC", gdcMachine.MachineCode, old, "A", 1) }))).Content.ReadFromJsonAsync<ProductionCountResult>())!;
+        Assert.Contains("400 days", Assert.Single(res.Problems).Problem);
+    }
+
+    /// <summary>Wraps the real router; the named store's report reads that start before <c>cutoff</c> fail like an unreachable database.</summary>
+    private sealed class FailingBeforeRouter(IEntryStoreRouter inner, string key, DateOnly cutoff) : IEntryStoreRouter
+    {
+        public IEntryStore For(string entryStoreKey) => entryStoreKey == key ? new Store(inner.For(entryStoreKey), cutoff) : inner.For(entryStoreKey);
+        public IReadOnlyList<IEntryStore> All() => inner.All();
+        public IReadOnlyCollection<string> Keys => inner.Keys;
+        public Task<bool> CanConnectAsync(string k, CancellationToken ct) => inner.CanConnectAsync(k, ct);
+
+        private sealed class Store(IEntryStore s, DateOnly cutoff) : IEntryStore
+        {
+            public Task<QualityRejectionEntry?> FindBySubmissionIdAsync(Guid id) => s.FindBySubmissionIdAsync(id);
+            public Task<QualityRejectionEntry> InsertAsync(QualityRejectionEntry e) => s.InsertAsync(e);
+            public Task<QualityRejectionEntry?> GetByIdAsync(long id) => s.GetByIdAsync(id);
+            public Task<IReadOnlyList<QualityRejectionEntry>> ListAsync(EntryFilter f) => s.ListAsync(f);
+            public Task<bool> IsPhenomenonUsedAsync(int id) => s.IsPhenomenonUsedAsync(id);
+            public Task<bool> IsMachineUsedAsync(int id) => s.IsMachineUsedAsync(id);
+            public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => s.CountWithoutProductionDateAsync(ct);
+            public Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly from, DateOnly to, string? shift) =>
+                from < cutoff ? throw new InvalidOperationException("simulated unreachable database") : s.AggregateAsync(shopId, from, to, shift);
+            public Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? r) =>
+                s.ApplyCorrectionAsync(shopId, entryId, correctionId, nowUtc, r);
+            public Task<IReadOnlyList<QualityRejectionEntry>> ListForReportAsync(int shopId, DateOnly from, DateOnly to, string? shift, int? m, int? p, int limit) =>
+                s.ListForReportAsync(shopId, from, to, shift, m, p, limit);
+        }
     }
 }

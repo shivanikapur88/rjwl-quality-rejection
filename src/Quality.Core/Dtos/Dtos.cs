@@ -92,11 +92,11 @@ public sealed record ReportQuery(DateOnly? FromDate, DateOnly? ToDate, int? Shop
 /// (null when nothing was produced per the counts). Coverage = RejectedWithProduction / Quantity: the share of rejected parts the
 /// rate is based on. A rate is meaningful only when coverage is high; the dashboard says so.
 /// </summary>
-public sealed record RateDto(int Produced, int RejectedWithProduction, decimal? Rate, decimal? Coverage);
+public sealed record RateDto(long Produced, int RejectedWithProduction, decimal? Rate, decimal? Coverage);
 
 public sealed record ReportTotal(int Quantity, int Entries, int? PreviousQuantity = null, int? PreviousEntries = null, RateDto? Rate = null);
 public sealed record ShopTotalDto(int ShopId, string ShopCode, string ShopName, int Quantity, int Entries, RateDto? Rate = null);
-public sealed record DayShiftTotalDto(DateOnly ProductionDate, string ShiftCode, int Quantity, int Entries, int? Produced = null);
+public sealed record DayShiftTotalDto(DateOnly ProductionDate, string ShiftCode, int Quantity, int Entries, long? Produced = null);
 public sealed record PhenomenonTotalDto(int PhenomenonId, string PhenomenonName, string ShopCode, int Quantity, int Entries, int? PreviousQuantity = null);
 public sealed record MachineTotalDto(int MachineId, string MachineCode, string MachineName, string ShopCode, int Quantity, int Entries,
     int? PreviousQuantity = null, RateDto? Rate = null);

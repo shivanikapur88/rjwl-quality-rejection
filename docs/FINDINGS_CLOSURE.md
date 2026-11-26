@@ -87,3 +87,25 @@ A separate Claude Sonnet 5.5 reviewer read the **whole application** at `453f148
 | 14 | Low | A stale test name, a stale spec sentence, and a script check that ignored order. | Renamed, corrected; the check now requires `SET QUOTED_IDENTIFIER ON` **before** the first filtered index. | unit |
 | 15 | Low | db/08 could stop half-way on a legacy 1-character employee code; db/10 re-activated machines an admin had deactivated. | db/08 lists them and stops with 50081 first; db/10 keeps existing active flags unless `@UpdateActiveFlagOfExisting = 1`. | both run with `sqlcmd` |
 | — | unverified | Rare deadlock between entry saves and admin edits; 50+ character login suffixes creating new throttle buckets. | The deadlock would map to 409 `concurrent_change` (retryable). Throttle keys are now cut to 50 characters. | unit `Long_login_names_share_one_bucket` |
+
+## Round 3: independent review (Claude Fable)
+
+A separate reviewer read the round-3 code (drill-down, comparison, Pareto, production counts and rate, dashboard) without seeing my conclusions. It found **no high-severity defect**. Scope, the exclusion of reversed entries, role checks and the dashboard's XSS/CSP safety were confirmed sound. Every finding was checked against the code.
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| 1 | Medium | Clicking a bar in the trend chart did nothing: the click area sat underneath the bars. | The day's click area is drawn on top of the bars. | browser check: clicking the tallest bar filters to that day |
+| 2 | Medium | When a shop's database failed in only one of the two periods, the comparison and totals covered different shops. | A shop unreadable in either period is left out of both periods and every total. | integration `A_shop_unreadable_in_one_period_is_left_out_of_both_periods` (fails without the fix) |
+| 3 | Medium | An error from an older, slower request could appear above newer, correct data. | Errors of superseded loads are ignored. | — |
+| 4 | Medium | Accessibility: focusable rectangles inside an image, table rows turned into buttons, no visible focus, focus lost after drill-down, nothing announced. | Real buttons in the first table cell and on Pareto names; table semantics kept; chart is mouse-only and the "Show as table" day buttons are the keyboard path; visible focus outline; focus moves to the filter chips; result announced in a live region. | browser check (keyboard drill via Enter) |
+| 5 | Medium | Upload error row numbers did not match the file's line numbers. | Each row keeps its file line; client and server errors both say "Line N". | browser check: blank line skipped, lines 2 and 4 reported |
+| 6 | Medium | An integration test used a fixed date that would be refused after Feb 2027. | The date is relative to today. | — |
+| 7 | Low | No change showed as "▲ 0%". | Under 0.5% reads "about the same" / "＝ 0%". | — |
+| 8 | Low | `fromDate=0001-01-01&compare=true` gave a 500; produced totals could overflow `int`. | Report dates start at 2000-01-01 (400); produced sums are `long`. | integration `Report_and_upload_limits_are_enforced` |
+| 9 | Low | CSV parsing: quoted fields, impossible dates, huge numbers, double click on Save. | Quoted-field parser; real-date and 0–1,000,000 checks per line; buttons disabled while sending. | browser check |
+| 10 | Low | The upload's lock covered the whole table for the date range. | Locks only the uploaded machines' key ranges, through the unique index. | integration upload test |
+| 11 | Low | A shared link could show a wrong machine label; impossible dates in a link; pasted links ignored in an open tab; removing "Day" always reset to 7 days. | Labels replaced from the report; dates validated; link changes applied; the previous range is restored. | browser check |
+| 12 | Low | Docs still said "no rejection percentage" and "read-only"; wrong approval date; limits not listed; glued sentence in the user guide. | Corrected. | — |
+| 13 | Low | Missing tests (JavaScript, limits, scope of `entries`, partial availability). | Added the server tests named above (limits, 403 on another shop's entries, partial availability). **Not added:** automated JavaScript tests and concurrent-upload tests; the dashboard was checked in a real browser instead. | — |
+
+Also fixed while checking: the chart's y-axis now uses whole-number steps (ticks read 0, 10, 20, 30, 40 rather than 13 and 38).

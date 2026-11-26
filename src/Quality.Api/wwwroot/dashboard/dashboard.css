@@ -80,7 +80,13 @@ details { margin-top: 8px; } summary { cursor: pointer; color: var(--text-second
 .readout { font-weight: 600; margin: 0 0 4px; }
 .pareto { display: flex; flex-direction: column; }
 .prow { display: grid; grid-template-columns: 28px minmax(110px, 30%) 1fr 60px 56px 82px 64px; gap: 8px; align-items: center; padding: 5px 4px; border-radius: 6px; cursor: pointer; }
-.prow:hover, .prow:focus-visible, tr.clickable:hover, tr.clickable:focus-visible { background: var(--grid); outline: none; }
+.prow:hover, tr.clickable:hover { background: var(--grid); }
+/* Row drill-down buttons look like the text they replace; keyboard focus keeps a clearly visible outline. */
+.rowbtn { all: unset; cursor: pointer; display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
+.rowbtn:hover { text-decoration: underline; }
+.rowbtn:focus-visible, .chip:focus-visible, #chips:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+tbody th { color: var(--text-primary); font-weight: 400; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .prow.phead { cursor: default; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
 .prow.phead:hover { background: none; }
 .prow.vital .barname { font-weight: 700; }
