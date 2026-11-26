@@ -1,0 +1,32 @@
+PASS  T01   Successful login returns token, role and identity
+PASS  T02   Invalid login (wrong password / unknown user / inactive user / blank) is rejected with one generic error
+PASS  T03   Four independent shops: each shop shows only its own single stage; unassigned shop is forbidden
+PASS  T04   Phenomena per shop/stage: exactly 25 / 52 / 34 / 34; Pre-treatment and FINAL never mix; wrong shop-stage pair rejected
+PASS  T05   Machine filtering returns only machines of the selected shop (four shops)
+PASS  T06   Successful entry save: server-side inspector, server time, phenomenon snapshot, trimmed remarks
+PASS  T07   Entries are stored in the correct shop database (GDC, CNC, PRE, FINAL each route to their own store)
+PASS  T08   Entry with a non-existent phenomenon is rejected and nothing is stored
+PASS  T08b  Entry with an inactive phenomenon is rejected
+PASS  T09   Phenomenon from another stage is rejected (FINAL item in the Pre-treatment shop; GDC item in the FINAL shop)
+PASS  T10   Machine from another shop is rejected; stage from another shop is rejected; unassigned shop is forbidden
+PASS  T11   Administrator can add a phenomenon (audited, creator recorded, code generated)
+PASS  T12   Administrator can edit a phenomenon (old/new values audited, modifier recorded)
+PASS  T13   Administrator can deactivate and reactivate; deactivated item disappears from entry lists but stays in admin list
+PASS  T14   Inspector and Supervisor cannot read or modify the phenomena master; nothing changes
+PASS  T15   Historical entries stay valid and keep the original phenomenon name after the master is edited and deactivated
+PASS  T16   Duplicate master-name validation (exact, case, extra whitespace; per stage; on create and edit)
+PASS  T18   Repeated submission protection: retry returns the original; race; mismatch; other user; after deactivation
+PASS  T21   Delete policy: used phenomenon cannot be deleted; never-used one can (audited)
+PASS  T22   Entry visibility: inspector sees own only, supervisor only assigned shops, admin all; no cross-user read; per-shop id lookup
+PASS  T23   Remarks longer than 500 characters are rejected; blank remarks stored as null
+PASS  T19   Excel import data: per-stage counts 25/52/34/34, no normalized duplicates per stage, original text preserved
+PASS  T24   Pre-treatment and FINAL entries sharing ONE database table never leak into each other (list, get by id, delete policy)
+PASS  T25   Rejected quantity: 1..9999 accepted and stored; 0, negative, over 9999 rejected; replay with another quantity is a mismatch
+PASS  T26   Machine admin: add / edit / deactivate / delete with rules, audit, history snapshot; roles other than Administrator are refused
+PASS  T27   User admin: create an inspector with chosen shops; password hashed, never audited; new user can sign in and sees only assigned shops
+PASS  T28   User admin validation: weak/short password, bad role, missing shops, bad ids, duplicates (incl. username == someone's employee code)
+PASS  T29   User admin: edit role/shops, deactivate/reactivate, reset password, and lock-out protections
+PASS  T30   Last active administrator cannot be deactivated or demoted; password reset replaces the credential; audit holds no secrets
+PASS  T31   Users: only administrators may manage users (nothing changes when refused); list, search, filter; no password data in the DTO
+
+30 passed, 0 failed, 30 total
