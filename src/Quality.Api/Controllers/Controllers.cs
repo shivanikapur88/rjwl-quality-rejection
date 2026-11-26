@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Quality.Api.Infrastructure;
 using Quality.Core.Common;
+using Quality.Core.Entities;
 using Quality.Core.Dtos;
 using Quality.Core.Services;
 
@@ -184,4 +185,71 @@ public sealed class AdminUsersController : ApiControllerBase
 
     [HttpPost("{id:int}/reset-password")]
     public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetPasswordRequest request) => Map(await _users.ResetPasswordAsync(Me, id, request), _ => NoContent());
+}
+
+/// <summary>Feature #1: correction requests. Entries are never edited; an approved request reverses the entry (and may add a replacement).</summary>
+[ApiController, Route("api"), Authorize]
+public sealed class CorrectionsController : ApiControllerBase
+{
+    private readonly EntryCorrectionService _svc;
+    public CorrectionsController(EntryCorrectionService svc) => _svc = svc;
+
+    /// <summary>Inspector asks to correct one of their own entries. No proposed values = remove the entry; any value = corrected entry.</summary>
+    [HttpPost("rejection-entries/{shopId:int}/{id:long}/corrections"), Authorize(Roles = RoleNames.QualityInspector)]
+    [ProducesResponseType(typeof(CorrectionDto), 201)]
+    public async Task<IActionResult> Create(int shopId, long id, [FromBody] CorrectionRequest request) =>
+        Map(await _svc.RequestAsync(Me, shopId, id, request), r => Created($"/api/corrections/{r.Id}", r));
+
+    /// <summary>Inspector: own requests. Supervisor: assigned shops. Administrator: all. Default status: Pending.</summary>
+    [HttpGet("corrections")]
+    public async Task<IActionResult> List([FromQuery] string? status = CorrectionStatus.Pending, [FromQuery] int? shopId = null) =>
+        Map(await _svc.ListAsync(Me, string.Equals(status, "all", StringComparison.OrdinalIgnoreCase) ? null : status, shopId));
+
+    [HttpPost("corrections/{id:long}/approve"), Authorize(Roles = RoleNames.Supervisor + "," + RoleNames.Administrator)]
+    public async Task<IActionResult> Approve(long id, [FromBody] CorrectionDecisionRequest? request) => Map(await _svc.ApproveAsync(Me, id, request));
+
+    [HttpPost("corrections/{id:long}/reject"), Authorize(Roles = RoleNames.Supervisor + "," + RoleNames.Administrator)]
+    public async Task<IActionResult> Reject(long id, [FromBody] CorrectionDecisionRequest? request) => Map(await _svc.RejectAsync(Me, id, request));
+
+    [HttpPost("corrections/{id:long}/withdraw"), Authorize(Roles = RoleNames.QualityInspector)]
+    public async Task<IActionResult> Withdraw(long id) => Map(await _svc.WithdrawAsync(Me, id));
+}
+
+/// <summary>Features #2, #4, #6: plant calendar and rejection totals.</summary>
+[ApiController, Route("api/reports"), Authorize]
+public sealed class ReportsController : ApiControllerBase
+{
+    private readonly ReportService _reports;
+    public ReportsController(ReportService reports) => _reports = reports;
+
+    /// <summary>Today's production date, current shift and the shift list (any signed-in user).</summary>
+    [HttpGet("calendar")]
+    [ProducesResponseType(typeof(CalendarDto), 200)]
+    public async Task<IActionResult> Calendar() => Ok(await _reports.CalendarAsync());
+
+    /// <summary>Totals for production days fromDate..toDate (inclusive; default today), optional shop and shift. Supervisor/administrator.</summary>
+    [HttpGet("totals")]
+    [ProducesResponseType(typeof(ReportDto), 200)]
+    public async Task<IActionResult> Totals([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode, [FromQuery] int? top) =>
+        Map(await _reports.RangeAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, top)));
+}
+
+/// <summary>Feature #8: machine QR codes.</summary>
+[ApiController, Route("api"), Authorize]
+public sealed class MachineQrController : ApiControllerBase
+{
+    /// <summary>Resolves a scanned label (inspector). 409 machine_inactive, 403 shop_not_assigned, 400 qr_invalid.</summary>
+    [HttpGet("machines/lookup"), Authorize(Roles = RoleNames.QualityInspector)]
+    [ProducesResponseType(typeof(MachineLookupDto), 200)]
+    public async Task<IActionResult> Lookup([FromQuery] string code, [FromServices] MachineLookupService svc) => Map(await svc.LookupAsync(Me, code));
+
+    /// <summary>SVG QR code for printing a machine label (administrator). Content: RJWLQR:M:&lt;id&gt;.</summary>
+    [HttpGet("admin/machines/{id:int}/qr.svg"), Authorize(Roles = RoleNames.Administrator)]
+    public async Task<IActionResult> QrSvg(int id, [FromServices] Quality.Core.Abstractions.IMasterData master)
+    {
+        if (await master.GetMachineAsync(id) is null) return ProblemFor(404, "machine_not_found", "Machine not found.");
+        using var data = new QRCoder.QRCodeGenerator().CreateQrCode(MachineLookupService.LabelPayload(id), QRCoder.QRCodeGenerator.ECCLevel.Q);
+        var svg = new QRCoder.SvgQRCode(data).GetGraphic(8);
+        return Content(svg, "image/svg+xml");
+    }
 }

@@ -109,3 +109,44 @@ public class AuditLogEntry
     public string? NewValue { get; set; }
     public DateTime Timestamp { get; set; }
 }
+
+/// <summary>A plant shift (db/11). Times are plant local time; a shift ends where the next one (by start time) begins.</summary>
+public class ShiftDefinition
+{
+    public int Id { get; set; }
+    public string ShiftCode { get; set; } = "";
+    public string ShiftName { get; set; } = "";
+    public TimeOnly StartTime { get; set; }
+    public byte SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public static class CorrectionStatus
+{
+    public const string Pending = "Pending", Approved = "Approved", Rejected = "Rejected", Withdrawn = "Withdrawn";
+}
+
+/// <summary>A request to correct a saved entry (db/11). Inspector requests; supervisor or administrator decides.</summary>
+public class EntryCorrection
+{
+    public long Id { get; set; }
+    public int ShopId { get; set; }
+    public long EntryId { get; set; }
+    public Guid EntrySubmissionId { get; set; }
+    public int RequestedBy { get; set; }
+    public DateTime RequestedAt { get; set; }
+    public string Reason { get; set; } = "";
+    public int? ProposedMachineId { get; set; }
+    public int? ProposedPhenomenonId { get; set; }
+    public int? ProposedQuantity { get; set; }
+    public string? ProposedRemarks { get; set; }
+    public string Status { get; set; } = CorrectionStatus.Pending;
+    public int? DecidedBy { get; set; }
+    public DateTime? DecidedAt { get; set; }
+    public string? DecisionNote { get; set; }
+    public long? ReplacementEntryId { get; set; }
+    public byte[]? RowVer { get; set; }
+
+    /// <summary>No proposal at all: the entry should simply not count.</summary>
+    public bool IsReverseOnly => ProposedMachineId is null && ProposedPhenomenonId is null && ProposedQuantity is null && ProposedRemarks is null;
+}

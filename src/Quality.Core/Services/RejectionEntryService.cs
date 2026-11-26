@@ -23,9 +23,10 @@ public sealed class RejectionEntryService
     private readonly IEntryStoreRouter _router;
     private readonly ShopAccessGuard _guard;
     private readonly TimeProvider _time;
+    private readonly IShiftCalendarProvider _calendar;
 
-    public RejectionEntryService(IMasterData master, IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time)
-        => (_master, _router, _guard, _time) = (master, router, guard, time);
+    public RejectionEntryService(IMasterData master, IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time, IShiftCalendarProvider calendar)
+        => (_master, _router, _guard, _time, _calendar) = (master, router, guard, time, calendar);
 
     /// <summary>The one definition of "cleaned-up remarks", used when saving AND when comparing a retry.</summary>
     public static string? CleanRemarks(string? remarks) => string.IsNullOrWhiteSpace(remarks) ? null : remarks.Trim();
@@ -58,6 +59,7 @@ public sealed class RejectionEntryService
         if (stage is null || !stage.IsActive || !await _master.IsStageMappedToShopAsync(shop.Id, stage.Id))
             return Fail(ErrorKind.Validation, "stage_not_in_shop", "The selected inspection stage does not belong to the selected shop.");
 
+        var calendar = await _calendar.GetAsync();
         ServiceResult<CreateEntryResult>? result = null;
         await _master.InTransactionAsync(async () =>
         {
@@ -86,6 +88,7 @@ public sealed class RejectionEntryService
                 Remarks = remarks,
                 ServerCreatedAt = _time.GetUtcNow().UtcDateTime,                    // server time
             };
+            (entry.ProductionDate, entry.ShiftCode) = calendar.Resolve(entry.ServerCreatedAt);   // #2: plant production day + shift
 
             try
             {
@@ -183,7 +186,7 @@ public sealed class RejectionEntryService
         var ordered = all.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.ShopId).ThenByDescending(e => e.Id).ToList();
         var page = ordered.Take(limit).ToList();
         string? next = ordered.Count > limit ? new Cursor(page[^1].ServerCreatedAt, page[^1].ShopId, page[^1].Id).ToString() : null;
-        return ServiceResult<EntryPage>.Ok(new EntryPage(page.Select(Mapping.ToDto).ToList(), next, unavailable));
+        return ServiceResult<EntryPage>.Ok(new EntryPage(await WithCorrectionStatusAsync(page), next, unavailable));
     }
 
     private async Task<(IReadOnlyList<Shop>? Shops, ServiceError? Error)> ScopeAsync(CurrentUser user, int? shopId)
@@ -204,7 +207,17 @@ public sealed class RejectionEntryService
         var entry = await _router.For(shop!.EntryStoreKey).GetByIdAsync(id);
         if (entry is null || entry.ShopId != shop.Id || (user.IsInspector && entry.InspectorId != user.Id))   // ShopId check: a shared table can hold another shop's entry with this id
             return ServiceResult<EntryDto>.Fail(ErrorKind.NotFound, "entry_not_found", "Entry not found.");
-        return ServiceResult<EntryDto>.Ok(Mapping.ToDto(entry));
+        return ServiceResult<EntryDto>.Ok((await WithCorrectionStatusAsync(new[] { entry }))[0]);
+    }
+
+    /// <summary>Adds the latest correction status per entry (#1), one master query per shop on the page.</summary>
+    private async Task<IReadOnlyList<EntryDto>> WithCorrectionStatusAsync(IReadOnlyList<QualityRejectionEntry> entries)
+    {
+        var status = new Dictionary<(int, long), string>();
+        foreach (var g in entries.GroupBy(e => e.ShopId))
+            foreach (var c in await _master.GetCorrectionsForEntriesAsync(g.Key, g.Select(e => e.Id).ToList()))
+                status[(c.ShopId, c.EntryId)] = c.Status;
+        return entries.Select(e => Mapping.ToDto(e, status.TryGetValue((e.ShopId, e.Id), out var s) ? s : null)).ToList();
     }
 
     /// <summary>Opaque page cursor: base64url("ticks.shopId.id") of the last row returned.</summary>

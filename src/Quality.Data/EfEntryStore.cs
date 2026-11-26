@@ -41,6 +41,50 @@ public sealed class EfEntryStore : IEntryStore
         return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(f.Limit).ToListAsync();
     }
 
+    public async Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode)
+    {
+        var q = _db.Entries.AsNoTracking().Where(e => e.ShopId == shopId && e.ReversedAt == null
+            && e.ProductionDate != null && e.ProductionDate >= fromDate && e.ProductionDate <= toDate);
+        if (shiftCode is not null) q = q.Where(e => e.ShiftCode == shiftCode);
+        var rows = await q.GroupBy(e => new { e.ProductionDate, e.ShiftCode, e.MachineId, e.RejectionPhenomenonId })
+            .Select(g => new
+            {
+                g.Key.ProductionDate, g.Key.ShiftCode, g.Key.MachineId, g.Key.RejectionPhenomenonId,
+                MachineCode = g.Max(e => e.MachineCode), MachineName = g.Max(e => e.MachineName), Phenomenon = g.Max(e => e.PhenomenonNameSnapshot),
+                Quantity = g.Sum(e => e.Quantity), Entries = g.Count(),
+            }).ToListAsync();
+        return rows.Select(r => new EntryAggregateRow(r.ProductionDate!.Value, r.ShiftCode ?? "?", r.MachineId, r.MachineCode, r.MachineName,
+            r.RejectionPhenomenonId, r.Phenomenon, r.Quantity, r.Entries)).ToList();
+    }
+
+    public async Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? replacement)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        // Lock the original row; set the reversal marker only if it is not reversed yet (or already by THIS correction: retry).
+        var original = await _db.Entries.FromSqlInterpolated($"SELECT * FROM qa.QualityRejectionEntries WITH (UPDLOCK, HOLDLOCK, ROWLOCK) WHERE Id = {entryId}")
+            .AsNoTracking().FirstOrDefaultAsync();
+        if (original is null || original.ShopId != shopId) throw new CorrectionConflictException("The entry no longer exists.");
+        if (original.ReversedByCorrectionId is long other && other != correctionId) throw new CorrectionConflictException("This entry was already reversed by another correction.");
+        if (original.ReversedAt is null)
+            await _db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE qa.QualityRejectionEntries SET ReversedAt = {nowUtc}, ReversedByCorrectionId = {correctionId} WHERE Id = {entryId} AND ReversedAt IS NULL");
+
+        QualityRejectionEntry? saved = null;
+        if (replacement is not null)
+        {
+            saved = await _db.Entries.AsNoTracking().FirstOrDefaultAsync(e => e.SubmissionId == replacement.SubmissionId);   // retry: already inserted
+            if (saved is null)
+            {
+                _db.Entries.Add(replacement);
+                await _db.SaveChangesAsync();
+                _db.Entry(replacement).State = EntityState.Detached;
+                saved = replacement;
+            }
+        }
+        await tx.CommitAsync();
+        return saved;
+    }
+
     public Task<bool> IsPhenomenonUsedAsync(int phenomenonId) => _db.Entries.AnyAsync(e => e.RejectionPhenomenonId == phenomenonId);
     public Task<bool> IsMachineUsedAsync(int machineId) => _db.Entries.AnyAsync(e => e.MachineId == machineId);
 }

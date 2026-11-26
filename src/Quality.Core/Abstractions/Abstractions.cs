@@ -38,6 +38,18 @@ public interface IMasterData
     /// <summary>Stops tracking an entity whose save failed, so a retry can add a fresh one.</summary>
     void Detach(object entity);
 
+    // ---- shifts and corrections (features #1, #2) ----
+    Task<IReadOnlyList<ShiftDefinition>> GetShiftDefinitionsAsync();
+    void AddCorrection(EntryCorrection c);
+    /// <summary>Call inside <see cref="InTransactionAsync"/>: reads the request with an update lock held to commit, so two decisions cannot both apply.</summary>
+    Task<EntryCorrection?> GetCorrectionLockedAsync(long id);
+    Task<EntryCorrection?> GetCorrectionAsync(long id);
+    /// <summary>Requests filtered by shop set (null = all), requester (null = anyone) and status (null = any); newest first.</summary>
+    Task<IReadOnlyList<EntryCorrection>> ListCorrectionsAsync(IReadOnlyCollection<int>? shopIds, int? requestedBy, string? status, int limit);
+    /// <summary>Latest request per entry for the given entries of one shop (to show "correction pending/approved" in history).</summary>
+    Task<IReadOnlyList<EntryCorrection>> GetCorrectionsForEntriesAsync(int shopId, IReadOnlyCollection<long> entryIds);
+    Task<IReadOnlyDictionary<int, string>> GetUserCodesAsync(IReadOnlyCollection<int> userIds);
+
     // ---- machine administration ----
     Task<IReadOnlyList<Machine>> GetMachinesAsync(int? shopId, bool? isActive, string? search);   // ordered by shop, code
     Task<Machine?> GetMachineForEditAsync(int machineId);                                        // tracked
@@ -109,6 +121,25 @@ public interface IEntryStore
     Task<IReadOnlyList<QualityRejectionEntry>> ListAsync(EntryFilter filter); // newest first
     Task<bool> IsPhenomenonUsedAsync(int phenomenonId);
     Task<bool> IsMachineUsedAsync(int machineId);
+
+    /// <summary>Totals of NON-reversed entries of one shop, grouped by production date, shift, machine and phenomenon (reports, #4/#6).</summary>
+    Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode);
+
+    /// <summary>
+    /// Applies an approved correction in ONE transaction of this entry database: marks entry <paramref name="entryId"/> of
+    /// <paramref name="shopId"/> as reversed by <paramref name="correctionId"/> and, if given, inserts <paramref name="replacement"/>.
+    /// Idempotent for the same correction (a retry returns the replacement already inserted).
+    /// </summary>
+    /// <exception cref="CorrectionConflictException">entry missing, or already reversed by another correction</exception>
+    Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? replacement);
+}
+
+public sealed record EntryAggregateRow(DateOnly ProductionDate, string ShiftCode, int MachineId, string MachineCode, string MachineName,
+    int PhenomenonId, string PhenomenonName, int Quantity, int Entries);
+
+public sealed class CorrectionConflictException : Exception
+{
+    public CorrectionConflictException(string message) : base(message) { }
 }
 
 /// <summary>Maps Shop.EntryStoreKey to the right database. The Android app never chooses a database.</summary>

@@ -41,6 +41,11 @@ builder.Services.AddScoped<RejectionEntryService>();
 builder.Services.AddScoped<PhenomenaAdminService>();
 builder.Services.AddScoped<MachineAdminService>();
 builder.Services.AddScoped<UserAdminService>();
+builder.Services.AddScoped<EntryCorrectionService>();
+builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<MachineLookupService>();
+builder.Services.AddSingleton(new CorrectionOptions(cfg.GetValue("Corrections:MaxAgeDays", 30)));
+builder.Services.AddSingleton<IShiftCalendarProvider, ShiftCalendarProvider>();
 builder.Services.AddSingleton<IdentityPasswordVerifier>();
 builder.Services.AddSingleton<IPasswordVerifier>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
 builder.Services.AddSingleton<IPasswordHashService>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
@@ -104,6 +109,22 @@ var app = builder.Build();
 if (knownProxies.Length > 0) app.UseForwardedHeaders();
 app.UseExceptionHandler(ErrorHandling.Configure);
 app.UseHttpsRedirection();
+// Feature #6: read-only web dashboard (static files under wwwroot/dashboard) with a strict content-security policy:
+// only this site's own scripts/styles, no inline script, no framing. The pages call the same API with the same roles.
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.StartsWithSegments("/dashboard"))
+    {
+        var h = ctx.Response.Headers;
+        h.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+        h.XContentTypeOptions = "nosniff";
+        h["Referrer-Policy"] = "no-referrer";
+        h.CacheControl = "no-cache";
+    }
+    await next();
+});
+app.UseDefaultFiles();
+app.UseStaticFiles();
 if (app.Environment.IsDevelopment() || cfg.GetValue<bool>("Swagger:Enabled")) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.UseRateLimiter();
 app.UseAuthentication();

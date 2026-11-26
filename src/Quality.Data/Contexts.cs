@@ -18,6 +18,8 @@ public sealed class MasterDbContext : DbContext
     public DbSet<RejectionPhenomenon> RejectionPhenomena => Set<RejectionPhenomenon>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<LoginIdentifier> LoginIdentifiers => Set<LoginIdentifier>();
+    public DbSet<ShiftDefinition> ShiftDefinitions => Set<ShiftDefinition>();
+    public DbSet<EntryCorrection> EntryCorrections => Set<EntryCorrection>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -62,6 +64,19 @@ public sealed class MasterDbContext : DbContext
             e.Property(x => x.RowVer).IsRowVersion();   // optimistic concurrency -> DbUpdateConcurrencyException -> HTTP 409
             e.HasOne(x => x.InspectionStage).WithMany().HasForeignKey(x => x.InspectionStageId);
         });
+        b.Entity<ShiftDefinition>(e =>   // db/11
+        {
+            e.ToTable("ShiftDefinitions"); e.Property(x => x.ShiftCode).HasMaxLength(10); e.Property(x => x.ShiftName).HasMaxLength(50);
+            e.Property(x => x.StartTime).HasColumnType("time(0)");
+        });
+        b.Entity<EntryCorrection>(e =>   // db/11
+        {
+            e.ToTable("EntryCorrections"); e.Ignore(x => x.IsReverseOnly);
+            e.Property(x => x.Reason).HasMaxLength(500); e.Property(x => x.ProposedRemarks).HasMaxLength(500); e.Property(x => x.DecisionNote).HasMaxLength(500);
+            e.Property(x => x.Status).HasMaxLength(10);
+            e.Property(x => x.RequestedAt).HasColumnType("datetime2(3)"); e.Property(x => x.DecidedAt).HasColumnType("datetime2(3)");
+            e.Property(x => x.RowVer).IsRowVersion();
+        });
         b.Entity<AuditLogEntry>(e =>
         {
             e.ToTable("AuditLog"); e.Property(x => x.Action).HasMaxLength(50); e.Property(x => x.EntityType).HasMaxLength(50); e.Property(x => x.EntityId).HasMaxLength(50);
@@ -88,6 +103,8 @@ public sealed class EntryDbContext : DbContext
             e.Property(x => x.Remarks).HasMaxLength(500);
             e.Property(x => x.Quantity).HasDefaultValue(1);
             e.Property(x => x.ServerCreatedAt).HasColumnType("datetime2(3)");
+            e.Property(x => x.ProductionDate).HasColumnType("date"); e.Property(x => x.ShiftCode).HasMaxLength(10);   // db/12
+            e.Property(x => x.ReversedAt).HasColumnType("datetime2(3)");
             e.HasIndex(x => x.SubmissionId).IsUnique();
         });
     }

@@ -14,7 +14,10 @@ public sealed record CreateEntryRequest(Guid SubmissionId, int ShopId, int Stage
 public sealed record EntryDto(
     long Id, Guid SubmissionId, int ShopId, string ShopCode, int StageId, string StageCode, string StageName,
     int MachineId, string MachineCode, string MachineName, int PhenomenonId, string PhenomenonName, int Quantity,
-    int InspectorId, string InspectorEmployeeCode, string? Remarks, DateTime ServerCreatedAtUtc);
+    int InspectorId, string InspectorEmployeeCode, string? Remarks, DateTime ServerCreatedAtUtc,
+    DateOnly? ProductionDate = null, string? ShiftCode = null, bool IsReversed = false, long? CorrectsEntryId = null,
+    // CorrectionStatus: status of the latest correction request for this entry (Pending/Approved/Rejected/Withdrawn) or null.
+    string? CorrectionStatus = null);
 
 public sealed record CreateEntryResult(EntryDto Entry, bool AlreadySubmitted);
 
@@ -57,3 +60,41 @@ public sealed record ResetPasswordRequest(string NewPassword);
 
 // ---- Readiness ----
 public sealed record ReadinessDto(string Status, IReadOnlyDictionary<string, string> Components);
+
+// ---- Shifts (#2) ----
+public sealed record ShiftDto(string ShiftCode, string ShiftName, string StartTime);
+/// <summary>Plant calendar: today's production date and current shift (plant time zone), and the shift list.</summary>
+public sealed record CalendarDto(DateOnly ProductionDate, string CurrentShift, string TimeZone, IReadOnlyList<ShiftDto> Shifts);
+
+// ---- Corrections (#1) ----
+/// <summary>Reason is required. Leave every Proposed* empty to ask for the entry to be removed; fill any to ask for a corrected entry.</summary>
+public sealed record CorrectionRequest(string Reason, int? MachineId = null, int? PhenomenonId = null, int? Quantity = null, string? Remarks = null);
+public sealed record CorrectionDecisionRequest(string? Note);
+public sealed record CorrectionDto(
+    long Id, int ShopId, string ShopCode, long EntryId, EntryDto? Entry,
+    int RequestedBy, string RequestedByCode, DateTime RequestedAtUtc, string Reason,
+    bool IsReverseOnly, int? ProposedMachineId, string? ProposedMachineCode, int? ProposedPhenomenonId, string? ProposedPhenomenonName,
+    int? ProposedQuantity, string? ProposedRemarks,
+    string Status, int? DecidedBy, string? DecidedByCode, DateTime? DecidedAtUtc, string? DecisionNote, long? ReplacementEntryId);
+
+// ---- Reports (#4, #6) ----
+public sealed record ReportQuery(DateOnly? FromDate, DateOnly? ToDate, int? ShopId, string? ShiftCode, int? Top);
+public sealed record ReportTotal(int Quantity, int Entries);
+public sealed record ShopTotalDto(int ShopId, string ShopCode, string ShopName, int Quantity, int Entries);
+public sealed record DayShiftTotalDto(DateOnly ProductionDate, string ShiftCode, int Quantity, int Entries);
+public sealed record PhenomenonTotalDto(int PhenomenonId, string PhenomenonName, string ShopCode, int Quantity, int Entries);
+public sealed record MachineTotalDto(int MachineId, string MachineCode, string MachineName, string ShopCode, int Quantity, int Entries);
+/// <summary>
+/// Rejected-part totals (NOT rejection percentages: no production counts are available) for production days
+/// FromDate..ToDate inclusive. Reversed entries are excluded. UnavailableShops: shops whose database could not be read.
+/// </summary>
+public sealed record ReportDto(DateOnly FromDate, DateOnly ToDate, string? ShiftCode, ReportTotal Total,
+    IReadOnlyList<ShopTotalDto> Shops, IReadOnlyList<DayShiftTotalDto> ByDayShift,
+    IReadOnlyList<PhenomenonTotalDto> TopPhenomena, IReadOnlyList<MachineTotalDto> TopMachines, IReadOnlyList<string> UnavailableShops)
+{
+    public bool IsComplete => UnavailableShops.Count == 0;
+}
+
+// ---- Machine QR (#8) ----
+/// <summary>Result of scanning a machine label: where the entry form should open.</summary>
+public sealed record MachineLookupDto(ShopDto Shop, IReadOnlyList<StageDto> Stages, MachineDto Machine);

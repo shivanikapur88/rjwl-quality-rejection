@@ -57,12 +57,15 @@ public sealed class ShopAccessGuard
     }
 }
 
-internal static class Mapping
+public static class Mapping
 {
     public static EntryDto ToDto(QualityRejectionEntry e) => new(
         e.Id, e.SubmissionId, e.ShopId, e.ShopCode, e.InspectionStageId, e.StageCode, e.StageName,
         e.MachineId, e.MachineCode, e.MachineName, e.RejectionPhenomenonId, e.PhenomenonNameSnapshot, e.Quantity,
-        e.InspectorId, e.InspectorEmployeeCode, e.Remarks, DateTime.SpecifyKind(e.ServerCreatedAt, DateTimeKind.Utc));
+        e.InspectorId, e.InspectorEmployeeCode, e.Remarks, DateTime.SpecifyKind(e.ServerCreatedAt, DateTimeKind.Utc),
+        e.ProductionDate, e.ShiftCode, e.ReversedAt is not null, e.CorrectsEntryId);
+
+    public static EntryDto ToDto(QualityRejectionEntry e, string? correctionStatus) => ToDto(e) with { CorrectionStatus = correctionStatus };
 }
 
 /// <summary>Row versions travel to the client as base64 strings ("Version") and come back on edits.</summary>

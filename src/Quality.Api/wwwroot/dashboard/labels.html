@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Machine QR Labels</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="common.js" defer></script>
+  <script src="labels.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">Quality Rejection <span>Machine QR labels</span></div>
+    <nav id="nav" hidden><span id="who"></span><a href="./">Dashboard</a><button id="logout" type="button" class="link">Sign out</button></nav>
+  </header>
+  <main>
+    <section id="login" class="card narrow" hidden>
+      <h1>Sign in</h1>
+      <p class="muted">Administrators only.</p>
+      <form id="loginForm">
+        <label>Username or employee ID <input id="user" autocomplete="username" required></label>
+        <label>Password <input id="pass" type="password" autocomplete="current-password" required></label>
+        <button type="submit" class="primary">Sign in</button>
+        <p id="loginError" class="error" role="alert" hidden></p>
+      </form>
+    </section>
+    <section id="page" hidden>
+      <form id="filters" class="filters">
+        <label>Shop <select id="shop" required></select></label>
+        <label class="noprint">Include inactive machines <select id="inactive"><option value="false">No</option><option value="true">Yes</option></select></label>
+        <button type="submit" class="primary">Show labels</button>
+        <button type="button" id="print">Print</button>
+      </form>
+      <p class="muted small noprint">Each label holds <code>RJWLQR:M:&lt;machine id&gt;</code>. Inspectors scan it in the app to open the entry form for that machine. Labels stay valid if a machine is renamed. Print on durable label stock; replace damaged labels.</p>
+      <p id="error" class="error" role="alert" hidden></p>
+      <div id="labels" class="labels"></div>
+    </section>
+  </main>
+</body>
+</html>

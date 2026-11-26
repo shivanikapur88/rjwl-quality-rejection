@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quality Rejection Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="common.js" defer></script>
+  <script src="dashboard.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">Quality Rejection <span>Dashboard</span></div>
+    <nav id="nav" hidden>
+      <span id="who"></span>
+      <a id="labelsLink" href="labels.html" hidden>Machine QR labels</a>
+      <button id="logout" type="button" class="link">Sign out</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="login" class="card narrow" hidden>
+      <h1>Sign in</h1>
+      <p class="muted">Supervisors and administrators. Use your username or employee ID.</p>
+      <form id="loginForm">
+        <label>Username or employee ID <input id="user" autocomplete="username" required></label>
+        <label>Password <input id="pass" type="password" autocomplete="current-password" required></label>
+        <button type="submit" class="primary">Sign in</button>
+        <p id="loginError" class="error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <section id="dash" hidden>
+      <form id="filters" class="filters" aria-label="Filters">
+        <label>Shop <select id="shop"><option value="">All my shops</option></select></label>
+        <label>From <input id="from" type="date" required></label>
+        <label>To <input id="to" type="date" required></label>
+        <label>Shift <select id="shift"><option value="">All shifts</option></select></label>
+        <div class="quick" role="group" aria-label="Quick ranges">
+          <button type="button" data-days="1">Today</button>
+          <button type="button" data-days="7">7 days</button>
+          <button type="button" data-days="30">30 days</button>
+        </div>
+        <button type="submit" class="primary">Show</button>
+      </form>
+
+      <p id="status" class="muted" aria-live="polite"></p>
+      <p id="incomplete" class="warning" role="status" hidden></p>
+      <p id="error" class="error" role="alert" hidden></p>
+
+      <div class="tiles">
+        <div class="tile"><div class="tile-label">Rejected parts</div><div class="tile-value" id="tParts">–</div></div>
+        <div class="tile"><div class="tile-label">Entries</div><div class="tile-value" id="tEntries">–</div></div>
+        <div class="tile"><div class="tile-label">Correction requests waiting</div><div class="tile-value" id="tPending">–</div></div>
+      </div>
+
+      <div class="grid">
+        <section class="card wide">
+          <h2>Rejected parts by production day and shift</h2>
+          <div id="legend" class="legend"></div>
+          <div id="trend" class="chart" role="img" aria-label="Stacked bar chart of rejected parts per production day, split by shift"></div>
+          <details><summary>Show as table</summary><div id="trendTable"></div></details>
+        </section>
+
+        <section class="card">
+          <h2>Top rejection phenomena</h2>
+          <p class="muted small">Share = share of all rejected parts in this selection (not a rejection rate).</p>
+          <div id="pareto" class="bars"></div>
+        </section>
+
+        <section class="card">
+          <h2>Top machines</h2>
+          <div id="machines"></div>
+        </section>
+
+        <section class="card">
+          <h2>By shop</h2>
+          <div id="shops"></div>
+        </section>
+      </div>
+      <p class="muted small foot">Counts of rejected parts recorded in the app; reversed entries (approved corrections) are excluded. Production days start at the first shift; night-shift entries after midnight belong to the previous day.</p>
+    </section>
+  </main>
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+</body>
+</html>

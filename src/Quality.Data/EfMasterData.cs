@@ -85,6 +85,40 @@ public sealed class EfMasterData : IMasterData
         if (_db.ChangeTracker.Entries<RejectionPhenomenon>().FirstOrDefault(e => e.Entity.Id == phenomenonId) is { } tracked) await tracked.ReloadAsync();
     }
 
+    // ---- shifts and corrections ----
+    public async Task<IReadOnlyList<ShiftDefinition>> GetShiftDefinitionsAsync() => await _db.ShiftDefinitions.AsNoTracking().OrderBy(s => s.SortOrder).ToListAsync();
+    public void AddCorrection(EntryCorrection c) => _db.EntryCorrections.Add(c);
+
+    public async Task<EntryCorrection?> GetCorrectionLockedAsync(long id)
+    {
+        RequireTransaction();
+        // Tracked, with an update lock held to commit: a second decision on the same request waits, then sees it is no longer Pending.
+        var c = await _db.EntryCorrections.FromSqlInterpolated($"SELECT * FROM qa.EntryCorrections WITH (UPDLOCK, HOLDLOCK, ROWLOCK) WHERE Id = {id}").FirstOrDefaultAsync();
+        if (c is not null) await _db.Entry(c).ReloadAsync();   // if it was already tracked, make sure we hold the committed values
+        return c;
+    }
+
+    public Task<EntryCorrection?> GetCorrectionAsync(long id) => _db.EntryCorrections.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
+
+    public async Task<IReadOnlyList<EntryCorrection>> ListCorrectionsAsync(IReadOnlyCollection<int>? shopIds, int? requestedBy, string? status, int limit)
+    {
+        var q = _db.EntryCorrections.AsNoTracking().AsQueryable();
+        if (shopIds is not null) q = q.Where(c => shopIds.Contains(c.ShopId));
+        if (requestedBy is int u) q = q.Where(c => c.RequestedBy == u);
+        if (status is not null) q = q.Where(c => c.Status == status);
+        return await q.OrderByDescending(c => c.RequestedAt).ThenByDescending(c => c.Id).Take(limit).ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<EntryCorrection>> GetCorrectionsForEntriesAsync(int shopId, IReadOnlyCollection<long> entryIds)
+    {
+        if (entryIds.Count == 0) return Array.Empty<EntryCorrection>();
+        var all = await _db.EntryCorrections.AsNoTracking().Where(c => c.ShopId == shopId && entryIds.Contains(c.EntryId)).ToListAsync();
+        return all.GroupBy(c => c.EntryId).Select(g => g.OrderByDescending(c => c.Id).First()).ToList();   // latest request per entry
+    }
+
+    public async Task<IReadOnlyDictionary<int, string>> GetUserCodesAsync(IReadOnlyCollection<int> userIds) =>
+        await _db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.EmployeeCode);
+
     public void ExpectRowVersion(object entity, byte[] rowVersion) => _db.Entry(entity).Property("RowVer").OriginalValue = rowVersion;
     public void Detach(object entity) => _db.Entry(entity).State = EntityState.Detached;
 
