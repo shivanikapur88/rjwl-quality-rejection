@@ -18,7 +18,9 @@ This document replaces the scattered statements in the supplied README, `Phase2_
 
 **In scope (supplied design, completed):** the Android entry workflow for four shops, role-based history, in-app administration of phenomena, machines and users, the API, and the SQL scripts.
 
-**Not added (out of the documented scope; listed so nobody assumes they exist):** offline entry or a local queue, a web administration portal, entry correction or reversal, an audit-viewing screen, photos, QR/barcode, dashboards, exports, PLC integration, shift or production-date allocation, and rejection percentages. Each needs a business decision first ([BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)).
+**Added in round 2 (approved by the owner, 26 Nov 2026):** entry corrections, shift and production date, the app's shift summary, machine QR codes, and a read-only web dashboard. See section 12.
+
+**Not added (outside the documented scope; listed so nobody assumes they exist):** offline entry or a local queue, a web *administration* portal, an audit-viewing screen, photos, dashboards beyond the read-only one, exports, PLC integration, and rejection percentages. Each needs a business decision first ([BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)).
 
 **Outside this application:** the CNC production collector and the ShopMonitor dashboard. The scripts add only schema `qa` and the table `qa.QualityRejectionEntries` to `GDC_AndonDB` and `MachineShopDB`; nothing else in those databases is touched.
 
@@ -135,3 +137,36 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 * The same SubmissionId is reused after an uncertain failure (timeout, connection loss, 5xx); the message says the entry **may not have been saved** and that Save again will not create a duplicate. Validation errors are shown as validation errors, not as an unknown outcome.
 * **Session expiry while saving (changed):** the entry, with its SubmissionId, is kept in memory. After the same user signs in again the form reopens with it, and Save again is safe. Another user signing in does not see it.
 * **Closing the app** with an unsaved entry discards it (no offline storage, by design). Anything already sent with that SubmissionId was either saved once or not at all; check **My entries**.
+
+
+## 12. Round 2 additions (approved 26 Nov 2026)
+
+### 12.1 Shift and production date (#2)
+* `qa.ShiftDefinitions` holds the shifts in plant local time. Seed: **A 06:00–14:00, B 14:00–22:00, C 22:00–06:00**. Plant time zone: `Plant:TimeZoneId`, default `Asia/Kolkata`.
+* Every entry stores `ProductionDate` and `ShiftCode`, calculated by the server from its receipt time. The production day starts at the start of the first shift, so **an entry at 02:00 on 27 Nov belongs to shift C of production day 26 Nov**.
+* Existing entries are backfilled by db/12. Changing shift times later does not move entries already saved.
+* `GET /api/reports/calendar` returns today's production date, the current shift and the shift list.
+
+### 12.2 Entry corrections (#1)
+* Entries are still never edited or deleted.
+* The **inspector who recorded an entry** asks for a correction: `POST /api/rejection-entries/{shopId}/{id}/corrections` with a reason (required, 500 characters max) and either nothing (= remove the entry) or the corrected phenomenon, machine, quantity and/or remarks. Only the stage's phenomena and the shop's machines are allowed. Entries older than `Corrections:MaxAgeDays` (default 30 production days) cannot be corrected from the app.
+* A **supervisor of that shop or an administrator** approves (`/api/corrections/{id}/approve`, optional note) or rejects (`/reject`, note required). The inspector can withdraw a pending request (`/withdraw`). `GET /api/corrections?status=Pending|Approved|Rejected|Withdrawn|all`: inspectors see their own, supervisors their shops', administrators all.
+* **Approval:** in one transaction of the shop's entry database, the original gets `ReversedAt`/`ReversedByCorrectionId`, and a replacement entry is inserted if values were proposed. The replacement has `CorrectsEntryId` = original, the **original's inspector, production day and shift**, and current machine/phenomenon names. This step is idempotent (the replacement's SubmissionId is derived from the request id), so a retry after a failure between the two databases completes the same correction rather than repeating it.
+* **Guards:** an update lock on the request row; unique indexes allow one pending and one approved request per entry; proposed machine/phenomenon are re-validated at approval under the same locks as a normal save; every step is audited (`CORRECTION_*`).
+* History shows reversed entries with a badge and keeps them visible. Totals exclude them and include replacements.
+
+### 12.3 Reports and the app's shift summary (#4)
+* `GET /api/reports/totals?fromDate&toDate&shopId&shiftCode&top` (supervisor: assigned shops; administrator: all; inspectors: 403). Production days are inclusive, at most 92 per request.
+* Returns totals, per shop, per day+shift, top phenomena and top machines, plus `unavailableShops` (the result is incomplete if any are listed). Reversed entries are excluded.
+* These are **counts of rejected parts**. No rejection percentage is computed, because there is no production count (decision #13).
+* The app's **Shift summary** shows one production day (today and the current shift by default; previous/next day; shift picker).
+
+### 12.4 Machine QR codes (#8)
+* Label content `RJWLQR:M:<machine id>`; the id is stable when a machine is renamed.
+* Administrators print labels at `/dashboard/labels.html` (SVG from `GET /api/admin/machines/{id}/qr.svg`).
+* Inspectors tap **Scan machine QR**. `GET /api/machines/lookup?code=…` checks shop assignment (403), active machine (409 `machine_inactive`) and label format (400 `qr_invalid`), then the entry form opens for that machine. The camera permission is requested the first time the scan screen opens.
+
+### 12.5 Read-only web dashboard (#6)
+* Served by the API at `/dashboard/`. Supervisors and administrators sign in with their normal credentials; same roles and shop scope as the API.
+* Shows: rejected parts and entries, waiting correction requests, a stacked bar chart per production day by shift (with a table view), top phenomena with share of rejected parts, top machines, and totals by shop.
+* Plain HTML/JS with no external libraries, so it works on an offline plant network. Strict Content-Security-Policy: own scripts only, no inline script, no framing. The token is kept in the browser tab's session storage and cleared on sign-out or expiry.
