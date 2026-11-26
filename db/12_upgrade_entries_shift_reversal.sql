@@ -14,6 +14,9 @@
    ============================================================================ */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
+-- Required for filtered indexes and consistent behaviour; sqlcmd defaults QUOTED_IDENTIFIER to OFF.
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 IF OBJECT_ID(N'qa.QualityRejectionEntries', N'U') IS NULL
     THROW 50012, N'qa.QualityRejectionEntries does not exist in this database. Run 02a/02b/02c first.', 1;

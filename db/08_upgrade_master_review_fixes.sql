@@ -26,6 +26,9 @@
    ============================================================================ */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
+-- Required for filtered indexes and consistent behaviour; sqlcmd defaults QUOTED_IDENTIFIER to OFF.
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
 /* ---------- 1. Token version (session revocation) ---------- */
