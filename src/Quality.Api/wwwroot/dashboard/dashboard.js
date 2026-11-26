@@ -86,6 +86,7 @@
   /** focusChips: after a drill-down or chip removal, keyboard focus moves to the filter chips (the clicked control is rebuilt). */
   async function load(focusChips = false) {
     el('error').hidden = true;
+    el('tip').hidden = true;   // the hovered element is about to be rebuilt, so its mouseleave never fires
     writeHash();
     renderChips();
     const seq = ++loadSeq;
