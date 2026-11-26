@@ -30,11 +30,12 @@ run "$M" "$DB_DIR/08_upgrade_master_review_fixes.sql"
 run "$M" "$DB_DIR/09_upgrade_entries_indexes.sql"
 run "$M" "$DB_DIR/11_upgrade_master_shifts_corrections.sql"
 run "$M" "$DB_DIR/12_upgrade_entries_shift_reversal.sql"
+run "$M" "$DB_DIR/13_upgrade_master_production_counts.sql"
 for db in Gdc Cnc; do
   if [ "$db" = Gdc ]; then run "${PREFIX}_Gdc" "$DB_DIR/02a_entries_schema_GDC_AndonDB.sql"; else run "${PREFIX}_Cnc" "$DB_DIR/02b_entries_schema_MachineShopDB.sql"; fi
   run "${PREFIX}_$db" "$DB_DIR/09_upgrade_entries_indexes.sql"
   run "${PREFIX}_$db" "$DB_DIR/12_upgrade_entries_shift_reversal.sql"
 done
 # Re-run everything that claims to be idempotent: must succeed and change nothing.
-for f in 01_master_schema 03_seed_reference 04_seed_phenomena 08_upgrade_master_review_fixes 09_upgrade_entries_indexes 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal; do run "$M" "$DB_DIR/$f.sql"; done
+for f in 01_master_schema 03_seed_reference 04_seed_phenomena 08_upgrade_master_review_fixes 09_upgrade_entries_indexes 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts; do run "$M" "$DB_DIR/$f.sql"; done
 echo "Fresh install + idempotent re-run complete."

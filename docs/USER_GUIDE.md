@@ -42,7 +42,11 @@
 * Supervisors do not record entries and cannot change master data.
 * **Correction requests:** approve (the entry is reversed, and the corrected entry is saved if one was proposed) or reject (give a reason; the inspector sees it). Tick "Also show decided requests" for history.
 * **Shift summary:** rejected parts for today's production day and the current shift. Use ‹ › to change the day and the picker to change the shift. Shows totals by shop, top phenomena and top machines.
-* **Web dashboard:** open `https://<server>/dashboard/` in a browser and sign in with your app username and password. It shows trends by day and shift, top phenomena and machines, and totals per shop for any period up to 92 days, with a table view of the chart.
+* **Web dashboard:** open `https://<server>/dashboard/` in a browser and sign in with your app username and password.
+  * **Drill down:** click a day in the chart, a phenomenon in the Pareto, or a machine or shop row. Everything filters to it, and the entries behind it are listed at the bottom. Chips above the tiles show the active filters; click × to remove one. You can copy the address to share the same view.
+  * **Comparison:** the tiles and the "vs prev." columns compare with the previous period of the same length (for example the 7 days before).
+  * **Pareto:** phenomena from most to fewest rejected parts, with the cumulative share and a line where 80% of rejected parts is reached. These are the few causes worth attacking first.
+  * **Rejection rate:** rejected ÷ produced parts. It appears only where production counts have been loaded, and the "based on N% of rejected parts" note says how much of the data it covers. It shows trends by day and shift, top phenomena and machines, and totals per shop for any period up to 92 days, with a table view of the chart.
 
 ## Administrator
 
@@ -62,6 +66,8 @@ Home shows three extra buttons: **Manage rejection phenomena**, **Manage machine
 * Resetting a password, deactivating a user or changing a role signs that user out everywhere.
 
 **"This record was changed by someone else after you opened it"**: another administrator saved the same record while you had it open. Go back, let the list reload, and make your change again.
+
+**Production counts (for the rejection rate):** on the dashboard, in the "Production counts" box, choose a CSV file with the columns `shop,machine,date,shift,produced` ("Download a template" gives an example). Press **Check file**: nothing is saved yet, and any wrong rows are listed. Then press **Save counts**. Uploading the same machine, day and shift again replaces the earlier number.
 
 **Machine QR labels:** in a browser, open `https://<server>/dashboard/labels.html`, choose the shop, then **Print**. Stick each label on its machine. Labels stay valid when a machine is renamed. Administrators can also approve or reject correction requests, and use the shift summary and dashboard for all shops.
 

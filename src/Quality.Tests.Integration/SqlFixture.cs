@@ -45,7 +45,7 @@ public sealed class SqlFixture : IAsyncLifetime
         }
         await RunScripts(MasterCs, "01_master_schema", "02c_entries_schema_PRE_FINAL", "03_seed_reference", "04_seed_phenomena",
             "05_DEV_ONLY_placeholder_machines",   // test database only: the workflow needs machines
-            "08_upgrade_master_review_fixes", "09_upgrade_entries_indexes", "11_upgrade_master_shifts_corrections", "12_upgrade_entries_shift_reversal");
+            "08_upgrade_master_review_fixes", "09_upgrade_entries_indexes", "11_upgrade_master_shifts_corrections", "12_upgrade_entries_shift_reversal", "13_upgrade_master_production_counts");
         await RunScripts(GdcCs, "02a_entries_schema_GDC_AndonDB", "09_upgrade_entries_indexes", "12_upgrade_entries_shift_reversal");
         await RunScripts(CncCs, "02b_entries_schema_MachineShopDB", "09_upgrade_entries_indexes", "12_upgrade_entries_shift_reversal");
 

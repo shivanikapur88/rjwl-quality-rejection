@@ -176,3 +176,30 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 * Served by the API at `/dashboard/`. Supervisors and administrators sign in with their normal credentials; same roles and shop scope as the API.
 * Shows: rejected parts and entries, waiting correction requests, a stacked bar chart per production day by shift (with a table view), top phenomena with share of rejected parts, top machines, and totals by shop.
 * Plain HTML/JS with no external libraries, so it works on an offline plant network. Strict Content-Security-Policy: own scripts only, no inline script, no framing. The token is kept in the browser tab's session storage and cleared on sign-out or expiry.
+
+
+## 13. Round 3: dashboard insights and rejection rate (approved 27 Nov 2026)
+
+### 13.1 Drill-down
+* Click a **day** in the chart, a **phenomenon** in the Pareto, a **machine** or a **shop** to filter the whole dashboard to it.
+* Active filters appear as chips; click × to remove one. The selection is kept in the page address, so a link can be shared.
+* API: `GET /api/reports/totals` accepts `machineId` and `phenomenonId`. `GET /api/reports/entries` (same filters, `limit` ≤ 200) lists the entries behind a selection, newest first. Reversed entries are excluded, as in the totals.
+* Scope is unchanged: a machine or phenomenon outside the caller's shops simply matches nothing.
+
+### 13.2 Comparison with the previous period
+* `compare=true` adds the previous period of the same length, ending the day before `fromDate`.
+* It covers totals (`previousQuantity`, `previousEntries`, `previousFromDate`/`previousToDate`) and each phenomenon's and machine's `previousQuantity`.
+* The dashboard shows "▲ 12% more rejected parts than 13–19 Nov (913)", and ▲/▼ per phenomenon and machine.
+
+### 13.3 Pareto
+* Phenomena sorted by rejected parts (`top` up to 50; `phenomenaCount` is the total), with share and cumulative share of rejected parts as text.
+* A line marks where 80% is reached, and a readout says "16 of 37 phenomena cause 82% of rejected parts". It is a single-axis chart: the cumulative share is a column, not a second axis.
+
+### 13.4 Rejection rate (#8)
+* **This system does not measure production.** Parts produced per machine, production day and shift are stored in `qa.ProductionCounts` (db/13), from either:
+  * an administrator's **CSV upload** on the dashboard (`shop,machine,date,shift,produced`). `POST /api/admin/production-counts` checks the whole file first (unknown shop, machine not in the shop, unknown shift, future date, quantity 0–1,000,000, duplicate rows). It saves nothing if any row is wrong, offers a dry run first, upserts by machine+day+shift, and is audited;
+  * an **automatic feed** from the production systems, using the read-only `db/14_production_counts_feed_TEMPLATE.sql`. The source names must be filled in with the owners of those systems.
+* **Rate** = rejected parts on machine+day+shift combinations that have a production count ÷ produced parts in scope.
+* Each rate comes with its **coverage**: the share of rejected parts it is based on. With no production data, the dashboard says so instead of showing 0%.
+* Rates are shown for the total, each shop and each machine.
+* **Counting rules still need RJWL's sign-off (decision #13).** For example: does a part rejected for two phenomena count twice? Is rework counted as produced? Until then the figure is labelled "rejected ÷ produced".

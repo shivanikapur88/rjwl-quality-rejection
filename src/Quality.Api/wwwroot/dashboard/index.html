@@ -43,42 +43,68 @@
         </div>
         <button type="submit" class="primary">Show</button>
       </form>
+      <div id="chips" class="chips" aria-label="Drill-down filters"></div>
 
       <p id="status" class="muted" aria-live="polite"></p>
       <p id="incomplete" class="warning" role="status" hidden></p>
       <p id="error" class="error" role="alert" hidden></p>
 
       <div class="tiles">
-        <div class="tile"><div class="tile-label">Rejected parts</div><div class="tile-value" id="tParts">–</div></div>
-        <div class="tile"><div class="tile-label">Entries</div><div class="tile-value" id="tEntries">–</div></div>
+        <div class="tile"><div class="tile-label">Rejected parts</div><div class="tile-value" id="tParts">–</div><div class="tile-delta" id="dParts"></div></div>
+        <div class="tile"><div class="tile-label">Entries</div><div class="tile-value" id="tEntries">–</div><div class="tile-delta" id="dEntries"></div></div>
+        <div class="tile"><div class="tile-label">Rejection rate <span class="muted small">(rejected ÷ produced)</span></div><div class="tile-value" id="tRate">–</div><div class="tile-delta" id="dRate"></div></div>
         <div class="tile"><div class="tile-label">Correction requests waiting</div><div class="tile-value" id="tPending">–</div></div>
       </div>
 
       <div class="grid">
         <section class="card wide">
           <h2>Rejected parts by production day and shift</h2>
+          <p class="muted small">Click a day to see only that day.</p>
           <div id="legend" class="legend"></div>
           <div id="trend" class="chart" role="img" aria-label="Stacked bar chart of rejected parts per production day, split by shift"></div>
           <details><summary>Show as table</summary><div id="trendTable"></div></details>
         </section>
 
-        <section class="card">
-          <h2>Top rejection phenomena</h2>
-          <p class="muted small">Share = share of all rejected parts in this selection (not a rejection rate).</p>
-          <div id="pareto" class="bars"></div>
+        <section class="card wide">
+          <h2>Pareto of rejection phenomena</h2>
+          <p id="paretoNote" class="readout"></p>
+          <p class="muted small">Sorted by rejected parts. Share and cumulative share are of all rejected parts in this selection (not a rejection rate). Click a phenomenon to drill down.</p>
+          <div id="pareto" class="pareto"></div>
         </section>
 
         <section class="card">
           <h2>Top machines</h2>
+          <p class="muted small">Click a machine to drill down. Rate only where production counts exist.</p>
           <div id="machines"></div>
         </section>
 
         <section class="card">
           <h2>By shop</h2>
+          <p class="muted small">Click a shop to show only that shop.</p>
           <div id="shops"></div>
         </section>
+
+        <section class="card wide">
+          <h2>Entries in this selection</h2>
+          <p id="entriesNote" class="muted small"></p>
+          <div id="entries"></div>
+        </section>
+
+        <section id="prodCard" class="card wide" hidden>
+          <h2>Production counts (for the rejection rate)</h2>
+          <p class="muted small">Upload parts <b>produced</b> per machine, production day and shift as a CSV file with the columns
+            <code>shop,machine,date,shift,produced</code> (date as YYYY-MM-DD, shift A/B/C). Existing values for the same machine, day and shift are replaced.
+            The whole file is checked first; nothing is saved if any row is wrong.</p>
+          <div class="upload">
+            <input id="prodFile" type="file" accept=".csv,text/csv" aria-label="Production counts CSV file">
+            <button type="button" id="prodCheck">Check file</button>
+            <button type="button" id="prodApply" class="primary" disabled>Save counts</button>
+            <button type="button" id="prodTemplate" class="link-dark">Download a template</button>
+          </div>
+          <div id="prodResult" role="status"></div>
+        </section>
       </div>
-      <p class="muted small foot">Counts of rejected parts recorded in the app; reversed entries (approved corrections) are excluded. Production days start at the first shift; night-shift entries after midnight belong to the previous day.</p>
+      <p class="muted small foot">Counts of rejected parts recorded in the app; reversed entries (approved corrections) are excluded. Production days start at the first shift; night-shift entries after midnight belong to the previous day. The rejection rate uses only rejected parts of machines, days and shifts that have a production count, as shown by its coverage.</p>
     </section>
   </main>
   <div id="tip" class="tip" role="tooltip" hidden></div>

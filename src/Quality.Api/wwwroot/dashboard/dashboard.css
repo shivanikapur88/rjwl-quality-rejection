@@ -72,3 +72,24 @@ details { margin-top: 8px; } summary { cursor: pointer; color: var(--text-second
 .label { background: #fff; color: #000; border: 1px dashed #999; border-radius: 6px; padding: 10px; text-align: center; break-inside: avoid; }
 .label img { width: 150px; height: 150px; } .label .code { font-size: 20px; font-weight: 700; } .label .name { font-size: 13px; }
 @media print { .top, .filters, .noprint { display: none !important; } body { background: #fff; } .labels { grid-template-columns: repeat(3, 1fr); } }
+/* ---- round 3: drill-down, comparison, Pareto, entries, upload ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.chip { border-radius: 999px; padding: 6px 12px; min-height: 34px; border: 1px solid var(--brand); color: var(--text-primary); background: var(--surface-1); font-size: 14px; }
+.chip-x { font-weight: 700; margin-left: 2px; }
+.tile-delta { color: var(--text-secondary); font-size: 13px; min-height: 18px; }
+.readout { font-weight: 600; margin: 0 0 4px; }
+.pareto { display: flex; flex-direction: column; }
+.prow { display: grid; grid-template-columns: 28px minmax(110px, 30%) 1fr 60px 56px 82px 64px; gap: 8px; align-items: center; padding: 5px 4px; border-radius: 6px; cursor: pointer; }
+.prow:hover, .prow:focus-visible, tr.clickable:hover, tr.clickable:focus-visible { background: var(--grid); outline: none; }
+.prow.phead { cursor: default; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.prow.phead:hover { background: none; }
+.prow.vital .barname { font-weight: 700; }
+.prow .num { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.pcut { text-align: center; color: var(--text-secondary); font-size: 12px; border-top: 1px dashed var(--border); margin: 4px 0; padding-top: 2px; }
+tr.clickable { cursor: pointer; }
+.upload { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0; }
+.link-dark { background: none; border: 0; color: var(--text-primary); text-decoration: underline; padding: 0; min-height: 0; }
+.ok { border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); border-radius: 8px; padding: 10px 12px; font-weight: 600; }
+.problems { max-height: 220px; overflow: auto; font-size: 14px; }
+@media (max-width: 760px) { .prow { grid-template-columns: 22px 1fr 50px 48px 64px; } .prow > :nth-child(3), .prow > :nth-child(7) { display: none; } }
+td.num, th.num { white-space: nowrap; }

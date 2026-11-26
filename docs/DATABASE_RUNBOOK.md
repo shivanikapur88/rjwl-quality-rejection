@@ -22,6 +22,8 @@
 | `10_load_production_machines.sql` | QualityMasterDB | when the list is approved | when the list changes | validated machine load with dry run (section 3) |
 | `11_upgrade_master_shifts_corrections.sql` | QualityMasterDB | **yes** | **yes** | shift definitions (A 06:00, B 14:00, C 22:00), correction requests |
 | `12_upgrade_entries_shift_reversal.sql` | **each** entry DB | **yes** | **yes** | production date + shift, reversal markers; **backfills existing rows** (IST, A/B/C times written in the script) |
+| `13_upgrade_master_production_counts.sql` | QualityMasterDB | **yes** | **yes** | `qa.ProductionCounts` for the rejection rate |
+| `14_production_counts_feed_TEMPLATE.sql` | QualityMasterDB | no | when a feed is agreed | **template**: read-only feed of production counts from the production systems; fill in the source names first |
 
 All scripts set `QUOTED_IDENTIFIER ON` themselves where needed. `sqlcmd` starts with it OFF, and SQL Server then refuses the filtered indexes in 11; a unit test now checks this for every script.
 
@@ -38,6 +40,7 @@ sqlcmd -S <I> -E -b -d QualityMasterDB -i db/08_upgrade_master_review_fixes.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/09_upgrade_entries_indexes.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/11_upgrade_master_shifts_corrections.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/12_upgrade_entries_shift_reversal.sql
+sqlcmd -S <I> -E -b -d QualityMasterDB -i db/13_upgrade_master_production_counts.sql
 ```
 3. Existing entry databases (check first that schema `qa` and `qa.QualityRejectionEntries` do not already exist there for something else):
 ```bash
