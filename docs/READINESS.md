@@ -51,4 +51,8 @@ Status at commit `3313612` (verified 2026-11-26). Key: ✅ done · ◐ partly ·
 | Automatic production feed (db/14) | ◐ template | — | — | ✗ | — | ✗ | source tables and owners' approval |
 | Independent review (Fable) | ✅ 13 findings fixed or documented | | | | | | |
 
+### Second full review (commit `a9fe6f8`)
+
+Three Sonnet 5.5 reviewers found no high-severity code defect. One high finding was in the runbook: the GDC/CNC permissions would have broken correction approvals. It is fixed by `db/15_api_permissions.sql`, and the integration tests now run the API with exactly those rights. All findings and their fixes are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#second-full-application-review-sonnet-55). **New action for deployment:** run db/15 in all three databases (runbook section 1 step 6 / section 2 step 8).
+
 **Release-candidate verdict:** the server, database and app logic are complete and tested against SQL Server. The build is **not** ready for production use until the ✗ items in the "Tested on Android" and "Blocked" columns are done: the device acceptance run, the machine list, the package id, keystore and certificate, and business acceptance. See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) and the checklist in [TEST_EVIDENCE.md §3](TEST_EVIDENCE.md).

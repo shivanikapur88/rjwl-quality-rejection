@@ -1,6 +1,6 @@
 # Test evidence
 
-> **Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+> **Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
 
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
@@ -156,3 +156,28 @@ Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `d4acbe0c328
 * concurrent uploads, or an upload racing a feed (the lock design is described in the code);
 * a real production-count feed (db/14 is a template);
 * the dashboard on RJWL's server and browsers.
+
+## 8. Second full review evidence (commit `a9fe6f8`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `a9fe6f8892c133f71c96e4b426f5bcc8cab8243c`, 26 Nov 2026, same environment. Raw output: [`docs/evidence/review2/`](evidence/review2/). The next commit only passes the test cancellation token in two new unit tests (removing two analyzer warnings); unit tests re-run: 97 passed.
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**. 141 warnings in the evidence run, 139 after that commit. All are nullable-annotation warnings in the recovered `Quality.Mobile.Core`; 4 more than before, from review fixes made in that recovered code. None are in the server, database or test code. |
+| Debug APK | SHA-256 `256246d7…6f87` (`evidence/review2/apk.txt`) |
+| Unit tests | **97 passed** (was 84): app fixes (9), throttle on a shared plant address, accent variants, 413 mapping |
+| Integration, SQL Server, RCSI ON / OFF | **55 passed** each (was 54) |
+| `sqlcmd` fresh install + idempotent re-run (entry databases too) | OK |
+| Upgrade path, now including 11, 12 (backfill of an old entry) and 13, with failing checks | OK |
+| `db/15` via `sqlcmd`, twice, in all three databases | OK; GDC/CNC show only the entries table with SELECT, INSERT and UPDATE of the two reversal columns |
+| Seed check | OK |
+
+**The API now runs as a least-privilege login in every integration test.** The fixture creates a temporary login, applies `db/15_api_permissions.sql` in the three databases, and the API connects with that login (the tests' own SQL checks use the administrator login). With the runbook's old GDC/CNC grants, 6 correction tests fail; with 15, all pass.
+
+**New or extended integration tests:** the seed re-run after an administrator renamed a seeded phenomenon; a machine with production counts cannot be deleted (409); a shift with 0 produced stays outside the rate; the db/12 backfill at 05:59:59.700 stays in shift C; the readiness warning (fresh instance; no counts or file names).
+
+**Browser checks (`visual_checks.txt`):**
+* the Pareto shows the shop when several shops are in view;
+* two quick "Show" clicks on the labels page show one shop only;
+* a forced 40% coverage shows the partial-coverage warning;
+* no page errors.

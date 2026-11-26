@@ -63,13 +63,13 @@ public sealed partial class MobileViewModelTests
         var failed = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
         var cmd = new AsyncCommand(async () => { await Task.Yield(); throw new InvalidOperationException("navigation failed"); }, onError: e => failed.TrySetResult(e));
         cmd.Execute(null);
-        Assert.IsType<InvalidOperationException>(await failed.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.IsType<InvalidOperationException>(await failed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.True(cmd.CanExecute(null));   // usable again
 
         var failedT = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
         var cmdT = new AsyncCommand<string>(_ => throw new InvalidOperationException("sync"), onError: e => failedT.TrySetResult(e));
         cmdT.Execute("x");
-        Assert.Equal("sync", (await failedT.Task.WaitAsync(TimeSpan.FromSeconds(5))).Message);
+        Assert.Equal("sync", (await failedT.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Message);
 
         new AsyncCommand(() => throw new InvalidOperationException("no listener")).Execute(null);   // no callback: logged, not thrown
     }
