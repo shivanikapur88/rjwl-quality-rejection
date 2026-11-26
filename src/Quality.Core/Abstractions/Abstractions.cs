@@ -123,6 +123,9 @@ public interface IEntryStore
     Task<bool> IsPhenomenonUsedAsync(int phenomenonId);
     Task<bool> IsMachineUsedAsync(int machineId);
 
+    /// <summary>Entries in this database without a production day (saved by an older API; reports leave them out until db/12 is re-run).</summary>
+    Task<int> CountWithoutProductionDateAsync(CancellationToken ct);
+
     /// <summary>Totals of NON-reversed entries of one shop, grouped by production date, shift, machine and phenomenon (reports, #4/#6).</summary>
     Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode);
 

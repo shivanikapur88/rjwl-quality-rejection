@@ -150,6 +150,24 @@ public sealed class SecurityTests(SqlFixture f) : SqlTest(f)
         Assert.All(dto.Components.Values, v => Assert.Equal("ok", v));
     }
 
+    /// <summary>Full review #5: entries without a production day are left out of reports; readiness must say so.</summary>
+    [Fact]
+    public async Task Readiness_warns_about_entries_without_a_production_day()
+    {
+        var id = Guid.NewGuid();
+        await SqlFixture.Scalar<int>(F.CncCs, """
+            INSERT INTO qa.QualityRejectionEntries (SubmissionId, ShopId, ShopCode, InspectionStageId, StageCode, StageName, MachineId, MachineCode, MachineName,
+              RejectionPhenomenonId, PhenomenonNameSnapshot, Quantity, InspectorId, InspectorEmployeeCode, ServerCreatedAt)
+            VALUES (@s, 2, 'CNC', 2, 'CNC_SHOP', 'CNC Shop', 1, 'M', 'M', 1, 'P', 1, 1, 'E', SYSUTCDATETIME()); SELECT 1
+            """, ("@s", id));
+        try
+        {
+            var dto = await F.Client().GetFromJsonAsync<ReadinessDto>("/api/health/ready");
+            Assert.Contains(dto!.Warnings!, w => w.StartsWith("entries:CNC:") && w.Contains("db/12"));
+        }
+        finally { await SqlFixture.Scalar<int>(F.CncCs, "DELETE FROM qa.QualityRejectionEntries WHERE SubmissionId = @s; SELECT 1", ("@s", id)); }
+    }
+
     [Fact]
     public async Task Readiness_reports_an_unreachable_entry_database_with_503()
     {

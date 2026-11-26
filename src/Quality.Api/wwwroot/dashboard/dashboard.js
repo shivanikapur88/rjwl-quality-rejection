@@ -36,7 +36,7 @@
     if (el('shift').value) q.set('shiftCode', el('shift').value);
     document.body.classList.add('busy');
     try {
-      const [r, pending] = await Promise.all([api('/api/reports/totals?' + q), api('/api/corrections/count?status=Pending').catch(() => null)]);
+      const [r, pending] = await Promise.all([api('/api/reports/totals?' + q), api('/api/corrections/count?status=Pending' + (el('shop').value ? '&shopId=' + el('shop').value : '')).catch(() => null)]);
       render(r);
       text(el('tPending'), pending === null ? '–' : fmt(pending));
     } catch (e) { showError(e); }

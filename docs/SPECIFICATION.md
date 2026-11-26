@@ -127,7 +127,13 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 ## 10. Security
 
 * **Tokens:** HS256 JWT, 480 minutes by default, claims `sub`, `emp`, `role`, `tv` (token version). Every request re-checks: user exists, is active, still has that role, and `tv` equals `Users.TokenVersion`. Password reset, deactivation and role change increase `TokenVersion`, so **all earlier tokens stop working immediately**, and reactivating or changing the role back does not revive them. Tokens with missing or malformed claims get 401, not 500.
-* **Login throttling:** failed attempts are counted per client address + login (5 in 5 min), per login (10 in 15 min) and per client address (30 in 15 min). A success clears that login's counters. There is a generous raw cap of 300 login requests/minute per address (configurable). Counters are in memory, per API instance. Behind a reverse proxy, set `ReverseProxy:KnownProxies` so the real client address is used.
+* **Login throttling:**
+  * Failed attempts are counted per client address + login (5 in 5 min) and per client address (30 in 15 min).
+  * Per login (10 in 15 min), counted **only for clients that have not signed in as that login before** (within 30 days). Someone guessing from elsewhere therefore cannot lock the real user out of their usual device.
+  * Checking and counting are one atomic step, so a parallel burst cannot slip past.
+  * A success clears that login's counters.
+  * There is also a generous raw cap of 300 login requests/minute per address (configurable).
+  * Counters are in memory, per API instance. Behind a reverse proxy, set `ReverseProxy:KnownProxies` so the real client address is used; otherwise a warning is logged.
 * **Passwords:** ASP.NET Core `PasswordHasher` (PBKDF2, salted). One generic message for unknown user, wrong password and inactive account.
 * **Device:** token in Android Keystore-backed storage, backup disabled, cleartext HTTP disabled; debug builds accept the development certificate only for `10.0.2.2`/`localhost`.
 
@@ -151,7 +157,7 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 * Entries are still never edited or deleted.
 * The **inspector who recorded an entry** asks for a correction: `POST /api/rejection-entries/{shopId}/{id}/corrections` with a reason (required, 500 characters max) and either nothing (= remove the entry) or the corrected phenomenon, machine, quantity and/or remarks. Only the stage's phenomena and the shop's machines are allowed. Entries older than `Corrections:MaxAgeDays` (default 30 production days) cannot be corrected from the app.
 * A **supervisor of that shop or an administrator** approves (`/api/corrections/{id}/approve`, optional note) or rejects (`/reject`, note required). The inspector can withdraw a pending request (`/withdraw`). `GET /api/corrections?status=Pending|Approved|Rejected|Withdrawn|all`: inspectors see their own, supervisors their shops', administrators all.
-* **Approval:** in one transaction of the shop's entry database, the original gets `ReversedAt`/`ReversedByCorrectionId`, and a replacement entry is inserted if values were proposed. The replacement has `CorrectsEntryId` = original, the **original's inspector, production day and shift**, and current machine/phenomenon names. This step is idempotent (the replacement's SubmissionId is derived from the request id), so a retry after a failure between the two databases completes the same correction rather than repeating it.
+* **Approval:** in one transaction of the shop's entry database, the original gets `ReversedAt`/`ReversedByCorrectionId`, and a replacement entry is inserted if values were proposed. The replacement has `CorrectsEntryId` = original, the **original's inspector, production day and shift**, and current machine/phenomenon names. This step is idempotent: the replacement's SubmissionId is a random value stored on the request when it is made and never sent to clients. A retry after a failure between the two databases therefore completes the same correction rather than repeating it. A later decide or withdraw on such a half-applied request completes it as Approved.
 * **Guards:** an update lock on the request row; unique indexes allow one pending and one approved request per entry; proposed machine/phenomenon are re-validated at approval under the same locks as a normal save; every step is audited (`CORRECTION_*`).
 * History shows reversed entries with a badge and keeps them visible. Totals exclude them and include replacements.
 

@@ -156,10 +156,12 @@ public sealed class EntryCorrectionService
     private async Task CompleteHalfAppliedAsync(EntryCorrection c, IEntryStore store, int actor, DateTime now, string old)
     {
         var replacement = c.IsReverseOnly ? null : await store.FindBySubmissionIdAsync(c.ReplacementSubmissionId);
-        c.Status = CorrectionStatus.Approved; c.DecidedBy ??= actor; c.DecidedAt = now;
+        // The person who approved is not known here (the failed request did not record it), so DecidedBy stays empty and the
+        // audit uses its own action: the current caller is NOT recorded as the approver (full review #7).
+        c.Status = CorrectionStatus.Approved; c.DecidedAt = now;
         c.DecisionNote ??= "Completed automatically: the approval had already been applied to the entry.";
         c.ReplacementEntryId = replacement?.Id;
-        _master.AddAudit(Audit(actor, AuditActions.CorrectionApproved, c, old));
+        _master.AddAudit(Audit(actor, AuditActions.CorrectionApprovalCompleted, c, old));
         await _master.SaveChangesAsync();
     }
 
@@ -225,11 +227,19 @@ public sealed class EntryCorrectionService
         return ServiceResult<IReadOnlyList<CorrectionDto>>.Ok(result);
     }
 
-    public async Task<ServiceResult<int>> CountAsync(CurrentUser user, string? status)
+    /// <summary>Count in the caller's scope, optionally for one shop (full review #13: the dashboard tile follows the shop filter).</summary>
+    public async Task<ServiceResult<int>> CountAsync(CurrentUser user, string? status, int? shopId = null)
     {
         if (status is not null && status is not (CorrectionStatus.Pending or CorrectionStatus.Approved or CorrectionStatus.Rejected or CorrectionStatus.Withdrawn))
             return Fail<int>(ErrorKind.Validation, "status_invalid", "Unknown status.");
-        var shops = await _guard.AccessibleShopsAsync(user);
+        IReadOnlyList<Shop> shops;
+        if (shopId is int sid)
+        {
+            var (s, err) = await _guard.AuthorizeAsync(user, sid);
+            if (err is not null) return ServiceResult<int>.Fail(err);
+            shops = new[] { s! };
+        }
+        else shops = await _guard.AccessibleShopsAsync(user);
         return ServiceResult<int>.Ok(await _master.CountCorrectionsAsync(shops.Select(s => s.Id).ToList(), user.IsInspector ? user.Id : null, status));
     }
 

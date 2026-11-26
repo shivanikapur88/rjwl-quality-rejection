@@ -1,17 +1,21 @@
-using System.Collections.Concurrent;
-
 namespace Quality.Api.Infrastructure;
 
 /// <summary>
-/// Review Q4: replaces the single server-wide login quota (10/minute for everybody) with FAILED-attempt counters per
-/// (client address + login name), per login name and per client address. One abusive client can only lock itself out,
-/// and a mistyped password on one tablet does not stop other people signing in.
+/// Review Q4: replaces the single server-wide login quota with FAILED-attempt counters per (client address + login name),
+/// per login name and per client address.
 /// </summary>
 /// <remarks>
-/// Plant tablets may share one network address (NAT), so the per-address limit is deliberately generous.
-/// A successful sign-in clears that login's counters. The counters live in memory: they reset when the API restarts and
-/// are per server instance (the documented deployment is a single instance). Behind a reverse proxy, configure
-/// forwarded headers (see docs/DEPLOYMENT.md) or every client shares the proxy's address.
+/// Full review (Sonnet) fixes:
+/// * #1 lock-out: the per-LOGIN bucket used to refuse everybody, so an anonymous caller could lock out any account (even the only
+///   administrator) with ~10 requests per 15 minutes. It now applies only to clients that have NOT signed in successfully as that
+///   login before ("known clients", remembered for 30 days). A plant tablet the user normally uses keeps working during such an
+///   attack; an unknown address is still limited. The per-client and per-client+login buckets apply to everybody.
+/// * #2 burst: checking and counting are one atomic step (<see cref="TryBegin"/>), so 200 parallel guesses can no longer all pass
+///   the check before the first failure is recorded. A success or a request that never reached the password check gives the
+///   reserved attempt back.
+/// * Login names are truncated to 50 characters (the identifier column size) so suffixes cannot create endless fresh buckets.
+/// Counters live in memory: they reset when the API restarts and are per server instance (single-instance deployment).
+/// Behind a reverse proxy, configure ReverseProxy:KnownProxies or every client shares the proxy's address.
 /// </remarks>
 public sealed class LoginThrottle
 {
@@ -20,56 +24,114 @@ public sealed class LoginThrottle
     public static readonly Limit PerClientAndLogin = new(5, TimeSpan.FromMinutes(5));
     public static readonly Limit PerLogin = new(10, TimeSpan.FromMinutes(15));
     public static readonly Limit PerClient = new(30, TimeSpan.FromMinutes(15));
+    public static readonly TimeSpan KnownClientFor = TimeSpan.FromDays(30);
+    private const int MaxLoginKeyLength = 50, MaxEntries = 50_000;
 
-    private readonly ConcurrentDictionary<string, Queue<DateTime>> _failures = new();
+    private readonly object _gate = new();
+    private readonly Dictionary<string, Queue<DateTime>> _failures = new();
+    private readonly Dictionary<string, DateTime> _known = new();   // "client|LOGIN" -> last successful sign-in
     private readonly TimeProvider _time;
     public LoginThrottle(TimeProvider time) => _time = time;
 
-    private static IEnumerable<(string Key, Limit Limit)> Keys(string client, string login)
+    private static string Login(string login)
     {
-        var l = login.Trim().ToUpperInvariant();
+        var l = (login ?? "").Trim().ToUpperInvariant();
+        return l.Length > MaxLoginKeyLength ? l[..MaxLoginKeyLength] : l;
+    }
+
+    private IEnumerable<(string Key, Limit Limit)> Buckets(string client, string login, bool knownClient)
+    {
+        var l = Login(login);
         yield return ($"cl:{client}|{l}", PerClientAndLogin);
-        yield return ($"l:{l}", PerLogin);
+        if (!knownClient) yield return ($"l:{l}", PerLogin);
         yield return ($"c:{client}", PerClient);
     }
 
-    /// <summary>Returns how long the caller must wait, or null if the attempt may go ahead.</summary>
-    public TimeSpan? RetryAfter(string client, string login)
+    private bool IsKnown(string client, string login, DateTime now) =>
+        _known.TryGetValue($"{client}|{Login(login)}", out var at) && now - at < KnownClientFor;
+
+    /// <summary>
+    /// Atomically checks the limits and, if the attempt may go ahead, reserves it as a failure in every bucket.
+    /// Returns how long to wait when refused (nothing is reserved then).
+    /// </summary>
+    public TimeSpan? TryBegin(string client, string login)
     {
         var now = _time.GetUtcNow().UtcDateTime;
-        TimeSpan? wait = null;
-        foreach (var (key, limit) in Keys(client, login))
+        lock (_gate)
         {
-            if (!_failures.TryGetValue(key, out var q)) continue;
-            lock (q)
+            var buckets = Buckets(client, login, IsKnown(client, login, now)).ToList();
+            TimeSpan? wait = null;
+            foreach (var (key, limit) in buckets)
             {
+                if (!_failures.TryGetValue(key, out var q)) continue;
                 Trim(q, now, limit.Window);
                 if (q.Count >= limit.MaxFailures)
                 {
-                    var until = q.Peek() + limit.Window - now;   // oldest counted failure leaves the window
+                    var until = q.Peek() + limit.Window - now;
                     if (wait is null || until > wait) wait = until;
                 }
             }
+            if (wait is not null) return wait < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait;
+            foreach (var (key, _) in buckets)
+            {
+                if (!_failures.TryGetValue(key, out var q)) _failures[key] = q = new Queue<DateTime>();
+                q.Enqueue(now);
+            }
+            if (_failures.Count > MaxEntries || _known.Count > MaxEntries) Prune(now);
+            return null;
         }
-        return wait is { } w && w < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait;
     }
 
-    public void RecordFailure(string client, string login)
-    {
-        var now = _time.GetUtcNow().UtcDateTime;
-        foreach (var (key, limit) in Keys(client, login))
-        {
-            var q = _failures.GetOrAdd(key, _ => new Queue<DateTime>());
-            lock (q) { Trim(q, now, limit.Window); q.Enqueue(now); }
-        }
-        if (_failures.Count > 50_000) Prune(now);
-    }
+    /// <summary>The attempt failed on the password: the reservation stands. (No-op; kept for readability at the call site.)</summary>
+    public void RecordFailure(string client, string login) { }
 
+    /// <summary>Signed in: clear this login's counters, give back the client reservation, remember the client as known.</summary>
     public void RecordSuccess(string client, string login)
     {
-        var (clientLogin, _) = Keys(client, login).First();
-        _failures.TryRemove(clientLogin, out _);
-        _failures.TryRemove($"l:{login.Trim().ToUpperInvariant()}", out _);
+        var now = _time.GetUtcNow().UtcDateTime;
+        lock (_gate)
+        {
+            var l = Login(login);
+            _failures.Remove($"cl:{client}|{l}");
+            _failures.Remove($"l:{l}");
+            RemoveNewest($"c:{client}");
+            _known[$"{client}|{l}"] = now;
+        }
+    }
+
+    /// <summary>The request never reached the password check (e.g. empty fields): give the reservation back.</summary>
+    public void Refund(string client, string login)
+    {
+        lock (_gate)
+        {
+            var now = _time.GetUtcNow().UtcDateTime;
+            foreach (var (key, _) in Buckets(client, login, IsKnown(client, login, now))) RemoveNewest(key);
+        }
+    }
+
+    private void RemoveNewest(string key)
+    {
+        if (!_failures.TryGetValue(key, out var q) || q.Count == 0) return;
+        var items = q.ToArray();
+        q.Clear();
+        for (var i = 0; i < items.Length - 1; i++) q.Enqueue(items[i]);
+    }
+
+    /// <summary>Compatibility helper for callers/tests that only want to know the current wait (does not reserve).</summary>
+    public TimeSpan? RetryAfter(string client, string login)
+    {
+        var now = _time.GetUtcNow().UtcDateTime;
+        lock (_gate)
+        {
+            TimeSpan? wait = null;
+            foreach (var (key, limit) in Buckets(client, login, IsKnown(client, login, now)))
+            {
+                if (!_failures.TryGetValue(key, out var q)) continue;
+                Trim(q, now, limit.Window);
+                if (q.Count >= limit.MaxFailures) { var until = q.Peek() + limit.Window - now; if (wait is null || until > wait) wait = until; }
+            }
+            return wait is { } w && w < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : wait;
+        }
     }
 
     private static void Trim(Queue<DateTime> q, DateTime now, TimeSpan window)
@@ -80,7 +142,7 @@ public sealed class LoginThrottle
     private void Prune(DateTime now)
     {
         var longest = new[] { PerClientAndLogin.Window, PerLogin.Window, PerClient.Window }.Max();
-        foreach (var (key, q) in _failures)
-            lock (q) { if (q.Count == 0 || q.Last() <= now - longest) _failures.TryRemove(key, out _); }
+        foreach (var key in _failures.Where(kv => kv.Value.Count == 0 || kv.Value.Last() <= now - longest).Select(kv => kv.Key).ToList()) _failures.Remove(key);
+        foreach (var key in _known.Where(kv => now - kv.Value >= KnownClientFor).Select(kv => kv.Key).ToList()) _known.Remove(key);
     }
 }

@@ -21,8 +21,10 @@ public sealed class SqlScriptRuleTests
     public void Scripts_with_filtered_indexes_set_quoted_identifier_on(string script)
     {
         var sql = File.ReadAllText(Path.Combine(DbDir(), script));
-        var filtered = Regex.IsMatch(sql, @"CREATE\s+(UNIQUE\s+)?(NONCLUSTERED\s+)?INDEX[^;]*?\)\s*WHERE\s", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        if (filtered) Assert.Matches(new Regex(@"SET\s+QUOTED_IDENTIFIER\s+ON", RegexOptions.IgnoreCase), sql);
+        var filtered = Regex.Match(sql, @"CREATE\s+(UNIQUE\s+)?(NONCLUSTERED\s+)?INDEX[^;]*?\)\s*WHERE\s", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        if (!filtered.Success) return;
+        var set = Regex.Match(sql, @"SET\s+QUOTED_IDENTIFIER\s+ON", RegexOptions.IgnoreCase);
+        Assert.True(set.Success && set.Index < filtered.Index, "SET QUOTED_IDENTIFIER ON must come before the first filtered index.");
     }
 
     [Theory, MemberData(nameof(Scripts))]

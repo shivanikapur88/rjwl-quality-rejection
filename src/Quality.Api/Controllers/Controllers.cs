@@ -31,8 +31,20 @@ public sealed class HealthController : ControllerBase
         // Round 2: entries are stamped with shifts from qa.ShiftDefinitions; a fallback calendar means those are not being used.
         var calendar = await HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>().GetAsync();
         components["shifts"] = calendar.IsFallback ? "unavailable" : "ok";
+        // Full review #5: entries without a production day are left out of reports; say so instead of silently under-counting.
+        var warnings = new List<string>();
+        foreach (var key in router.Keys)
+        {
+            if (components["entries:" + key] != "ok") continue;
+            try
+            {
+                var n = await router.For(key).CountWithoutProductionDateAsync(ct);
+                if (n > 0) warnings.Add($"entries:{key}: {n} entries have no production day and are not in reports. Run db/12_upgrade_entries_shift_reversal.sql in that database.");
+            }
+            catch (Exception) { /* reachability is already reported above */ }
+        }
         var ok = components.Values.All(v => v == "ok");
-        return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components));
+        return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));
 
         static async Task<string> CanConnect(Func<Task<bool>> probe)
         {
@@ -55,14 +67,14 @@ public sealed class AuthController : ApiControllerBase
     {
         var client = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var login = request?.Username ?? "";
-        if (_throttle.RetryAfter(client, login) is { } wait)
+        if (_throttle.TryBegin(client, login) is { } wait)   // checks AND reserves the attempt atomically (full review #2)
         {
             Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return ProblemFor(429, "too_many_attempts", "Too many failed sign-in attempts. Wait a few minutes and try again.");
         }
         var result = await _auth.LoginAsync(request!);
         if (result.IsSuccess) _throttle.RecordSuccess(client, login);
-        else if (result.Error!.Kind == ErrorKind.Unauthorized) _throttle.RecordFailure(client, login);
+        else if (result.Error!.Kind != ErrorKind.Unauthorized) _throttle.Refund(client, login);   // never reached the password check
         return Map(result);
     }
 }
@@ -210,8 +222,8 @@ public sealed class CorrectionsController : ApiControllerBase
 
     /// <summary>Number of requests in the caller's scope (for badges and the dashboard tile); one query, no entry reads.</summary>
     [HttpGet("corrections/count")]
-    public async Task<IActionResult> Count([FromQuery] string? status = CorrectionStatus.Pending) =>
-        Map(await _svc.CountAsync(Me, string.Equals(status, "all", StringComparison.OrdinalIgnoreCase) ? null : status));
+    public async Task<IActionResult> Count([FromQuery] string? status = CorrectionStatus.Pending, [FromQuery] int? shopId = null) =>
+        Map(await _svc.CountAsync(Me, string.Equals(status, "all", StringComparison.OrdinalIgnoreCase) ? null : status, shopId));
 
     [HttpPost("corrections/{id:long}/approve"), Authorize(Roles = RoleNames.Supervisor + "," + RoleNames.Administrator)]
     public async Task<IActionResult> Approve(long id, [FromBody] CorrectionDecisionRequest? request) => Map(await _svc.ApproveAsync(Me, id, request));
