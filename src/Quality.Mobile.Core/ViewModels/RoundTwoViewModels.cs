@@ -258,7 +258,8 @@ public sealed class SummaryViewModel : BaseViewModel
             _today = c.Value!.ProductionDate;
             if (firstTime || _day > _today) _day = _today;
             _shiftCodes = c.Value.Shifts.Select(s => s.ShiftCode).ToList();
-            if (firstTime)
+            var labels = c.Value.Shifts.Select((s, i) => $"{s.ShiftName} (from {s.StartTime})").ToList();
+            if (firstTime || !ShiftOptions.Skip(1).Select(o => o.Name).SequenceEqual(labels))   // full review #12: shifts were edited
             {
                 ShiftOptions.Clear(); ShiftOptions.Add(new Option(null, "All shifts"));
                 for (var i = 0; i < c.Value.Shifts.Count; i++) ShiftOptions.Add(new Option(i, $"{c.Value.Shifts[i].ShiftName} (from {c.Value.Shifts[i].StartTime})"));
@@ -312,18 +313,25 @@ public sealed class ScanViewModel : BaseViewModel
     {
         if (Interlocked.CompareExchange(ref _handling, 1, 0) != 0) return;
         OnPropertyChanged(nameof(IsScanning));
-        var resumed = false;
+        var navigated = false;
+        try
+        {
         await RunBusyAsync(async () =>
         {
             var r = await _api.LookupMachineAsync(text);
-            if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; Hint = "Try again, or go back and choose the machine from the list."; resumed = true; return; }
+            if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; Hint = "Try again, or go back and choose the machine from the list."; return; }
             var x = r.Value!;
             if (x.Stages.Count == 1)
-                await _nav.GoToAsync(Routes.Entry, new Dictionary<string, object> { ["shop"] = x.Shop, ["stage"] = x.Stages[0], ["machine"] = x.Machine });
+            { await _nav.GoToAsync(Routes.Entry, new Dictionary<string, object> { ["shop"] = x.Shop, ["stage"] = x.Stages[0], ["machine"] = x.Machine }); navigated = true; }
             else if (x.Stages.Count > 1)
-                await _nav.GoToAsync(Routes.Stages, new Dictionary<string, object> { ["shop"] = x.Shop });
-            else { ErrorMessage = "No inspection stage is configured for this shop."; resumed = true; }
+            { await _nav.GoToAsync(Routes.Stages, new Dictionary<string, object> { ["shop"] = x.Shop }); navigated = true; }
+            else ErrorMessage = "No inspection stage is configured for this shop.";
         });
-        if (resumed) { await Task.Delay(1500); Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); }
+        }
+        finally
+        {
+            // Full review #11: whatever happened (error, exception swallowed by RunBusyAsync), scanning resumes unless we left the page.
+            if (!navigated) { await Task.Delay(1500); Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); }
+        }
     }
 }

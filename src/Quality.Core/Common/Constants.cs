@@ -46,5 +46,7 @@ public static class AuditActions
     public const string CorrectionApproved = "CORRECTION_APPROVED";
     public const string CorrectionRejected = "CORRECTION_REJECTED";
     public const string CorrectionWithdrawn = "CORRECTION_WITHDRAWN";
+    /// <summary>A half-applied approval was found and completed while someone else acted on the request (UserId = that caller).</summary>
+    public const string CorrectionApprovalCompleted = "CORRECTION_APPROVAL_COMPLETED";
     public const string ProductionCountsImported = "PRODUCTION_COUNTS_IMPORTED";
 }

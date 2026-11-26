@@ -10,7 +10,8 @@
      * empty / too long machine name (max 100)
      * the same machine code twice for one shop in the list
      * the EXAMPLE rows still present, or a code starting with DEV- (placeholder machines)
-   Machines that already exist (same shop + code) are UPDATED (name, active flag), not duplicated.
+   Machines that already exist (same shop + code) get the new NAME, not a duplicate row; their active flag is kept
+   unless @UpdateActiveFlagOfExisting = 1 (so a machine deactivated in the app is not silently reactivated).
    Every insert/update is written to qa.AuditLog (UserId NULL = loaded by script).
    Set @DeactivatePlaceholders = 1 to deactivate the DEV-* placeholder machines from script 05 at the same time.
    Run it first with @DryRun = 1: it reports what it WOULD do and rolls back.
@@ -20,6 +21,9 @@ SET XACT_ABORT ON;
 
 DECLARE @DryRun bit = 1;                    -- 1 = validate and report only; 0 = apply
 DECLARE @DeactivatePlaceholders bit = 0;    -- 1 = also deactivate DEV-* placeholder machines
+-- 0 (default) = machines that already exist keep their current active flag (an administrator may have deactivated one in the
+-- app); only new machines take the flag from the list. 1 = the list's flag overwrites existing machines too.
+DECLARE @UpdateActiveFlagOfExisting bit = 0;
 
 DECLARE @in TABLE (RowNo int IDENTITY(1,1), ShopCode nvarchar(20), MachineCode nvarchar(200), MachineName nvarchar(400), IsActive bit);
 INSERT INTO @in (ShopCode, MachineCode, MachineName, IsActive) VALUES
@@ -57,8 +61,10 @@ BEGIN TRANSACTION;
     USING (SELECT s.Id AS ShopId, s.ShopCode, LTRIM(RTRIM(i.MachineCode)) AS MachineCode, LTRIM(RTRIM(i.MachineName)) AS MachineName, i.IsActive
            FROM @in i JOIN qa.Shops s ON s.ShopCode = i.ShopCode) AS src
        ON t.ShopId = src.ShopId AND t.MachineCode = src.MachineCode
-    WHEN MATCHED AND (t.MachineName <> src.MachineName OR t.IsActive <> src.IsActive) THEN
-        UPDATE SET MachineName = src.MachineName, IsActive = src.IsActive, ModifiedAt = SYSUTCDATETIME()
+    WHEN MATCHED AND (t.MachineName <> src.MachineName OR (@UpdateActiveFlagOfExisting = 1 AND t.IsActive <> src.IsActive)) THEN
+        UPDATE SET MachineName = src.MachineName,
+                   IsActive = CASE WHEN @UpdateActiveFlagOfExisting = 1 THEN src.IsActive ELSE t.IsActive END,
+                   ModifiedAt = SYSUTCDATETIME()
     WHEN NOT MATCHED THEN
         INSERT (MachineCode, MachineName, ShopId, IsActive) VALUES (src.MachineCode, src.MachineName, src.ShopId, src.IsActive)
     OUTPUT $action, inserted.Id, src.ShopCode, inserted.MachineCode, inserted.MachineName, inserted.IsActive INTO @changes;

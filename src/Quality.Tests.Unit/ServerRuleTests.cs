@@ -15,45 +15,80 @@ public sealed class ManualTime(DateTime start) : TimeProvider
 public sealed class LoginThrottleTests
 {
     private readonly ManualTime _t = new(new DateTime(2026, 11, 26, 8, 0, 0, DateTimeKind.Utc));
+    private static void Fail(LoginThrottle th, string c, string l) => Assert.Null(th.TryBegin(c, l));   // attempt allowed and counted
 
     [Fact]
     public void Five_failures_from_one_client_lock_that_login_on_that_client_only()
     {
         var th = new LoginThrottle(_t);
-        for (var i = 0; i < 5; i++) { Assert.Null(th.RetryAfter("10.0.0.5", "e1001")); th.RecordFailure("10.0.0.5", "e1001"); }
-        Assert.NotNull(th.RetryAfter("10.0.0.5", "E1001"));            // case-insensitive login
+        for (var i = 0; i < 5; i++) Fail(th, "10.0.0.5", "e1001");
+        Assert.NotNull(th.TryBegin("10.0.0.5", "E1001"));            // case-insensitive login
         Assert.Null(th.RetryAfter("10.0.0.5", "e2002"));               // other user, same tablet: fine
         Assert.Null(th.RetryAfter("10.0.0.9", "e1001"));               // same user, other tablet: fine (below per-login limit)
     }
 
     [Fact]
-    public void Per_login_limit_stops_a_distributed_guess_and_expires()
+    public void Per_login_limit_stops_a_distributed_guess_from_unknown_clients_and_expires()
     {
         var th = new LoginThrottle(_t);
-        for (var i = 0; i < 10; i++) th.RecordFailure($"10.0.1.{i}", "victim");
-        Assert.NotNull(th.RetryAfter("10.0.2.1", "victim"));
+        for (var i = 0; i < 10; i++) Fail(th, $"10.0.1.{i}", "victim");
+        Assert.NotNull(th.TryBegin("10.0.2.1", "victim"));
         _t.Now += LoginThrottle.PerLogin.Window;
         Assert.Null(th.RetryAfter("10.0.2.1", "victim"));
+    }
+
+    /// <summary>Full review #1: an attacker's failures must not lock the real user out of their usual device.</summary>
+    [Fact]
+    public void Attackers_cannot_lock_the_real_user_out_of_a_known_device()
+    {
+        var th = new LoginThrottle(_t);
+        Assert.Null(th.TryBegin("tablet-7", "admin")); th.RecordSuccess("tablet-7", "admin");   // admin signed in here before
+        _t.Now += TimeSpan.FromHours(1);
+        for (var i = 0; i < 5; i++) Fail(th, "attacker-1", "admin");
+        _t.Now += TimeSpan.FromMinutes(5);
+        for (var i = 0; i < 5; i++) Fail(th, "attacker-2", "admin");                            // 10 failures: per-login bucket full
+        Assert.NotNull(th.TryBegin("new-pc", "admin"));                                          // unknown device: limited
+        Assert.Null(th.TryBegin("tablet-7", "admin"));                                           // usual device: still signs in
+    }
+
+    /// <summary>Full review #2: the check and the count are one step, so a parallel burst cannot slip past the limit.</summary>
+    [Fact]
+    public void Parallel_burst_cannot_exceed_the_per_client_and_login_limit()
+    {
+        var th = new LoginThrottle(_t);
+        var allowed = 0;
+        Parallel.For(0, 200, _ => { if (th.TryBegin("10.0.0.5", "e1001") is null) Interlocked.Increment(ref allowed); });
+        Assert.Equal(LoginThrottle.PerClientAndLogin.MaxFailures, allowed);
     }
 
     [Fact]
     public void Per_client_limit_is_generous_for_shared_plant_addresses()
     {
         var th = new LoginThrottle(_t);
-        for (var i = 0; i < 29; i++) th.RecordFailure("plant-nat", "user" + i);
+        for (var i = 0; i < 29; i++) Fail(th, "plant-nat", "user" + i);
         Assert.Null(th.RetryAfter("plant-nat", "someone-else"));
-        th.RecordFailure("plant-nat", "user29");
+        Fail(th, "plant-nat", "user29");
         Assert.NotNull(th.RetryAfter("plant-nat", "someone-else"));
     }
 
     [Fact]
-    public void Success_clears_that_logins_counters()
+    public void Success_and_refund_give_attempts_back()
     {
         var th = new LoginThrottle(_t);
-        for (var i = 0; i < 4; i++) th.RecordFailure("c", "u");
-        th.RecordSuccess("c", "u");
-        for (var i = 0; i < 4; i++) th.RecordFailure("c", "u");
+        for (var i = 0; i < 4; i++) Fail(th, "c", "u");
+        Assert.Null(th.TryBegin("c", "u")); th.RecordSuccess("c", "u");
+        for (var i = 0; i < 4; i++) Fail(th, "c", "u");
+        Assert.Null(th.TryBegin("c", "u")); th.Refund("c", "u");   // e.g. empty password: never checked
         Assert.Null(th.RetryAfter("c", "u"));
+    }
+
+    [Fact]
+    public void Long_login_names_share_one_bucket()
+    {
+        var th = new LoginThrottle(_t);
+        var prefix = new string('a', 50);
+        for (var i = 0; i < 5; i++) Fail(th, "c", prefix + i);
+        Assert.NotNull(th.TryBegin("c", prefix + "zzz"));
     }
 }
 

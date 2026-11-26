@@ -25,6 +25,11 @@ var entryStores = new Dictionary<string, string>
     ["GDC"] = Require("ConnectionStrings:GdcEntries"), ["CNC"] = Require("ConnectionStrings:CncEntries"),
     ["PRE"] = Require("ConnectionStrings:PreEntries"), ["FINAL"] = Require("ConnectionStrings:FinalEntries"),
 };
+// Fail at start-up, not on the first request, if the plant time zone is unknown on this host (full review #9).
+var plantZone = cfg["Plant:TimeZoneId"] is { Length: > 0 } tz ? tz : "Asia/Kolkata";
+try { TimeZoneInfo.FindSystemTimeZoneById(plantZone); }
+catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+{ throw new InvalidOperationException($"Plant:TimeZoneId '{plantZone}' is not known on this server (install time-zone data / ICU, or use the Windows id 'India Standard Time').", ex); }
 var jwt = cfg.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
 if (Encoding.UTF8.GetByteCount(Require("Jwt:Key")) < 32) throw new InvalidOperationException("Jwt:Key must be at least 32 bytes.");
 jwt.Key = cfg["Jwt:Key"]!;
@@ -108,6 +113,19 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 if (knownProxies.Length > 0) app.UseForwardedHeaders();
+else
+{
+    // Full review #3: behind a proxy without ReverseProxy:KnownProxies every device shares the proxy's address, and one
+    // throttle bucket. Warn (once) when requests carry X-Forwarded-For from a non-loopback peer.
+    var warned = 0;
+    app.Use(async (ctx, next) =>
+    {
+        if (warned == 0 && ctx.Request.Headers.ContainsKey("X-Forwarded-For") && ctx.Connection.RemoteIpAddress is { } ip && !IPAddress.IsLoopback(ip)
+            && Interlocked.Exchange(ref warned, 1) == 0)
+            app.Logger.LogWarning("Requests arrive through a proxy ({Proxy}) but ReverseProxy:KnownProxies is not set: all clients share one address for login throttling. See docs/BUILD_AND_DEPLOY.md.", ip);
+        await next();
+    });
+}
 app.UseExceptionHandler(ErrorHandling.Configure);
 app.UseHttpsRedirection();
 // Feature #6: read-only web dashboard (static files under wwwroot/dashboard) with a strict content-security policy:

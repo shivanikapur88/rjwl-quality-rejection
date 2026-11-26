@@ -59,7 +59,8 @@ public sealed record UpdateUserRequest(string DisplayName, string Role, IReadOnl
 public sealed record ResetPasswordRequest(string NewPassword);
 
 // ---- Readiness ----
-public sealed record ReadinessDto(string Status, IReadOnlyDictionary<string, string> Components);
+/// <summary>Warnings do not make the API "unavailable" but need attention (e.g. entries without a production day: run db/12).</summary>
+public sealed record ReadinessDto(string Status, IReadOnlyDictionary<string, string> Components, IReadOnlyList<string>? Warnings = null);
 
 // ---- Shifts (#2) ----
 public sealed record ShiftDto(string ShiftCode, string ShiftName, string StartTime);

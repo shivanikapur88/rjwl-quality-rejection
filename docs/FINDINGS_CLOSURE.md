@@ -63,3 +63,27 @@ The round-2 diff (`484f52d..459f3d0`) was reviewed read-only by a separate Claud
 **Also found in round 2 by my own checks:**
 * `sqlcmd` + `QUOTED_IDENTIFIER OFF` broke db/11's filtered indexes. Fixed; covered by a static unit test.
 * The Q9 race test's orphan check was too broad once other tests inserted synthetic rows. Scoped to its own machines; the product was not affected.
+
+
+## Full application review (Sonnet 5.5)
+
+A separate Claude Sonnet 5.5 reviewer read the **whole application** at `453f148`: server, database scripts, app, dashboard and tests. It worked read-only and was given only the code and the system description. It found no role or shop-scope bypass and no dashboard XSS. Every finding was checked against the code.
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| 1 | **High** | Anyone could lock out any account (even the only administrator): the per-login failure bucket refused everybody, at a cost of ~10 requests per 15 min. The Q4 closure's "an abusive client can only lock itself out" was therefore wrong. | The per-login bucket now applies only to clients that have not signed in successfully as that login in the last 30 days. Per-client and per-client+login limits still apply to everyone. | unit `Attackers_cannot_lock_the_real_user_out_of_a_known_device` |
+| 2 | Medium | A parallel burst passed the throttle check before any failure was recorded. | Check and reserve are one atomic step; success and "never reached the password" give the reservation back. | unit `Parallel_burst_cannot_exceed_the_per_client_and_login_limit` (200 parallel → exactly 5 allowed) |
+| 3 | Medium | Behind a proxy without `ReverseProxy:KnownProxies`, every device shared one throttle bucket, silently. | A warning is logged when forwarded requests arrive and no proxies are configured; documented. | — |
+| 4 | Medium | If db/03 was missing, the first-admin start-up threw outside the retry filter and stopped the API. | Every failure except shutdown is logged and retried. | — |
+| 5 | Medium | Entries without a production day were silently left out of reports. | `/api/health/ready` lists them as a warning naming db/12. | integration `Readiness_warns_about_entries_without_a_production_day` |
+| 6 | Low-medium | No self-service password change. | **Not changed:** outside the documented scope (administrators reset passwords). Logged as decision #19. | — |
+| 7 | Low | Completing a half-applied approval recorded the current caller (even the requesting inspector) as the approver. | `DecidedBy` stays empty; audit action `CORRECTION_APPROVAL_COMPLETED`. | existing half-applied test |
+| 8 | Low | Unknown or inactive users answered faster than wrong passwords (account enumeration by timing). | The short paths verify a real dummy hash of the same cost. | — |
+| 9 | Low | An unknown plant time zone failed on the first request instead of at start-up. | Checked at start-up with a clear message. | — |
+| 10 | Low | The app kept sending its token after the server address was changed to another host. | Changing to a different host ends the session. | — |
+| 11 | Low | The QR scan screen could stay frozen after an exception. | Scanning resumes in a `finally` unless the page was left. | — |
+| 12 | Low | The summary's shift list was built once and could map to the wrong shift after an edit. | Rebuilt when the shift list changes. | — |
+| 13 | Low | The dashboard's correction count ignored the shop filter; lists are capped at 200. | Count takes `shopId`; the 200 cap is documented. | — |
+| 14 | Low | A stale test name, a stale spec sentence, and a script check that ignored order. | Renamed, corrected; the check now requires `SET QUOTED_IDENTIFIER ON` **before** the first filtered index. | unit |
+| 15 | Low | db/08 could stop half-way on a legacy 1-character employee code; db/10 re-activated machines an admin had deactivated. | db/08 lists them and stops with 50081 first; db/10 keeps existing active flags unless `@UpdateActiveFlagOfExisting = 1`. | both run with `sqlcmd` |
+| — | unverified | Rare deadlock between entry saves and admin edits; 50+ character login suffixes creating new throttle buckets. | The deadlock would map to 409 `concurrent_change` (retryable). Throttle keys are now cut to 50 characters. | unit `Long_login_names_share_one_bucket` |

@@ -50,7 +50,7 @@ public sealed class QrPayloadTests
     public void Parses_only_our_labels(string? text, int? id) => Assert.Equal(id, MachineLookupService.ParsePayload(text));
 
     [Fact]
-    public void Label_round_trips_and_replacement_ids_are_deterministic()
+    public void Label_round_trips()
     {
         Assert.Equal(42, MachineLookupService.ParsePayload(MachineLookupService.LabelPayload(42)));
     }

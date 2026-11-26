@@ -41,6 +41,8 @@ public sealed class EfEntryStore : IEntryStore
         return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(f.Limit).ToListAsync();
     }
 
+    public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => _db.Entries.CountAsync(e => e.ProductionDate == null, ct);
+
     public async Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode)
     {
         var q = _db.Entries.AsNoTracking().Where(e => e.ShopId == shopId && e.ReversedAt == null

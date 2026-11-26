@@ -96,7 +96,8 @@ public sealed class BootstrapAdmin : BackgroundService
         for (var attempt = 1; !stop.IsCancellationRequested; attempt++)
         {
             try { await EnsureAsync(_sp, _cfg, _log, stop); return; }
-            catch (Exception ex) when (ex is SqlException or DbUpdateException or TimeoutException or InvalidOperationException { InnerException: SqlException })
+            // Any failure (SQL down, roles not seeded yet by db/03, ...) is logged and retried; it must never stop the API (full review #4).
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 var wait = TimeSpan.FromSeconds(Math.Min(300, 5 * attempt));
                 _log.LogWarning(ex, "Bootstrap administrator check failed (attempt {Attempt}); retrying in {Wait}.", attempt, wait);
