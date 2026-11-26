@@ -1,0 +1,4 @@
+Demo database (DEV placeholder machines, 2 weeks of generated history + live entries), API at 13d6d8c-equivalent build, Playwright Chromium.
+light errors: []
+dark errors: []
+QR labels decoded with jsQR 1.4.0: RJWLQR:M:1, RJWLQR:M:2 (= ids of DEV-GDC-01, DEV-GDC-02)

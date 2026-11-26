@@ -10,4 +10,11 @@ public partial class MyEntriesPage : AppPage
         InitializeComponent();
         BindingContext = vm;
     }
+
+    // Round 2: tap an entry to see its detail (and request a correction).
+    private void OnSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is EntryRow row) _ = ((MyEntriesViewModel)BindingContext).OpenAsync(row);
+        if (sender is CollectionView list) list.SelectedItem = null;
+    }
 }

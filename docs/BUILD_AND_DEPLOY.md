@@ -54,6 +54,8 @@ No secrets are in source. The API refuses to start without these settings (user-
 | `LoginThrottle:RequestsPerMinutePerClient` | optional, default 300 |
 | `ReverseProxy:KnownProxies` | optional, list of proxy IP addresses; set it when behind IIS ARR / nginx / a load balancer so login throttling sees the real client address |
 | `Swagger:Enabled` | optional, default off outside Development |
+| `Plant:TimeZoneId` | optional, default `Asia/Kolkata`; time zone of the shift times in `qa.ShiftDefinitions` |
+| `Corrections:MaxAgeDays` | optional, default 30; inspectors cannot request corrections of older production days |
 
 Template (no secrets): `src/Quality.Api/appsettings.json`. Development example:
 ```bash
@@ -69,7 +71,7 @@ Set the other connection strings, `Jwt:Key` and the `Bootstrap:*` values the sam
 dotnet publish src/Quality.Api -c Release -o out/api
 ```
 Host behind HTTPS (IIS with the ASP.NET Core Hosting Bundle **10.0**, or Kestrel as a Windows service). Set `ASPNETCORE_ENVIRONMENT=Production`. `Directory.Build.props` sets `UseAppHost=false`, so there is no `.exe`; IIS and `dotnet Quality.Api.dll` work, or remove that line.
-3. Check: `GET /api/health` → 200; `GET /api/health/ready` → 200 with every component `ok`.
+3. Check: `GET /api/health` → 200; `GET /api/health/ready` → 200 with every component `ok`; `https://<server>/dashboard/` shows the sign-in page.
 4. Sign in as the bootstrap administrator in the app, create the real users, then remove the `Bootstrap:*` settings and restart.
 5. **Run one instance.** The login throttle counters are in memory per instance. With several instances behind a load balancer the limits apply per instance; move them to a shared store first if that matters.
 

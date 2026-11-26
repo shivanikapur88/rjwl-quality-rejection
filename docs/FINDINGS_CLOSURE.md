@@ -40,3 +40,50 @@ Source of the findings: the Q1-Q9 list in the implementation brief. **The review
 |---|---|
 | EF Core refuses to save to a table with a trigger unless told about it (`OUTPUT` without `INTO`). Found by the integration tests as soon as the Q3 trigger existed. | `Users` mapping declares `HasTrigger(...)`. The runbook warns that the **old** API cannot save users on a database with the trigger. |
 | The supplied seed check `CAST(RIGHT(code,3) AS int)` failed on non-numeric codes when SQL Server evaluated it before the `LIKE` filter | `TRY_CAST` in the generated check |
+
+
+## Round 2: independent review
+
+The round-2 diff (`484f52d..459f3d0`) was reviewed read-only by a separate Claude Fable reviewer that was given only the code and the feature description. It reported **no critical defects and no authorization hole**. Every finding was checked against the code; all held.
+
+| # | Severity | Finding | Fix | Regression test |
+|---|---|---|---|---|
+| 1 | High | An approval could be committed in the entry database but not the master (failure between the two). A later **reject or withdraw** would then win, leaving the entry reversed while the request said Rejected or Withdrawn. A re-approval could also be blocked if the proposed machine had been deactivated in the meantime. | Decide and withdraw first check whether this request already reversed the entry. If so they complete it as **Approved** (no re-validation) and return 409 `correction_already_applied` to a reject or withdraw. | `Half_applied_approval_is_completed_as_approved_not_rejected_or_withdrawn` |
+| 2 | Medium | The app's summary and corrections screens had no guard against overlapping loads, so a slow earlier response could show another day's totals. | A sequence number on each load; only the latest result is applied. | `Summary_ignores_a_slow_response_from_an_earlier_tap` (fails without the fix) |
+| 3 | Medium | Renamed or retired shift codes vanished from the dashboard trend and could not be queried. | Known codes include inactive shifts; the dashboard adds a "(retired)" series for codes found in the data. | unit `Custom_two_shift_pattern_and_validation` |
+| 4 | Medium | Entries saved by the old API during an upgrade have no production day and are not counted. | Runbook step 7b: re-run db/12 after the switch (it fills only empty rows). | documented |
+| 5 | Medium | The db/12 backfill hard-codes the IST offset and shift times. | The script prints its parameters and row count, and in QualityMasterDB refuses (50013) if they differ from `qa.ShiftDefinitions`. | run with `sqlcmd`: mismatch refused, match applied |
+| 6 | Low-medium | The replacement entry's SubmissionId was derived from the sequential request id, so an inspector could pre-claim it with an ordinary entry. Approval would then adopt the wrong row. | Random id stored on the request at request time and never sent to clients; the entry store refuses any existing row that is not this correction's replacement. | `A_pre_claimed_replacement_id_is_refused_and_nothing_is_reversed` |
+| 7 | Low | The dashboard loaded up to 200 requests (with entry look-ups) just to show a count. | `GET /api/corrections/count`. | `Count_endpoint_matches_the_list_in_scope` |
+| 8 | Low | A read after a committed decision could turn a success into a 500. | The read is wrapped. Reject still reads the entry database on purpose, to detect #1; if that database is down it answers 503. | — |
+| 9 | Low | Summary "today" went stale after 06:00; the default shift was matched by display name; a failed calendar call led to a query for year 1. | The calendar is re-read on every appearance, the shift is matched by code, and there is no query before the calendar has loaded. | covered by summary tests |
+| 10 | Low | The default shift calendar was used silently when `qa.ShiftDefinitions` could not be read. | `/api/health/ready` reports `shifts: unavailable` in that case. | readiness test |
+| 11 | Low | Minor items. | Accepted and documented: the correction list's entry badge reflects that row; a replacement's `ServerCreatedAt` is the approval time while its production day is the original's. | — |
+
+**Also found in round 2 by my own checks:**
+* `sqlcmd` + `QUOTED_IDENTIFIER OFF` broke db/11's filtered indexes. Fixed; covered by a static unit test.
+* The Q9 race test's orphan check was too broad once other tests inserted synthetic rows. Scoped to its own machines; the product was not affected.
+
+
+## Full application review (Sonnet 5.5)
+
+A separate Claude Sonnet 5.5 reviewer read the **whole application** at `453f148`: server, database scripts, app, dashboard and tests. It worked read-only and was given only the code and the system description. It found no role or shop-scope bypass and no dashboard XSS. Every finding was checked against the code.
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| 1 | **High** | Anyone could lock out any account (even the only administrator): the per-login failure bucket refused everybody, at a cost of ~10 requests per 15 min. The Q4 closure's "an abusive client can only lock itself out" was therefore wrong. | The per-login bucket now applies only to clients that have not signed in successfully as that login in the last 30 days. Per-client and per-client+login limits still apply to everyone. | unit `Attackers_cannot_lock_the_real_user_out_of_a_known_device` |
+| 2 | Medium | A parallel burst passed the throttle check before any failure was recorded. | Check and reserve are one atomic step; success and "never reached the password" give the reservation back. | unit `Parallel_burst_cannot_exceed_the_per_client_and_login_limit` (200 parallel → exactly 5 allowed) |
+| 3 | Medium | Behind a proxy without `ReverseProxy:KnownProxies`, every device shared one throttle bucket, silently. | A warning is logged when forwarded requests arrive and no proxies are configured; documented. | — |
+| 4 | Medium | If db/03 was missing, the first-admin start-up threw outside the retry filter and stopped the API. | Every failure except shutdown is logged and retried. | — |
+| 5 | Medium | Entries without a production day were silently left out of reports. | `/api/health/ready` lists them as a warning naming db/12. | integration `Readiness_warns_about_entries_without_a_production_day` |
+| 6 | Low-medium | No self-service password change. | **Not changed:** outside the documented scope (administrators reset passwords). Logged as decision #19. | — |
+| 7 | Low | Completing a half-applied approval recorded the current caller (even the requesting inspector) as the approver. | `DecidedBy` stays empty; audit action `CORRECTION_APPROVAL_COMPLETED`. | existing half-applied test |
+| 8 | Low | Unknown or inactive users answered faster than wrong passwords (account enumeration by timing). | The short paths verify a real dummy hash of the same cost. | — |
+| 9 | Low | An unknown plant time zone failed on the first request instead of at start-up. | Checked at start-up with a clear message. | — |
+| 10 | Low | The app kept sending its token after the server address was changed to another host. | Changing to a different host ends the session. | — |
+| 11 | Low | The QR scan screen could stay frozen after an exception. | Scanning resumes in a `finally` unless the page was left. | — |
+| 12 | Low | The summary's shift list was built once and could map to the wrong shift after an edit. | Rebuilt when the shift list changes. | — |
+| 13 | Low | The dashboard's correction count ignored the shop filter; lists are capped at 200. | Count takes `shopId`; the 200 cap is documented. | — |
+| 14 | Low | A stale test name, a stale spec sentence, and a script check that ignored order. | Renamed, corrected; the check now requires `SET QUOTED_IDENTIFIER ON` **before** the first filtered index. | unit |
+| 15 | Low | db/08 could stop half-way on a legacy 1-character employee code; db/10 re-activated machines an admin had deactivated. | db/08 lists them and stops with 50081 first; db/10 keeps existing active flags unless `@UpdateActiveFlagOfExisting = 1`. | both run with `sqlcmd` |
+| — | unverified | Rare deadlock between entry saves and admin edits; 50+ character login suffixes creating new throttle buckets. | The deadlock would map to 409 `concurrent_change` (retryable). Throttle keys are now cut to 50 characters. | unit `Long_login_names_share_one_bucket` |

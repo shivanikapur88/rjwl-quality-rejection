@@ -94,10 +94,23 @@ public sealed class SettingsViewModel : BaseViewModel
 			ErrorMessage = error;
 			return false;
 		}
+		var previous = _settings.BaseUrl;
 		_settings.BaseUrl = normalized;
 		ServerUrl = normalized;
+		// Full review #10: a token is only for the server that issued it. A different server ends the session,
+		// so the token is never sent to the new address.
+		if (_session.IsAuthenticated && !SameHost(previous, normalized))
+		{
+			_ = _session.EndAsync();
+			OnPropertyChanged("IsSignedIn");
+			OnPropertyChanged("UserText");
+		}
 		return true;
 	}
+
+	private static bool SameHost(string? a, string? b) =>
+		Uri.TryCreate(a, UriKind.Absolute, out var x) && Uri.TryCreate(b, UriKind.Absolute, out var y)
+		&& string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase) && x.Port == y.Port && x.Scheme == y.Scheme;
 
 	public Task SaveAsync()
 	{

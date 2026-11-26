@@ -12,7 +12,7 @@ namespace Quality.Tests.Unit;
 /// The recovered mobile logic, exercised through the REAL ApiClient and Session with a scripted HTTP handler
 /// (no device, no MAUI). Covers brief §7 / §14: double taps, uncertain outcomes, session expiry, inactive items, paging.
 /// </summary>
-public sealed class MobileViewModelTests
+public sealed partial class MobileViewModelTests
 {
     private sealed class Handler : HttpMessageHandler
     {
@@ -43,6 +43,8 @@ public sealed class MobileViewModelTests
         public readonly List<string> Alerts = new();
         public Task AlertAsync(string t, string m) { Alerts.Add(t); return Task.CompletedTask; }
         public Task<bool> ConfirmAsync(string t, string m, string a, string c) => Task.FromResult(true);
+        public string? NextPrompt { get; set; } = "because";
+        public Task<string?> PromptAsync(string t, string m, string a, string c, string? p = null, int max = 500) => Task.FromResult(NextPrompt);
     }
 
     private static readonly ShopDto Shop = new(1, "GDC", "GDC Shop");
@@ -183,7 +185,7 @@ public sealed class MobileViewModelTests
         _http.Respond = r => Task.FromResult(r.RequestUri!.Query.Contains("cursor=")
             ? Json(HttpStatusCode.OK, new EntryPage(new[] { E(1) }, null, Array.Empty<string>()))
             : Json(HttpStatusCode.OK, new EntryPage(new[] { E(3), E(2) }, "c1", new[] { "CNC" })));
-        var vm = new MyEntriesViewModel(_api, _session);
+        var vm = new MyEntriesViewModel(_api, _session, _nav);
         await vm.LoadAsync();
         Assert.Equal(2, vm.Entries.Count);
         Assert.True(vm.HasMore);
@@ -194,6 +196,8 @@ public sealed class MobileViewModelTests
         Assert.False(vm.HasMore);
         Assert.False(vm.IsIncomplete);
         Assert.Contains(_http.Calls, c => c.Path.Contains("/api/rejection-entries/page?limit=50&cursor=c1"));
+        await vm.OpenAsync(vm.Entries[0]);
+        Assert.Equal(("entrydetail", 3L), (_nav.Calls.Last().Route, ((EntryDto)_nav.Calls.Last().Args!["entry"]).Id));
     }
 
     [Fact]

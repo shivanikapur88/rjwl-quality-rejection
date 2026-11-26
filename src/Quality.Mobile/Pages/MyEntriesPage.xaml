@@ -8,7 +8,7 @@
         </Border>
         <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=OneWay}">
             <Grid>
-                <CollectionView ItemsSource="{Binding Entries}" SelectionMode="None">
+                <CollectionView ItemsSource="{Binding Entries}" SelectionMode="Single" SelectionChanged="OnSelected">
                     <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="vm:EntryRow">
@@ -17,6 +17,7 @@
                                     <Label Text="{Binding Line1}" Style="{StaticResource H2}" />
                                     <Label Text="{Binding Line2}" Style="{StaticResource Body}" FontSize="15" />
                                     <Label Text="{Binding Line3}" Style="{StaticResource Muted}" />
+                                    <Label Text="{Binding Badge}" IsVisible="{Binding HasBadge}" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource Primary}" />
                                 </VerticalStackLayout>
                             </Border>
                         </DataTemplate>

@@ -30,4 +30,15 @@ Status at commit `3313612` (verified 2026-11-26). Key: ✅ done · ◐ partly ·
 | Deployment, backup, restore, rollback guidance | ✅ docs | — | — | ◐ (rollback trigger issue found in tests) | — | ✗ | restore drill on RJWL servers |
 | Inspector / supervisor / admin instructions | ✅ docs | — | — | — | ✗ | ✗ | screenshots after the device test |
 
+### Round 2 additions (commit `13d6d8c`)
+
+| Area | Implemented | Built | Tested with substitutes | Tested against SQL Server | Tested on Android | Business accepted | Blocked / unverified |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| Shift and production date (#2) | ✅ | ✅ | ✅ boundaries | ✅ incl. backfill | ✗ | ✗ | confirm real shift times per shop |
+| Entry corrections (#1) | ✅ | ✅ | ✅ app logic | ✅ incl. races, half-applied, pre-claim | ✗ | ✗ | confirm the 30-day limit |
+| Reports and app shift summary (#4) | ✅ | ✅ | ✅ app logic | ✅ exact totals | ✗ | ✗ | percentages need production counts (#13) |
+| Web dashboard (#6) | ✅ | ✅ | ✅ rendered in a browser (light/dark) | ✅ API | — | ✗ | RJWL server, certificate and browsers |
+| Machine QR (#8) | ✅ | ✅ | ✅ labels decoded independently | ✅ lookup | ✗ **camera on device** | ✗ | label stock and printer |
+| Independent review | ✅ 11 findings fixed or documented | | | | | | |
+
 **Release-candidate verdict:** the server, database and app logic are complete and tested against SQL Server. The build is **not** ready for production use until the ✗ items in the "Tested on Android" and "Blocked" columns are done: the device acceptance run, the machine list, the package id, keystore and certificate, and business acceptance. See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) and the checklist in [TEST_EVIDENCE.md §3](TEST_EVIDENCE.md).

@@ -20,6 +20,10 @@
 | `08_upgrade_master_review_fixes.sql` | QualityMasterDB | **yes** | **yes** | review fixes Q2/Q3/Q5/Q6, version columns |
 | `09_upgrade_entries_indexes.sql` | **each** entry DB (GDC_AndonDB, MachineShopDB, QualityMasterDB) | **yes** | **yes** | indexes for machine checks and paging |
 | `10_load_production_machines.sql` | QualityMasterDB | when the list is approved | when the list changes | validated machine load with dry run (section 3) |
+| `11_upgrade_master_shifts_corrections.sql` | QualityMasterDB | **yes** | **yes** | shift definitions (A 06:00, B 14:00, C 22:00), correction requests |
+| `12_upgrade_entries_shift_reversal.sql` | **each** entry DB | **yes** | **yes** | production date + shift, reversal markers; **backfills existing rows** (IST, A/B/C times written in the script) |
+
+All scripts set `QUOTED_IDENTIFIER ON` themselves where needed. `sqlcmd` starts with it OFF, and SQL Server then refuses the filtered indexes in 11; a unit test now checks this for every script.
 
 ## 1. Fresh installation
 
@@ -32,13 +36,17 @@ sqlcmd -S <I> -E -b -d QualityMasterDB -i db/03_seed_reference.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/04_seed_phenomena.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/08_upgrade_master_review_fixes.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/09_upgrade_entries_indexes.sql
+sqlcmd -S <I> -E -b -d QualityMasterDB -i db/11_upgrade_master_shifts_corrections.sql
+sqlcmd -S <I> -E -b -d QualityMasterDB -i db/12_upgrade_entries_shift_reversal.sql
 ```
 3. Existing entry databases (check first that schema `qa` and `qa.QualityRejectionEntries` do not already exist there for something else):
 ```bash
 sqlcmd -S <I> -E -b -d GDC_AndonDB   -i db/02a_entries_schema_GDC_AndonDB.sql
 sqlcmd -S <I> -E -b -d GDC_AndonDB   -i db/09_upgrade_entries_indexes.sql
+sqlcmd -S <I> -E -b -d GDC_AndonDB   -i db/12_upgrade_entries_shift_reversal.sql
 sqlcmd -S <I> -E -b -d MachineShopDB -i db/02b_entries_schema_MachineShopDB.sql
 sqlcmd -S <I> -E -b -d MachineShopDB -i db/09_upgrade_entries_indexes.sql
+sqlcmd -S <I> -E -b -d MachineShopDB -i db/12_upgrade_entries_shift_reversal.sql
 ```
 4. Machines: production → section 3. Development/test only → `05_DEV_ONLY_placeholder_machines.sql`.
 5. Verify:
@@ -62,7 +70,7 @@ This exact order is what `tools/create-test-databases.sh` and the integration-te
 
 ## 2. Upgrade of an existing installation
 
-Plan a short maintenance window. **Every user must sign in again once** after the upgrade, because tokens issued before it carry no token version.
+Plan a short maintenance window. **Every user must sign in again once** after the upgrade from the supplied version, because tokens issued before it carry no token version.
 
 1. Back up all three databases (section 5).
 2. Stop the API (application pool / service).
@@ -71,6 +79,8 @@ Plan a short maintenance window. **Every user must sign in again once** after th
 5. `08_upgrade_master_review_fixes.sql` in QualityMasterDB.
    * If it stops with **error 50080**, two users share a username/employee code (possible with the old schema). It lists them. Rename one account of each pair in `qa.Users`, then run 08 again. The column additions from the first run are kept; that is harmless.
 6. `09_upgrade_entries_indexes.sql` in **each** entry database.
+6b. `11_upgrade_master_shifts_corrections.sql` in QualityMasterDB, then `12_upgrade_entries_shift_reversal.sql` in **each** entry database. 12 fills `ProductionDate`/`ShiftCode` for existing entries from their server time, using IST (UTC+05:30) and the A/B/C start times written at the top of the script. If the plant's shifts differ, edit those values **and** `qa.ShiftDefinitions` to match before running it. In QualityMasterDB the script refuses to run if they differ (error 50013), and it prints the parameters and row count it uses. On large tables it works in batches of 5,000 rows.
+7b. **After the new API is running, run 12 once more in each entry database.** It fills only rows that are still empty, i.e. any saved by the old API during the switch. Reports count only rows with a production day.
 7. Deploy the new API, start it, check `GET /api/health/ready` returns 200, then sign in.
 8. `04_seed_phenomena.sql`: re-run **only** if the workbook was intentionally changed. It inserts missing (stage, name) pairs and never renames or deletes. Phenomena maintained by administrators stay as they are.
 
@@ -95,6 +105,10 @@ Administrators can also add or edit machines in the app (Admin → Machines) ins
 | Seed check 50001 | Some seeded codes are missing (03 not run, or rows were renamed/deleted by hand). Compare with `db/seed/phenomena_seed.json`. |
 | New API misbehaves after the upgrade | Stop it. Preferred rollback: restore the backups (section 5) and redeploy the old API. |
 | Must run the **old** API on the upgraded database (no restore) | The 08/09 changes are additive (columns, a table, a trigger, indexes). One part breaks the old API: EF Core writes with an `OUTPUT` clause, which SQL Server refuses on a table with a trigger, so **every** user save fails while `qa.TR_Users_KeepActiveAdministrator` exists (this was seen in testing before the new API declared the trigger). Run `DROP TRIGGER qa.TR_Users_KeepActiveAdministrator;` first. Users created by the old API get no `qa.LoginIdentifiers` rows. Before returning to the new API, re-run 08: it recreates the trigger and backfills the identifiers. |
+
+## 4b. Changing shift times later
+
+Edit `qa.ShiftDefinitions` (code, name, start time in plant local time, sort order; the first shift's start is the production-day start). The API picks the change up within 5 minutes. Entries already saved keep the production day and shift they were saved with; historical reports do not move. Set `Plant:TimeZoneId` (default `Asia/Kolkata`) if the plant is elsewhere.
 
 ## 5. Backup, restore and retention
 

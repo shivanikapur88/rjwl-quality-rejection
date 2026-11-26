@@ -1,5 +1,7 @@
 # Test evidence
 
+> **Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
 | | |
@@ -83,3 +85,39 @@ QR_TEST_SQL="Server=localhost,14333;User Id=sa;Password=<pwd>;TrustServerCertifi
 ```bash
 python3 -I tools/import_excel.py --check
 ```
+
+
+## 6. Round 2 evidence (commit `13d6d8c`)
+
+Fresh clone of branch `claude/corrections-shifts-dashboard-qr` at `13d6d8c30afcb8c9eece4d7f627d543defe44a04`, 26-27 Nov 2026, same environment as above. Raw output: [`docs/evidence/round2/`](evidence/round2/).
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**, 135 warnings (all in the decompiled `Quality.Mobile.Core`; new code has none) |
+| Debug APK | SHA-256 `3a46ec35…5a23` (`evidence/round2/apk.txt`) |
+| Unit tests | **77 passed** (was 27): + shift calendar boundaries, QR payloads, SQL-script rules, correction request building, corrections screen, shift summary (including overlapping loads), QR scan flow |
+| Integration, SQL Server, RCSI ON / OFF | **49 passed** each (was 37). Before the final run the suite also passed four times in a row (two per mode) at `5ca0fb5`. |
+| `sqlcmd` fresh install incl. 11/12 + idempotent re-run | OK (`fresh_install_sqlcmd.txt`) |
+| Upgrade path | OK (`upgrade_path.txt`) |
+| Seed check | OK |
+
+**New integration tests** cover:
+* shift stamping on save, and the db/12 backfill (02:00 IST → shift C of the previous day);
+* the correction flow (approve with replacement, reverse-only, reject needs a note, withdraw, "no change", reason rules, role and shop scoping);
+* two supervisors approving at once (5 rounds, one replacement each);
+* idempotent apply in the entry database;
+* review regressions: a half-applied approval followed by reject or withdraw, and a pre-claimed replacement id;
+* the corrections count;
+* report totals (exact numbers, reversed entries excluded, shift filter, scope, limits);
+* QR label SVG and lookup (assigned shop, inactive machine, invalid label);
+* dashboard served with a strict Content-Security-Policy.
+
+**Visual and decode checks (manual, on a demo database):**
+* The dashboard was rendered with Playwright in light and dark mode with no console errors.
+* The printed QR labels were decoded with an independent decoder (jsQR): they read `RJWLQR:M:1` and `RJWLQR:M:2`, the ids of those machines.
+
+**Found by the documented `sqlcmd` route, not by the in-process tests:** `sqlcmd` runs with `QUOTED_IDENTIFIER OFF`, which broke the filtered indexes in db/11. Fixed, and a unit test now checks every script.
+
+**Independent review:** a separate reviewer (Claude Fable) read the round-2 diff without seeing my conclusions. Its findings and their fixes are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#round-2-independent-review).
+
+**Still not tested in round 2:** camera scanning on a real device (no emulator here); the scan screen's logic is unit-tested and the APK builds with the ZXing camera view. Not yet run either: printing labels on real label stock, and the dashboard against RJWL's server, certificate and data.

@@ -20,5 +20,9 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(Routes.MachineEditor, typeof(MachineEditorPage));
         Routing.RegisterRoute(Routes.AdminUsers, typeof(AdminUsersPage));
         Routing.RegisterRoute(Routes.UserEditor, typeof(UserEditorPage));
+        Routing.RegisterRoute(Routes.EntryDetail, typeof(EntryDetailPage));   // round 2
+        Routing.RegisterRoute(Routes.Corrections, typeof(CorrectionsPage));
+        Routing.RegisterRoute(Routes.Summary, typeof(SummaryPage));
+        Routing.RegisterRoute(Routes.Scan, typeof(ScanPage));
     }
 }

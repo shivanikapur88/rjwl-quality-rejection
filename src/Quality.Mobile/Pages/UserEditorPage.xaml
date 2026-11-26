@@ -7,7 +7,7 @@
                 <VerticalStackLayout Spacing="10">
                     <VerticalStackLayout IsVisible="{Binding IsCreate}" Spacing="6">
                         <Label Text="Employee code" Style="{StaticResource Muted}" />
-                        <Entry Text="{Binding EmployeeCode}" MaxLength="50" Placeholder="e.g. E1234" Keyboard="Plain" />
+                        <Entry Text="{Binding EmployeeCode}" MaxLength="30" Placeholder="e.g. E1234" Keyboard="Plain" />
                         <Label Text="Username" Style="{StaticResource Muted}" />
                         <Entry Text="{Binding Username}" MaxLength="50" Placeholder="login name" Keyboard="Plain" />
                     </VerticalStackLayout>

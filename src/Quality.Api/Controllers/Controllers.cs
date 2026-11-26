@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Quality.Api.Infrastructure;
 using Quality.Core.Common;
+using Quality.Core.Entities;
 using Quality.Core.Dtos;
 using Quality.Core.Services;
 
@@ -27,8 +28,23 @@ public sealed class HealthController : ControllerBase
         var components = new Dictionary<string, string>();
         components["master"] = await CanConnect(() => master.Database.CanConnectAsync(ct));
         foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(() => router.CanConnectAsync(key, ct));
+        // Round 2: entries are stamped with shifts from qa.ShiftDefinitions; a fallback calendar means those are not being used.
+        var calendar = await HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>().GetAsync();
+        components["shifts"] = calendar.IsFallback ? "unavailable" : "ok";
+        // Full review #5: entries without a production day are left out of reports; say so instead of silently under-counting.
+        var warnings = new List<string>();
+        foreach (var key in router.Keys)
+        {
+            if (components["entries:" + key] != "ok") continue;
+            try
+            {
+                var n = await router.For(key).CountWithoutProductionDateAsync(ct);
+                if (n > 0) warnings.Add($"entries:{key}: {n} entries have no production day and are not in reports. Run db/12_upgrade_entries_shift_reversal.sql in that database.");
+            }
+            catch (Exception) { /* reachability is already reported above */ }
+        }
         var ok = components.Values.All(v => v == "ok");
-        return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components));
+        return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));
 
         static async Task<string> CanConnect(Func<Task<bool>> probe)
         {
@@ -51,14 +67,14 @@ public sealed class AuthController : ApiControllerBase
     {
         var client = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var login = request?.Username ?? "";
-        if (_throttle.RetryAfter(client, login) is { } wait)
+        if (_throttle.TryBegin(client, login) is { } wait)   // checks AND reserves the attempt atomically (full review #2)
         {
             Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return ProblemFor(429, "too_many_attempts", "Too many failed sign-in attempts. Wait a few minutes and try again.");
         }
         var result = await _auth.LoginAsync(request!);
         if (result.IsSuccess) _throttle.RecordSuccess(client, login);
-        else if (result.Error!.Kind == ErrorKind.Unauthorized) _throttle.RecordFailure(client, login);
+        else if (result.Error!.Kind != ErrorKind.Unauthorized) _throttle.Refund(client, login);   // never reached the password check
         return Map(result);
     }
 }
@@ -184,4 +200,76 @@ public sealed class AdminUsersController : ApiControllerBase
 
     [HttpPost("{id:int}/reset-password")]
     public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetPasswordRequest request) => Map(await _users.ResetPasswordAsync(Me, id, request), _ => NoContent());
+}
+
+/// <summary>Feature #1: correction requests. Entries are never edited; an approved request reverses the entry (and may add a replacement).</summary>
+[ApiController, Route("api"), Authorize]
+public sealed class CorrectionsController : ApiControllerBase
+{
+    private readonly EntryCorrectionService _svc;
+    public CorrectionsController(EntryCorrectionService svc) => _svc = svc;
+
+    /// <summary>Inspector asks to correct one of their own entries. No proposed values = remove the entry; any value = corrected entry.</summary>
+    [HttpPost("rejection-entries/{shopId:int}/{id:long}/corrections"), Authorize(Roles = RoleNames.QualityInspector)]
+    [ProducesResponseType(typeof(CorrectionDto), 201)]
+    public async Task<IActionResult> Create(int shopId, long id, [FromBody] CorrectionRequest request) =>
+        Map(await _svc.RequestAsync(Me, shopId, id, request), r => Created($"/api/corrections/{r.Id}", r));
+
+    /// <summary>Inspector: own requests. Supervisor: assigned shops. Administrator: all. Default status: Pending.</summary>
+    [HttpGet("corrections")]
+    public async Task<IActionResult> List([FromQuery] string? status = CorrectionStatus.Pending, [FromQuery] int? shopId = null) =>
+        Map(await _svc.ListAsync(Me, string.Equals(status, "all", StringComparison.OrdinalIgnoreCase) ? null : status, shopId));
+
+    /// <summary>Number of requests in the caller's scope (for badges and the dashboard tile); one query, no entry reads.</summary>
+    [HttpGet("corrections/count")]
+    public async Task<IActionResult> Count([FromQuery] string? status = CorrectionStatus.Pending, [FromQuery] int? shopId = null) =>
+        Map(await _svc.CountAsync(Me, string.Equals(status, "all", StringComparison.OrdinalIgnoreCase) ? null : status, shopId));
+
+    [HttpPost("corrections/{id:long}/approve"), Authorize(Roles = RoleNames.Supervisor + "," + RoleNames.Administrator)]
+    public async Task<IActionResult> Approve(long id, [FromBody] CorrectionDecisionRequest? request) => Map(await _svc.ApproveAsync(Me, id, request));
+
+    [HttpPost("corrections/{id:long}/reject"), Authorize(Roles = RoleNames.Supervisor + "," + RoleNames.Administrator)]
+    public async Task<IActionResult> Reject(long id, [FromBody] CorrectionDecisionRequest? request) => Map(await _svc.RejectAsync(Me, id, request));
+
+    [HttpPost("corrections/{id:long}/withdraw"), Authorize(Roles = RoleNames.QualityInspector)]
+    public async Task<IActionResult> Withdraw(long id) => Map(await _svc.WithdrawAsync(Me, id));
+}
+
+/// <summary>Features #2, #4, #6: plant calendar and rejection totals.</summary>
+[ApiController, Route("api/reports"), Authorize]
+public sealed class ReportsController : ApiControllerBase
+{
+    private readonly ReportService _reports;
+    public ReportsController(ReportService reports) => _reports = reports;
+
+    /// <summary>Today's production date, current shift and the shift list (any signed-in user).</summary>
+    [HttpGet("calendar")]
+    [ProducesResponseType(typeof(CalendarDto), 200)]
+    public async Task<IActionResult> Calendar() => Ok(await _reports.CalendarAsync());
+
+    /// <summary>Totals for production days fromDate..toDate (inclusive; default today), optional shop and shift. Supervisor/administrator.</summary>
+    [HttpGet("totals")]
+    [ProducesResponseType(typeof(ReportDto), 200)]
+    public async Task<IActionResult> Totals([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode, [FromQuery] int? top) =>
+        Map(await _reports.RangeAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, top)));
+}
+
+/// <summary>Feature #8: machine QR codes.</summary>
+[ApiController, Route("api"), Authorize]
+public sealed class MachineQrController : ApiControllerBase
+{
+    /// <summary>Resolves a scanned label (inspector). 409 machine_inactive, 403 shop_not_assigned, 400 qr_invalid.</summary>
+    [HttpGet("machines/lookup"), Authorize(Roles = RoleNames.QualityInspector)]
+    [ProducesResponseType(typeof(MachineLookupDto), 200)]
+    public async Task<IActionResult> Lookup([FromQuery] string code, [FromServices] MachineLookupService svc) => Map(await svc.LookupAsync(Me, code));
+
+    /// <summary>SVG QR code for printing a machine label (administrator). Content: RJWLQR:M:&lt;id&gt;.</summary>
+    [HttpGet("admin/machines/{id:int}/qr.svg"), Authorize(Roles = RoleNames.Administrator)]
+    public async Task<IActionResult> QrSvg(int id, [FromServices] Quality.Core.Abstractions.IMasterData master)
+    {
+        if (await master.GetMachineAsync(id) is null) return ProblemFor(404, "machine_not_found", "Machine not found.");
+        using var data = new QRCoder.QRCodeGenerator().CreateQrCode(MachineLookupService.LabelPayload(id), QRCoder.QRCodeGenerator.ECCLevel.Q);
+        var svg = new QRCoder.SvgQRCode(data).GetGraphic(8);
+        return Content(svg, "image/svg+xml");
+    }
 }

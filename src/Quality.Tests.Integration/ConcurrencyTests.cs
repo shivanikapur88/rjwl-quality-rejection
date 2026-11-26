@@ -152,7 +152,8 @@ public sealed class ConcurrencyTests(SqlFixture f) : SqlTest(f)
         }
         var orphans = await SqlFixture.Scalar<int>(F.GdcCs, $"""
             SELECT COUNT(*) FROM qa.QualityRejectionEntries e
-            WHERE NOT EXISTS (SELECT 1 FROM [{F.Prefix}_Master].qa.Machines m WHERE m.Id = e.MachineId)
+            WHERE e.MachineCode LIKE 'Q9R-{F.Prefix[^5..]}-%'   -- only this race's machines (other tests insert synthetic rows)
+              AND NOT EXISTS (SELECT 1 FROM [{F.Prefix}_Master].qa.Machines m WHERE m.Id = e.MachineId)
             """);
         Assert.Equal(0, orphans);
         Assert.Equal(15, created + deleted);   // every round: exactly one side won

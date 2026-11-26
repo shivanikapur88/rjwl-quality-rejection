@@ -25,6 +25,8 @@ public sealed class Session : ISession
 
 	public bool IsInspector => IsAuthenticated && User.Role == "QualityInspector";
 
+	public bool IsSupervisor => IsAuthenticated && User!.Role == "Supervisor";
+
 	public event Action? Expired;
 
 	public Session(ISecureStore store, TimeProvider time)

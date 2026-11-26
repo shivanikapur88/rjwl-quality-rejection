@@ -17,6 +17,7 @@
                                   system without an active administrator                [Q3]
      5. CK_Users_EmployeeCode_Length - employee codes 2..30 characters                  [Q6]
 
+   If step 5 finds an employee code that is not 2-30 characters long, it stops with error 50081 and lists them.
    If step 3 finds two users whose username/employee code collide (possible with
    the earlier schema), it STOPS with error 50080 and lists them. Resolve the
    collision (rename one account in qa.Users) and run the script again. Steps 1-2 (new columns) have then
@@ -26,6 +27,9 @@
    ============================================================================ */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
+-- Required for filtered indexes and consistent behaviour; sqlcmd defaults QUOTED_IDENTIFIER to OFF.
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 GO
 
 /* ---------- 1. Token version (session revocation) ---------- */
@@ -110,6 +114,13 @@ END;
 GO
 
 /* ---------- 5. Employee code length matches validation (2..30) ---------- */
+-- Existing users with a 1-character code would make the constraint fail half-way: list them and stop with a clear error instead.
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Users_EmployeeCode_Length' AND parent_object_id = OBJECT_ID(N'qa.Users'))
+   AND EXISTS (SELECT 1 FROM qa.Users WHERE LEN(EmployeeCode) NOT BETWEEN 2 AND 30)
+BEGIN
+    SELECT Id, EmployeeCode, Username FROM qa.Users WHERE LEN(EmployeeCode) NOT BETWEEN 2 AND 30;
+    THROW 50081, N'Some employee codes are shorter than 2 or longer than 30 characters (listed above). Correct them in qa.Users, then re-run 08.', 1;
+END;
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Users_EmployeeCode_Length' AND parent_object_id = OBJECT_ID(N'qa.Users'))
     ALTER TABLE qa.Users WITH CHECK ADD CONSTRAINT CK_Users_EmployeeCode_Length CHECK (LEN(EmployeeCode) BETWEEN 2 AND 30);
 GO

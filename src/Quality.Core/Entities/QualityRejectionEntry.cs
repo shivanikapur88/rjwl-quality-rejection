@@ -24,4 +24,12 @@ public class QualityRejectionEntry
     public string InspectorEmployeeCode { get; set; } = "";
     public string? Remarks { get; set; }
     public DateTime ServerCreatedAt { get; set; }
+    /// <summary>Production day (plant calendar) and shift, set by the server on save (db/12). Null only for rows not yet backfilled.</summary>
+    public DateOnly? ProductionDate { get; set; }
+    public string? ShiftCode { get; set; }
+    /// <summary>Set once when a correction is approved; the row is otherwise never changed. Reversed entries are excluded from totals.</summary>
+    public DateTime? ReversedAt { get; set; }
+    public long? ReversedByCorrectionId { get; set; }
+    /// <summary>On a replacement entry: the entry it corrects (same shop database).</summary>
+    public long? CorrectsEntryId { get; set; }
 }

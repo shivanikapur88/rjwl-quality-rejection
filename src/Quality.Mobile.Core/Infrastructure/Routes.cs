@@ -30,4 +30,12 @@ public static class Routes
 	public const string AdminUsers = "adminusers";
 
 	public const string UserEditor = "usereditor";
+
+	public const string EntryDetail = "entrydetail";
+
+	public const string Corrections = "corrections";
+
+	public const string Summary = "summary";
+
+	public const string Scan = "scan";
 }

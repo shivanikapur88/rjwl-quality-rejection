@@ -42,4 +42,10 @@ public static class AuditActions
     public const string UserActivated = "USER_ACTIVATED";
     public const string UserDeactivated = "USER_DEACTIVATED";
     public const string UserPasswordReset = "USER_PASSWORD_RESET";
+    public const string CorrectionRequested = "CORRECTION_REQUESTED";
+    public const string CorrectionApproved = "CORRECTION_APPROVED";
+    public const string CorrectionRejected = "CORRECTION_REJECTED";
+    public const string CorrectionWithdrawn = "CORRECTION_WITHDRAWN";
+    /// <summary>A half-applied approval was found and completed while someone else acted on the request (UserId = that caller).</summary>
+    public const string CorrectionApprovalCompleted = "CORRECTION_APPROVAL_COMPLETED";
 }

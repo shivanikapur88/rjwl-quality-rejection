@@ -30,12 +30,19 @@
 
 **My entries** lists your own entries, newest first. Pull down to refresh; tap **Load more** at the bottom for older ones. If a box says some shops' entries "could not be loaded right now", the list is **incomplete**; try again later.
 
-Entries cannot be edited or deleted in the app. Tell your supervisor about a mistake (correction rules are still to be decided by RJWL).
+**Fixing a mistake:** entries are never edited. Open **My entries**, tap the entry, then **Request correction**. Give a reason, and either choose **Remove this entry** or **Correct the details** (phenomenon, machine, quantity, remarks). Your supervisor approves or rejects it. Until then the entry stays as it is and shows "Correction requested". **My correction requests** on Home shows your requests; you can withdraw one while it is waiting. Entries older than 30 days cannot be corrected from the app.
+
+**Scan machine QR** (Home): point the camera at the label on the machine and the entry form opens for it. Allow camera access the first time. If a label is damaged or not recognised, choose the machine from the list as before.
+
+**Shift:** every entry belongs to a production day and shift (A 06:00–14:00, B 14:00–22:00, C 22:00–06:00). Night-shift entries after midnight count for the previous day. The confirmation screen and My entries show it.
 
 ## Supervisor
 
 * **Entries** shows all entries of your assigned shops (all inspectors), newest first, with **Load more** and the same "incomplete" notice.
 * Supervisors do not record entries and cannot change master data.
+* **Correction requests:** approve (the entry is reversed, and the corrected entry is saved if one was proposed) or reject (give a reason; the inspector sees it). Tick "Also show decided requests" for history.
+* **Shift summary:** rejected parts for today's production day and the current shift. Use ‹ › to change the day and the picker to change the shift. Shows totals by shop, top phenomena and top machines.
+* **Web dashboard:** open `https://<server>/dashboard/` in a browser and sign in with your app username and password. It shows trends by day and shift, top phenomena and machines, and totals per shop for any period up to 92 days, with a table view of the chart.
 
 ## Administrator
 
@@ -55,5 +62,7 @@ Home shows three extra buttons: **Manage rejection phenomena**, **Manage machine
 * Resetting a password, deactivating a user or changing a role signs that user out everywhere.
 
 **"This record was changed by someone else after you opened it"**: another administrator saved the same record while you had it open. Go back, let the list reload, and make your change again.
+
+**Machine QR labels:** in a browser, open `https://<server>/dashboard/labels.html`, choose the shop, then **Print**. Stick each label on its machine. Labels stay valid when a machine is renamed. Administrators can also approve or reject correction requests, and use the shift summary and dashboard for all shops.
 
 Every administrative change is recorded in the audit log (who, what, when, before and after). Passwords are never recorded. There is no screen to browse the log; IT can query `qa.AuditLog`.

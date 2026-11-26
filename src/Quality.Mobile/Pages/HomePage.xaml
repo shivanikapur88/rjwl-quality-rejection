@@ -23,7 +23,10 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
         <VerticalStackLayout Grid.Row="4" Spacing="12">
+            <Button Text="Scan machine QR" Command="{Binding ScanCommand}" Style="{StaticResource PrimaryButton}" IsVisible="{Binding CanRecord}" />
             <Button Text="{Binding EntriesButtonText}" Command="{Binding MyEntriesCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Text="Shift summary" Command="{Binding SummaryCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding CanReview}" />
+            <Button Text="{Binding CorrectionsButtonText}" Command="{Binding CorrectionsCommand}" Style="{StaticResource SecondaryButton}" />
             <Button Text="Manage rejection phenomena" Command="{Binding AdminCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding IsAdmin}" />
             <Button Text="Manage machines" Command="{Binding AdminMachinesCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding IsAdmin}" />
             <Button Text="Manage users" Command="{Binding AdminUsersCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding IsAdmin}" />
