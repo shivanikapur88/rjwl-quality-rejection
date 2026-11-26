@@ -53,8 +53,9 @@ public sealed class EfEntryStore : IEntryStore
                 MachineCode = g.Max(e => e.MachineCode), MachineName = g.Max(e => e.MachineName), Phenomenon = g.Max(e => e.PhenomenonNameSnapshot),
                 Quantity = g.Sum(e => e.Quantity), Entries = g.Count(),
             }).ToListAsync();
-        return rows.Select(r => new EntryAggregateRow(r.ProductionDate!.Value, r.ShiftCode ?? "?", r.MachineId, r.MachineCode, r.MachineName,
-            r.RejectionPhenomenonId, r.Phenomenon, r.Quantity, r.Entries)).ToList();
+        // Snapshot columns are NOT NULL; the ?? only satisfies the compiler's view of MAX() over strings.
+        return rows.Select(r => new EntryAggregateRow(r.ProductionDate!.Value, r.ShiftCode ?? "?", r.MachineId, r.MachineCode ?? "", r.MachineName ?? "",
+            r.RejectionPhenomenonId, r.Phenomenon ?? "", r.Quantity, r.Entries)).ToList();
     }
 
     public async Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? replacement)
