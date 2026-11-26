@@ -27,6 +27,9 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	private EntryDraft? _resume;
 
+	/// <summary>The draft already put back: Shell can apply the same query again (e.g. coming back to this page), and it must not be restored twice.</summary>
+	private EntryDraft? _restored;
+
 	private ShopDto? _shop;
 
 	private StageDto? _stage;
@@ -192,7 +195,8 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_shop = BaseViewModel.Arg<ShopDto>(args, "shop");
 		_stage = BaseViewModel.Arg<StageDto>(args, "stage");
 		_machine = BaseViewModel.Arg<MachineDto>(args, "machine");
-		_resume = BaseViewModel.Arg<EntryDraft>(args, "draft");
+		EntryDraft? draft = BaseViewModel.Arg<EntryDraft>(args, "draft");
+		_resume = ((object)draft != null && !Equals(draft, _restored)) ? draft : null;
 		OnPropertyChanged("ShopText");
 		OnPropertyChanged("StageText");
 		OnPropertyChanged("MachineText");
@@ -202,8 +206,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 		}
 		else
 		{
-			await LoadPhenomenaAsync();
-			if (_resume is not null) Restore(_resume);
+			await LoadPhenomenaAsync();   // restores the draft once the phenomena are loaded
 		}
 	}
 
@@ -211,6 +214,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 	private void Restore(EntryDraft d)
 	{
 		_resume = null;
+		_restored = d;
 		SelectedPhenomenon = d.PhenomenonId is int pid ? _all.FirstOrDefault(p => p.Id == pid) : null;
 		QuantityText = d.QuantityText;
 		Remarks = d.Remarks;
@@ -245,6 +249,11 @@ public sealed class EntryFormViewModel : BaseViewModel
 				if (_all.Count == 0)
 				{
 					ErrorMessage = "No active rejection phenomena are configured for this stage. Contact your administrator.";
+				}
+				else if ((object)_resume != null)
+				{
+					// Only now: if loading failed, the error stays on screen and the draft is kept for the next attempt.
+					Restore(_resume);
 				}
 			}
 		});

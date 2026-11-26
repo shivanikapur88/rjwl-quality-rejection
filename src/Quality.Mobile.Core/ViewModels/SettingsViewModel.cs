@@ -85,14 +85,15 @@ public sealed class SettingsViewModel : BaseViewModel
 		return Task.CompletedTask;
 	}
 
-	private bool TrySave()
+	/// <summary>Saves the address. Returns null when it is not valid; otherwise whether the session was ended because the server changed.</summary>
+	private async Task<bool?> TrySaveAsync()
 	{
 		ErrorMessage = null;
 		InfoMessage = null;
 		if (!BaseUrlValidator.TryNormalize(ServerUrl, out string normalized, out string error))
 		{
 			ErrorMessage = error;
-			return false;
+			return null;
 		}
 		var previous = _settings.BaseUrl;
 		_settings.BaseUrl = normalized;
@@ -101,29 +102,43 @@ public sealed class SettingsViewModel : BaseViewModel
 		// so the token is never sent to the new address.
 		if (_session.IsAuthenticated && !SameHost(previous, normalized))
 		{
-			_ = _session.EndAsync();
+			await _session.EndAsync();
 			OnPropertyChanged("IsSignedIn");
 			OnPropertyChanged("UserText");
+			return true;
 		}
-		return true;
+		return false;
+	}
+
+	/// <summary>The session was ended because the server changed: go to sign-in (otherwise every call fails as "session expired").</summary>
+	private async Task SignedOutAsync(string outcome)
+	{
+		await _dialogs.AlertAsync("Signed out", (outcome + " You were signed out because the server address changed. Sign in to the new server.").TrimStart());
+		await _nav.GoToAsync(Routes.Login);
 	}
 
 	private static bool SameHost(string? a, string? b) =>
 		Uri.TryCreate(a, UriKind.Absolute, out var x) && Uri.TryCreate(b, UriKind.Absolute, out var y)
 		&& string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase) && x.Port == y.Port && x.Scheme == y.Scheme;
 
-	public Task SaveAsync()
+	public async Task SaveAsync()
 	{
-		if (TrySave())
+		var saved = await TrySaveAsync();
+		if (saved is null)
 		{
-			InfoMessage = "Server address saved.";
+			return;
 		}
-		return Task.CompletedTask;
+		InfoMessage = "Server address saved.";
+		if (saved == true)
+		{
+			await SignedOutAsync("Server address saved.");
+		}
 	}
 
 	public async Task TestAsync()
 	{
-		if (!TrySave())
+		var saved = await TrySaveAsync();
+		if (saved is null)
 		{
 			return;
 		}
@@ -147,6 +162,10 @@ public sealed class SettingsViewModel : BaseViewModel
 		finally
 		{
 			IsBusy = false;
+		}
+		if (saved == true)
+		{
+			await SignedOutAsync(InfoMessage ?? ErrorMessage ?? "");
 		}
 	}
 

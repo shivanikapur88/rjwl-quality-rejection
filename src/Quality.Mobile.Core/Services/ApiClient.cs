@@ -257,6 +257,12 @@ public sealed class ApiClient : IApiClient
 		{
 			return Fail<T>(ApiErrorKind.NotConfigured, "not_configured", "The server address is not set. Open Settings and enter it.");
 		}
+		// The stored address may predate the https-only rule (e.g. an old http:// value): never send the token to it.
+		if (!BaseUrlValidator.TryNormalize(baseUrl, out string validUrl, out string urlError))
+		{
+			return Fail<T>(ApiErrorKind.NotConfigured, "invalid_server_address", "The saved server address is not valid (" + urlError.TrimEnd('.') + "). Open Settings and correct it.");
+		}
+		baseUrl = validUrl;
 		using HttpRequestMessage req = new HttpRequestMessage(method, baseUrl + path);
 		if (auth)
 		{
@@ -280,6 +286,10 @@ public sealed class ApiClient : IApiClient
 		catch (TaskCanceledException)
 		{
 			return Fail<T>(ApiErrorKind.Timeout, "timeout", "The server took too long to respond. Check your connection and try again.");
+		}
+		catch (HttpRequestException ex) when (IsCertificateFailure(ex))
+		{
+			return Fail<T>(ApiErrorKind.Network, "certificate_untrusted", CertificateMessage);
 		}
 		catch (HttpRequestException)
 		{
@@ -309,6 +319,32 @@ public sealed class ApiClient : IApiClient
 			}
 			return await MapFailureAsync<T>(resp, auth);
 		}
+	}
+
+	public const string CertificateMessage = "The server's security certificate is not trusted on this device. Contact IT.";
+
+	/// <summary>A TLS handshake or certificate failure (not an unreachable server): an inner AuthenticationException,
+	/// .NET's SecureConnectionError, or (Android's native handler) an SSL / trust-anchor message.</summary>
+	internal static bool IsCertificateFailure(HttpRequestException ex)
+	{
+		if (ex.HttpRequestError == HttpRequestError.SecureConnectionError)
+		{
+			return true;
+		}
+		for (Exception? e = ex; e != null; e = e.InnerException)
+		{
+			if (e is System.Security.Authentication.AuthenticationException)
+			{
+				return true;
+			}
+			string m = e.Message ?? "";
+			if (m.Contains("SSL", StringComparison.OrdinalIgnoreCase) || m.Contains("certificate", StringComparison.OrdinalIgnoreCase)
+				|| m.Contains("trust anchor", StringComparison.OrdinalIgnoreCase) || m.Contains("CertPath", StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private async Task<ApiResult<T>> MapFailureAsync<T>(HttpResponseMessage resp, bool auth)

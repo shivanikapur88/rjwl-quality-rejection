@@ -50,22 +50,40 @@ public sealed class MyEntriesViewModel : BaseViewModel
         return LoadAsync();
     }
 
-    /// <summary>First page (newest entries).</summary>
-    public Task LoadAsync() => RunBusyAsync(async () =>
-    {
-        var r = await _api.GetEntriesPageAsync(null, PageSize);
-        if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
-        Entries.Clear();
-        Apply(r.Value!);
-    });
+    private int _loadSeq;
 
-    /// <summary>Next page; appends below the rows already shown.</summary>
-    public Task LoadMoreAsync() => HasMore ? RunBusyAsync(async () =>
+    /// <summary>First page (newest entries). Supersedes any load still running (e.g. a slow "Load more").</summary>
+    public Task LoadAsync() => LoadPageAsync(more: false);
+
+    /// <summary>Next page; appends below the rows already shown. Not started while another load is running.</summary>
+    public Task LoadMoreAsync() => HasMore && !IsBusy ? LoadPageAsync(more: true) : Task.CompletedTask;
+
+    private async Task LoadPageAsync(bool more)
     {
-        var r = await _api.GetEntriesPageAsync(_cursor, PageSize);
-        if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
-        Apply(r.Value!);
-    }) : Task.CompletedTask;
+        // Only the latest load may change the list, the cursor or IsBusy: a "Load more" answering after a refresh
+        // would otherwise append an old page below the new first page and replace the cursor.
+        var seq = Interlocked.Increment(ref _loadSeq);
+        var cursor = more ? _cursor : null;
+        IsBusy = true;
+        ErrorMessage = null;
+        LoadMoreCommand.RaiseCanExecuteChanged();
+        try
+        {
+            var r = await _api.GetEntriesPageAsync(cursor, PageSize);
+            if (seq != Volatile.Read(ref _loadSeq)) return;
+            if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
+            if (!more) Entries.Clear();
+            Apply(r.Value!);
+        }
+        catch (Exception)
+        {
+            if (seq == Volatile.Read(ref _loadSeq)) ErrorMessage = GenericError;
+        }
+        finally
+        {
+            if (seq == Volatile.Read(ref _loadSeq)) { IsBusy = false; LoadMoreCommand.RaiseCanExecuteChanged(); }
+        }
+    }
 
     private void Apply(EntryPage page)
     {

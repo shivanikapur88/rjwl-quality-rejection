@@ -125,6 +125,17 @@ public sealed class EntryDetailViewModel : BaseViewModel
         await RunBusyAsync(async () =>
         {
             var r = await _api.RequestCorrectionAsync(_entry!.ShopId, _entry.Id, req);
+            if (!r.IsSuccess && r.Error!.Code == "correction_pending")
+            {
+                // A request is already waiting (e.g. an earlier attempt that timed out did reach the server):
+                // close the form and show the entry as it is now, with its pending request.
+                FormOpen = false;
+                var fresh = await _api.GetEntryAsync(_entry.ShopId, _entry.Id);
+                _entry = fresh.IsSuccess ? fresh.Value! : _entry with { CorrectionStatus = "Pending" };
+                Refresh();
+                ErrorMessage = r.Error.Message;
+                return;
+            }
             if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
             FormOpen = false;
             _entry = _entry with { CorrectionStatus = "Pending" };
@@ -275,16 +286,22 @@ public sealed class SummaryViewModel : BaseViewModel
 
     private List<string> _shiftCodes = new();
 
+    /// <summary>Day and shift the numbers on screen belong to (null: nothing shown).</summary>
+    private (DateOnly Day, string? Shift)? _shown;
+
     public Task LoadAsync() => _day == default ? Task.CompletedTask : RunBusyAsync(async () =>   // no calendar yet: nothing to ask for
     {
         OnPropertyChanged(nameof(DayText));
         var day = _day;
         var code = _shift?.Id is int i && i < _shiftCodes.Count ? _shiftCodes[i] : null;
+        // Another day or shift: the old numbers must not stay under the new heading while it loads, or if the load fails.
+        if (_shown != (day, code)) ClearResults();
         var seq = Interlocked.Increment(ref _loadSeq);
         var r = await _api.GetTotalsAsync(day, day, code, top: 5);
         if (seq != Volatile.Read(ref _loadSeq)) return;   // a later tap (day or shift) started another load: its result wins
         if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
         var d = r.Value!;
+        _shown = (day, code);
         TotalText = d.Total.Quantity.ToString("N0", CultureInfo.CurrentCulture);
         EntriesText = $"rejected parts in {d.Total.Entries} entries";
         IncompleteNotice = d.UnavailableShops.Count == 0 ? "" : $"Incomplete: {string.Join(", ", d.UnavailableShops)} could not be read right now.";
@@ -292,6 +309,13 @@ public sealed class SummaryViewModel : BaseViewModel
         Fill(TopPhenomena, d.TopPhenomena.Select(p => new SummaryLine(p.PhenomenonName, p.ShopCode, p.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
         Fill(TopMachines, d.TopMachines.Select(m => new SummaryLine(m.MachineCode, $"{m.MachineName} · {m.ShopCode}", m.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
     });
+
+    private void ClearResults()
+    {
+        _shown = null;
+        TotalText = "–"; EntriesText = ""; IncompleteNotice = "";
+        Shops.Clear(); TopPhenomena.Clear(); TopMachines.Clear();
+    }
 
     private static void Fill(ObservableCollection<SummaryLine> target, IEnumerable<SummaryLine> items) { target.Clear(); foreach (var x in items) target.Add(x); }
 }
@@ -324,7 +348,7 @@ public sealed class ScanViewModel : BaseViewModel
             if (x.Stages.Count == 1)
             { await _nav.GoToAsync(Routes.Entry, new Dictionary<string, object> { ["shop"] = x.Shop, ["stage"] = x.Stages[0], ["machine"] = x.Machine }); navigated = true; }
             else if (x.Stages.Count > 1)
-            { await _nav.GoToAsync(Routes.Stages, new Dictionary<string, object> { ["shop"] = x.Shop }); navigated = true; }
+            { await _nav.GoToAsync(Routes.Stages, new Dictionary<string, object> { ["shop"] = x.Shop, ["machine"] = x.Machine }); navigated = true; }   // the stage screen keeps the scanned machine
             else ErrorMessage = "No inspection stage is configured for this shop.";
         });
         }
