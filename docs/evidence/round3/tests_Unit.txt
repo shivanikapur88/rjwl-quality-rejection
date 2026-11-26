@@ -1,0 +1,84 @@
+Quality.Tests.Unit.LoginThrottleTests.Attackers_cannot_lock_the_real_user_out_of_a_known_device
+Quality.Tests.Unit.LoginThrottleTests.Five_failures_from_one_client_lock_that_login_on_that_client_only
+Quality.Tests.Unit.LoginThrottleTests.Long_login_names_share_one_bucket
+Quality.Tests.Unit.LoginThrottleTests.Parallel_burst_cannot_exceed_the_per_client_and_login_limit
+Quality.Tests.Unit.LoginThrottleTests.Per_client_limit_is_generous_for_shared_plant_addresses
+Quality.Tests.Unit.LoginThrottleTests.Per_login_limit_stops_a_distributed_guess_from_unknown_clients_and_expires
+Quality.Tests.Unit.LoginThrottleTests.Success_and_refund_give_attempts_back
+Quality.Tests.Unit.MobileViewModelTests.A_different_user_signing_in_does_not_get_someone_elses_draft
+Quality.Tests.Unit.MobileViewModelTests.Admin_edit_sends_the_version_the_screen_was_built_from
+Quality.Tests.Unit.MobileViewModelTests.Correction_request_sends_only_changed_values
+Quality.Tests.Unit.MobileViewModelTests.Double_tap_sends_one_request
+Quality.Tests.Unit.MobileViewModelTests.History_pages_and_discloses_incomplete_results
+Quality.Tests.Unit.MobileViewModelTests.Inactive_machine_alerts_and_returns_to_the_machine_list
+Quality.Tests.Unit.MobileViewModelTests.Inactive_phenomenon_reloads_the_list_and_clears_the_choice
+Quality.Tests.Unit.MobileViewModelTests.Lost_response_keeps_the_form_and_the_retry_reuses_the_submission_id
+Quality.Tests.Unit.MobileViewModelTests.Remove_request_has_no_values_and_other_peoples_or_reversed_entries_cannot_be_requested
+Quality.Tests.Unit.MobileViewModelTests.Scan_opens_the_entry_form_once_and_recovers_from_a_bad_label
+Quality.Tests.Unit.MobileViewModelTests.Session_expiry_during_save_keeps_the_entry_and_login_resumes_it_with_the_same_submission_id
+Quality.Tests.Unit.MobileViewModelTests.Summary_ignores_a_slow_response_from_an_earlier_tap
+Quality.Tests.Unit.MobileViewModelTests.Summary_loads_today_and_current_shift_and_shows_incomplete_data
+Quality.Tests.Unit.MobileViewModelTests.Supervisor_rejects_with_a_note_and_the_list_refreshes
+Quality.Tests.Unit.MobileViewModelTests.Validation_error_is_not_reported_as_an_unknown_outcome
+Quality.Tests.Unit.QrPayloadTests.Label_round_trips
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: " rjwlqr:m:7 ", id: 7)
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: "RJWLQR:M:", id: null)
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: "RJWLQR:M:-3", id: null)
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: "RJWLQR:M:0", id: null)
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: "RJWLQR:M:12", id: 12)
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: "RJWLQR:M:12:GDC-02", id: 12)
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: "https://evil", id: null)
+Quality.Tests.Unit.QrPayloadTests.Parses_only_our_labels(text: null, id: null)
+Quality.Tests.Unit.RuleTests.Date_filters_are_normalised_to_utc
+Quality.Tests.Unit.RuleTests.Error_mapping_does_not_report_conflicts_as_database_unavailable
+Quality.Tests.Unit.RuleTests.Q5_username_and_employee_code_share_one_normalized_namespace
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "A", ok: False)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234", ok: True)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "ABCDEFGHIJKLMNOPQRSTUVWXYZ12345", ok: False)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "E 1", ok: False)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "E.1_2-3", ok: True)
+Quality.Tests.Unit.RuleTests.Q6_employee_code_is_2_to_30_characters(code: "E1", ok: True)
+Quality.Tests.Unit.RuleTests.Q7_remarks_cleanup_used_for_save_and_replay(input: "   ", expected: null)
+Quality.Tests.Unit.RuleTests.Q7_remarks_cleanup_used_for_save_and_replay(input: " a  b ", expected: "a  b")
+Quality.Tests.Unit.RuleTests.Q7_remarks_cleanup_used_for_save_and_replay(input: null, expected: null)
+Quality.Tests.Unit.RuleTests.Row_versions_round_trip_and_garbage_never_matches
+Quality.Tests.Unit.RuleTests.Text_normalizer_matches_the_import_rule
+Quality.Tests.Unit.ShiftCalendarTests.Custom_two_shift_pattern_and_validation
+Quality.Tests.Unit.ShiftCalendarTests.Resolves_production_day_and_shift_in_plant_time(d: 26, h: 0, m: 29, day: "2026-11-25", shift: "C")
+Quality.Tests.Unit.ShiftCalendarTests.Resolves_production_day_and_shift_in_plant_time(d: 26, h: 0, m: 30, day: "2026-11-26", shift: "A")
+Quality.Tests.Unit.ShiftCalendarTests.Resolves_production_day_and_shift_in_plant_time(d: 26, h: 16, m: 30, day: "2026-11-26", shift: "C")
+Quality.Tests.Unit.ShiftCalendarTests.Resolves_production_day_and_shift_in_plant_time(d: 26, h: 20, m: 30, day: "2026-11-26", shift: "C")
+Quality.Tests.Unit.ShiftCalendarTests.Resolves_production_day_and_shift_in_plant_time(d: 26, h: 8, m: 29, day: "2026-11-26", shift: "A")
+Quality.Tests.Unit.ShiftCalendarTests.Resolves_production_day_and_shift_in_plant_time(d: 26, h: 8, m: 30, day: "2026-11-26", shift: "B")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "01_master_schema.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "02a_entries_schema_GDC_AndonDB.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "02b_entries_schema_MachineShopDB.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "02c_entries_schema_PRE_FINAL.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "03_seed_reference.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "04_seed_phenomena.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "05_DEV_ONLY_placeholder_machines.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "06_migration_four_shops.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "07_migration_add_quantity.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "08_upgrade_master_review_fixes.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "09_upgrade_entries_indexes.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "10_load_production_machines.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "11_upgrade_master_shifts_corrections.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "12_upgrade_entries_shift_reversal.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "13_upgrade_master_production_counts.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Every_script_stops_on_error_inside_transactions(script: "14_production_counts_feed_TEMPLATE.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "01_master_schema.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "02a_entries_schema_GDC_AndonDB.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "02b_entries_schema_MachineShopDB.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "02c_entries_schema_PRE_FINAL.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "03_seed_reference.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "04_seed_phenomena.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "05_DEV_ONLY_placeholder_machines.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "06_migration_four_shops.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "07_migration_add_quantity.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "08_upgrade_master_review_fixes.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "09_upgrade_entries_indexes.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "10_load_production_machines.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "11_upgrade_master_shifts_corrections.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "12_upgrade_entries_shift_reversal.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "13_upgrade_master_production_counts.sql")
+Quality.Tests.Unit.SqlScriptRuleTests.Scripts_with_filtered_indexes_set_quoted_identifier_on(script: "14_production_counts_feed_TEMPLATE.sql")

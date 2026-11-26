@@ -10,7 +10,8 @@ An Android app (.NET MAUI), an ASP.NET Core Web API and SQL Server, used to reco
 | Framework | **.NET 10** for every project (the API and libraries were on .NET 8, which left support on 10 Nov 2026) |
 | Review findings Q1-Q9 | Fixed and tested on SQL Server 2022 ([docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md)) |
 | Round 2 | Entry corrections, shift and production date, app shift summary, machine QR codes, read-only web dashboard at `/dashboard/` ([SPECIFICATION.md §12](docs/SPECIFICATION.md)), checked by an independent review |
-| Tests | 77 unit and 49 SQL Server integration tests, all passing on a clean checkout ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
+| Round 3 | Dashboard drill-down, previous-period comparison, Pareto, and rejection rate from uploaded production counts ([SPECIFICATION.md §13](docs/SPECIFICATION.md)), checked by an independent review |
+| Tests | 84 unit and 54 SQL Server integration tests, all passing on a clean checkout ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
 | Android | Debug APK builds. **Not yet tested on an emulator or device**; no signed release APK yet. |
 | Production readiness | **Not yet.** See [docs/READINESS.md](docs/READINESS.md) for what is blocked: device acceptance, the real machine list, package id, keystore and certificate, and business acceptance. |
 
@@ -44,7 +45,7 @@ src/
   Quality.Api/            HTTP endpoints, JWT, login throttling, error mapping, readiness
   Quality.Mobile.Core/    API client, session, navigation abstractions, 14 view-models   (recovered)
   Quality.Mobile/         Android app: 14 pages, styles, platform services, manifest      (recovered)
-  Quality.Api/wwwroot/dashboard/  read-only web dashboard and QR label printing (no external libraries)
+  Quality.Api/wwwroot/dashboard/  web dashboard (production-count upload for administrators) and QR label printing (no external libraries)
   Quality.Tests.Unit/     77 tests (rules, shifts, throttling, SQL-script checks, app logic through the real API client)
   Quality.Tests.Integration/  49 tests against real SQL Server (HTTP, concurrency, corrections, reports, scripts, reference data)
 ```
@@ -73,4 +74,4 @@ QR_TEST_SQL="Server=localhost,14333;User Id=sa;Password=<pwd>;TrustServerCertifi
 
 ## Not included (outside the documented scope)
 
-There is no offline mode, web *administration* portal, audit-viewing screen, photo capture, export, PLC integration or rejection percentage. Each needs a decision first ([BUSINESS_DECISIONS.md](docs/BUSINESS_DECISIONS.md)). The CNC production collector and ShopMonitor dashboard are separate systems and are not changed.
+There is no offline mode, web *administration* portal, audit-viewing screen, photo capture, export or PLC integration. The rejection rate needs production counts to be uploaded (or a feed agreed), and its counting rules confirmed (decision #13). Each needs a decision first ([BUSINESS_DECISIONS.md](docs/BUSINESS_DECISIONS.md)). The CNC production collector and ShopMonitor dashboard are separate systems and are not changed.

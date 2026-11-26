@@ -1,6 +1,6 @@
 # Test evidence
 
-> **Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+> **Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
 
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
@@ -121,3 +121,38 @@ Fresh clone of branch `claude/corrections-shifts-dashboard-qr` at `13d6d8c30afcb
 **Independent review:** a separate reviewer (Claude Fable) read the round-2 diff without seeing my conclusions. Its findings and their fixes are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#round-2-independent-review).
 
 **Still not tested in round 2:** camera scanning on a real device (no emulator here); the scan screen's logic is unit-tested and the APK builds with the ZXing camera view. Not yet run either: printing labels on real label stock, and the dashboard against RJWL's server, certificate and data.
+
+## 7. Round 3 evidence (commit `d4acbe0`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `d4acbe0c328b250e7e77d65cb06f76146537bd71`, 26 Nov 2026, same environment as above. The later commit `36a5f25` changes only two dashboard styling/tooltip lines, checked in the browser. Raw output: [`docs/evidence/round3/`](evidence/round3/).
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**, 135 warnings (all in the decompiled `Quality.Mobile.Core`; new code has none) |
+| Debug APK | SHA-256 `2ada84f2…0a7c` (`evidence/round3/apk.txt`) |
+| Unit tests | **84 passed** |
+| Integration, SQL Server, RCSI ON / OFF | **54 passed** each (was 49 in round 2) |
+| `sqlcmd` fresh install incl. 13 + idempotent re-run | OK (`fresh_install_sqlcmd.txt`) |
+| Upgrade path | OK (`upgrade_path.txt`) |
+| Seed check | OK |
+
+**New integration tests:**
+* comparison with the previous period, and drill-down by machine and phenomenon, with exact numbers and scope;
+* production-count upload: all-or-nothing validation listed by row, dry run, upsert, audit, and exact rate and coverage (including the shift filter and partial coverage);
+* a shop readable in only one period is left out of both. This test fails without the fix;
+* limits: report dates before 2000, more than 5,000 rows, dates more than 400 days ago, and 403 for another shop's entries.
+
+**Browser checks (Playwright, demo database, `visual_checks.txt`):**
+* clicking a bar filters to that day, and removing the chip restores the earlier range;
+* keyboard drill-down with Enter, with focus moving to the chips and the result announced;
+* a pasted link with a wrong label is corrected from the report;
+* CSV errors are reported by file line, with a blank line skipped;
+* no page errors. Screenshots are in the same folder.
+
+**Independent review:** Claude Fable reviewed round 3 without seeing my conclusions; findings and fixes are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#round-3-independent-review-claude-fable).
+
+**Not tested in round 3:**
+* automated JavaScript unit tests;
+* concurrent uploads, or an upload racing a feed (the lock design is described in the code);
+* a real production-count feed (db/14 is a template);
+* the dashboard on RJWL's server and browsers.

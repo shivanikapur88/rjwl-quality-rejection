@@ -41,4 +41,14 @@ Status at commit `3313612` (verified 2026-11-26). Key: ✅ done · ◐ partly ·
 | Machine QR (#8) | ✅ | ✅ | ✅ labels decoded independently | ✅ lookup | ✗ **camera on device** | ✗ | label stock and printer |
 | Independent review | ✅ 11 findings fixed or documented | | | | | | |
 
+### Round 3 additions (commit `d4acbe0`)
+
+| Area | Implemented | Built | Tested with substitutes | Tested against SQL Server | Tested on Android | Business accepted | Blocked / unverified |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| Dashboard drill-down, comparison, Pareto | ✅ | ✅ | ✅ browser checks | ✅ exact totals, scope | — | ✗ | RJWL browsers |
+| Production counts upload | ✅ | ✅ | ✅ browser checks | ✅ validation, upsert, audit | — | ✗ | who uploads, and how often |
+| Rejection rate with coverage | ✅ | ✅ | — | ✅ exact rate/coverage | — | ✗ | **counting rules and source (decision #13)** |
+| Automatic production feed (db/14) | ◐ template | — | — | ✗ | — | ✗ | source tables and owners' approval |
+| Independent review (Fable) | ✅ 13 findings fixed or documented | | | | | | |
+
 **Release-candidate verdict:** the server, database and app logic are complete and tested against SQL Server. The build is **not** ready for production use until the ✗ items in the "Tested on Android" and "Blocked" columns are done: the device acceptance run, the machine list, the package id, keystore and certificate, and business acceptance. See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) and the checklist in [TEST_EVIDENCE.md §3](TEST_EVIDENCE.md).

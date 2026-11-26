@@ -1,0 +1,8 @@
+bar click -> day 2026-11-22, chips: Day: Nov 22 ×, focus: chip
+announce: Showing 155 rejected parts, filtered by Day: Nov 22.
+day chip removed -> from restored to 2026-11-20
+keyboard machine drill -> hash #from=2026-11-20&to=2026-11-26&m=5&ml=DEV-PRE-01
+pasted link label corrected -> chips: Machine: DEV-PRE-01 ×
+bad csv -> Nothing was sent: 2 line(s) need fixing.Line 2: date must be a real day as YYYY-MM-DD (got "2026-02-31").Line 4: produced must be a whole number from 0 to 1,000,000 (got "99999999999").
+server problems -> Nothing was saved: 2 row(s) need fixing.Line 2: Machine 'NOPE' is not a machine of GDC.Line 4: Machine 'NOPE2' is not a machine of GDC.
+page errors: []
