@@ -1,39 +1,45 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- App design round: the filters are the list's header and scroll away (A4); Delete is a text button on its own line (A5). -->
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.AdminMachinesPage" x:DataType="vm:AdminMachinesViewModel" Title="Machines">
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="12" RowSpacing="8">
-        <Border Grid.Row="0" Style="{StaticResource Card}" Padding="12">
-            <VerticalStackLayout Spacing="6">
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <VerticalStackLayout><Label Text="Shop" Style="{StaticResource Muted}" /><Picker ItemsSource="{Binding Shops}" SelectedItem="{Binding SelectedShop, Mode=TwoWay}" /></VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1"><Label Text="Status" Style="{StaticResource Muted}" /><Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}" /></VerticalStackLayout>
-                </Grid>
-                <Button Text="+ Add machine" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" />
-                <SearchBar Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by code or name" FontSize="17" />
-            </VerticalStackLayout>
-        </Border>
-        <ctl:StatusBar Grid.Row="1" />
-        <Label Grid.Row="2" Text="{Binding CountText}" Style="{StaticResource Muted}" />
-        <CollectionView Grid.Row="3" ItemsSource="{Binding Items}" SelectionMode="None">
+    <Grid RowDefinitions="Auto,*" Padding="12,8,12,0" RowSpacing="8">
+        <ctl:StatusBar />
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" SelectionMode="None">
             <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
+            <CollectionView.Header>
+                <VerticalStackLayout Spacing="8" Padding="0,0,0,8">
+                    <Border Style="{StaticResource CardCompact}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout><Label Text="Shop" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding Shops}" SelectedItem="{Binding SelectedShop, Mode=TwoWay}" Title="Shop" /></VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1"><Label Text="Status" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}" Title="Status" /></VerticalStackLayout>
+                            </Grid>
+                            <SearchBar Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by code or name" />
+                            <Button Text="+ Add machine" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Label Text="{Binding CountText}" Style="{StaticResource Secondary}" Margin="4,0" />
+                </VerticalStackLayout>
+            </CollectionView.Header>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:MachineItem">
-                    <Border Style="{StaticResource Card}" Padding="12">
+                    <Border Style="{StaticResource CardCompact}">
                         <VerticalStackLayout Spacing="4">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <Label Text="{Binding Code}" Style="{StaticResource H2}" />
-                                <Label Grid.Column="1" Text="{Binding StatusText}" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Label Text="{Binding Code}" Style="{StaticResource Subheading}" VerticalOptions="Center" />
+                                <ctl:StatusChip Grid.Column="1" Text="{Binding StatusText}" VerticalOptions="Start" />
                             </Grid>
-                            <Label Text="{Binding Name}" Style="{StaticResource Body}" FontSize="16" />
-                            <Label Text="{Binding ShopName}" Style="{StaticResource Muted}" />
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" Margin="0,6,0,0">
-                                <Button Text="Edit" Style="{StaticResource SmallButton}" Clicked="OnEdit" />
-                                <Button Grid.Column="1" Text="{Binding ToggleText}" Style="{StaticResource SmallButton}" Clicked="OnToggle" />
-                                <Button Grid.Column="2" Text="Delete" Style="{StaticResource DangerButton}" HeightRequest="48" FontSize="15" Clicked="OnDelete" />
+                            <Label Text="{Binding Name}" Style="{StaticResource Body}" />
+                            <Label Text="{Binding ShopName}" Style="{StaticResource Secondary}" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0">
+                                <Button Text="Edit" Style="{StaticResource SecondaryButton}" Clicked="OnEdit" />
+                                <Button Grid.Column="1" Text="{Binding ToggleText}" Style="{StaticResource SecondaryButton}" Clicked="OnToggle" />
                             </Grid>
+                            <Button Text="Delete" Style="{StaticResource DangerTextButton}" HorizontalOptions="Start" Clicked="OnDelete" />
                         </VerticalStackLayout>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
+            <CollectionView.Footer><BoxView HeightRequest="16" Color="Transparent" /></CollectionView.Footer>
         </CollectionView>
     </Grid>
 </pages:AppPage>

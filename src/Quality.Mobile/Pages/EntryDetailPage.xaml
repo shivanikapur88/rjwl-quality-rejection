@@ -1,44 +1,45 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!-- Round 2 (#1): entry detail; the inspector who recorded the entry can ask for a correction. -->
+<!-- Round 2 (#1): entry detail; the inspector who recorded the entry can ask for a correction.
+     App design round: status chip, shared type scale, tappable "Change the remarks" label. -->
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.EntryDetailPage" x:DataType="vm:EntryDetailViewModel" Title="Entry">
     <ScrollView>
-        <VerticalStackLayout Padding="16" Spacing="12">
+        <VerticalStackLayout Padding="{StaticResource PagePadding}" Spacing="12">
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="4">
-                    <Label Text="{Binding EntryNumber}" Style="{StaticResource Muted}" />
-                    <Label Text="{Binding Headline}" Style="{StaticResource H2}" />
-                    <Label Text="{Binding ShopLine}" Style="{StaticResource Body}" FontSize="16" />
-                    <Label Text="{Binding WhenLine}" Style="{StaticResource Muted}" />
-                    <Label Text="{Binding RemarksLine}" Style="{StaticResource Body}" FontSize="16" />
-                    <Border Style="{StaticResource Card}" Padding="8" BackgroundColor="{StaticResource AccentSoft}" Stroke="{StaticResource Accent}" IsVisible="{Binding HasBadge}" Margin="0,6,0,0">
-                        <Label Text="{Binding Badge}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" />
-                    </Border>
+                    <Label Text="{Binding EntryNumber}" Style="{StaticResource Secondary}" />
+                    <Label Text="{Binding Headline}" Style="{StaticResource Heading}" />
+                    <ctl:StatusChip Text="{Binding Badge}" Margin="0,2,0,4" />
+                    <Label Text="{Binding ShopLine}" Style="{StaticResource Body}" />
+                    <Label Text="{Binding WhenLine}" Style="{StaticResource Secondary}" />
+                    <Label Text="{Binding RemarksLine}" Style="{StaticResource Body}" Margin="0,4,0,0" />
                 </VerticalStackLayout>
             </Border>
             <ctl:StatusBar />
             <Button Text="Request correction" Command="{Binding OpenFormCommand}" Style="{StaticResource SecondaryButton}" IsVisible="{Binding CanRequest}" />
             <Border Style="{StaticResource Card}" IsVisible="{Binding FormOpen}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Request a correction" Style="{StaticResource H2}" />
-                    <Label Text="Your supervisor approves or rejects it. Nothing changes until then." Style="{StaticResource Muted}" />
-                    <Label Text="Reason (required)" Style="{StaticResource Muted}" />
-                    <Editor Text="{Binding Reason}" Placeholder="What is wrong with this entry?" MaxLength="500" HeightRequest="80" AutoSize="Disabled" />
-                    <RadioButton Content="Remove this entry (it should not count)" IsChecked="{Binding RemoveEntry}" GroupName="kind" FontSize="16" />
-                    <RadioButton Content="Correct the details" IsChecked="{Binding CorrectValues}" GroupName="kind" FontSize="16" />
-                    <VerticalStackLayout Spacing="6" IsVisible="{Binding CorrectValues}">
-                        <Label Text="Phenomenon" Style="{StaticResource Muted}" />
-                        <Picker ItemsSource="{Binding Phenomena}" ItemDisplayBinding="{Binding PhenomenonName, x:DataType=dto:PhenomenonDto}" SelectedItem="{Binding SelectedPhenomenon, Mode=TwoWay}" />
-                        <Label Text="Machine" Style="{StaticResource Muted}" />
-                        <Picker ItemsSource="{Binding Machines}" ItemDisplayBinding="{Binding MachineCode, x:DataType=dto:MachineDto}" SelectedItem="{Binding SelectedMachine, Mode=TwoWay}" />
-                        <Label Text="Quantity (parts)" Style="{StaticResource Muted}" />
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Request a correction" Style="{StaticResource Heading}" />
+                    <Label Text="Your supervisor approves or rejects it. Nothing changes until then." Style="{StaticResource Secondary}" />
+                    <Label Text="Reason (required)" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+                    <Editor Text="{Binding Reason}" Placeholder="What is wrong with this entry?" MaxLength="500" HeightRequest="88" AutoSize="Disabled" />
+                    <RadioButton Content="Remove this entry (it should not count)" IsChecked="{Binding RemoveEntry}" GroupName="kind" />
+                    <RadioButton Content="Correct the details" IsChecked="{Binding CorrectValues}" GroupName="kind" />
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding CorrectValues}">
+                        <Label Text="Phenomenon" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding Phenomena}" ItemDisplayBinding="{Binding PhenomenonName, x:DataType=dto:PhenomenonDto}" SelectedItem="{Binding SelectedPhenomenon, Mode=TwoWay}" Title="Phenomenon" />
+                        <Label Text="Machine" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding Machines}" ItemDisplayBinding="{Binding MachineCode, x:DataType=dto:MachineDto}" SelectedItem="{Binding SelectedMachine, Mode=TwoWay}" Title="Machine" />
+                        <Label Text="Quantity (parts)" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding QuantityText}" Keyboard="Numeric" MaxLength="4" />
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
                             <CheckBox IsChecked="{Binding ChangeRemarks}" VerticalOptions="Center" />
-                            <Label Grid.Column="1" Text="Change the remarks" Style="{StaticResource Body}" FontSize="16" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="Change the remarks" Style="{StaticResource CheckLabel}">
+                                <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnChangeRemarksTapped" /></Label.GestureRecognizers>
+                            </Label>
                         </Grid>
-                        <Editor Text="{Binding NewRemarks}" Placeholder="New remarks (empty = none)" MaxLength="500" HeightRequest="60" AutoSize="Disabled" IsVisible="{Binding ChangeRemarks}" />
+                        <Editor Text="{Binding NewRemarks}" Placeholder="New remarks (empty = none)" MaxLength="500" HeightRequest="72" AutoSize="Disabled" IsVisible="{Binding ChangeRemarks}" />
                     </VerticalStackLayout>
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
                         <Button Text="Cancel" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" />
                         <Button Grid.Column="1" Text="Send request" Command="{Binding SubmitCommand}" Style="{StaticResource PrimaryButton}" />
                     </Grid>

@@ -1,43 +1,50 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- App design round: the filters are the list's header and scroll away (A4); Edit and Activate/Deactivate share a row,
+     Delete is a text button on its own line, so nothing wraps or clips at 360 dp (A5). -->
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.AdminPhenomenaPage" x:DataType="vm:AdminPhenomenaViewModel" Title="Rejection phenomena">
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="12" RowSpacing="8">
-        <Border Grid.Row="0" Style="{StaticResource Card}" Padding="12">
-            <VerticalStackLayout Spacing="6">
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <VerticalStackLayout><Label Text="Shop" Style="{StaticResource Muted}" /><Picker ItemsSource="{Binding Shops}" SelectedItem="{Binding SelectedShop, Mode=TwoWay}" /></VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1"><Label Text="Inspection stage" Style="{StaticResource Muted}" /><Picker ItemsSource="{Binding Stages}" SelectedItem="{Binding SelectedStage, Mode=TwoWay}" /></VerticalStackLayout>
-                </Grid>
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <VerticalStackLayout><Label Text="Status" Style="{StaticResource Muted}" /><Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}" /></VerticalStackLayout>
-                    <Button Grid.Column="1" Text="+ Add" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" VerticalOptions="End" />
-                </Grid>
-                <SearchBar Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by name" FontSize="17" />
-            </VerticalStackLayout>
-        </Border>
-        <ctl:StatusBar Grid.Row="1" />
-        <Label Grid.Row="2" Text="{Binding CountText}" Style="{StaticResource Muted}" />
-        <CollectionView Grid.Row="3" ItemsSource="{Binding Items}" SelectionMode="None">
+    <Grid RowDefinitions="Auto,*" Padding="12,8,12,0" RowSpacing="8">
+        <ctl:StatusBar />
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" SelectionMode="None">
             <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
+            <CollectionView.Header>
+                <VerticalStackLayout Spacing="8" Padding="0,0,0,8">
+                    <Border Style="{StaticResource CardCompact}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout><Label Text="Shop" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding Shops}" SelectedItem="{Binding SelectedShop, Mode=TwoWay}" Title="Shop" /></VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1"><Label Text="Inspection stage" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding Stages}" SelectedItem="{Binding SelectedStage, Mode=TwoWay}" Title="Inspection stage" /></VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout><Label Text="Status" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}" Title="Status" /></VerticalStackLayout>
+                                <Button Grid.Column="1" Text="+ Add" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" VerticalOptions="End" />
+                            </Grid>
+                            <SearchBar Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by name" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Label Text="{Binding CountText}" Style="{StaticResource Secondary}" Margin="4,0" />
+                </VerticalStackLayout>
+            </CollectionView.Header>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:AdminItem">
-                    <Border Style="{StaticResource Card}" Padding="12">
+                    <Border Style="{StaticResource CardCompact}">
                         <VerticalStackLayout Spacing="4">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <Label Text="{Binding Name}" Style="{StaticResource H2}" />
-                                <Label Grid.Column="1" Text="{Binding StatusText}" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Label Text="{Binding Name}" Style="{StaticResource Subheading}" VerticalOptions="Center" />
+                                <ctl:StatusChip Grid.Column="1" Text="{Binding StatusText}" VerticalOptions="Start" />
                             </Grid>
-                            <Label Text="{Binding Code}" Style="{StaticResource Muted}" />
-                            <Label Text="{Binding StageLine}" Style="{StaticResource Body}" FontSize="15" />
-                            <Label Text="{Binding AuditText}" Style="{StaticResource Muted}" FontSize="12" />
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" Margin="0,6,0,0">
-                                <Button Text="Edit" Style="{StaticResource SmallButton}" Clicked="OnEdit" />
-                                <Button Grid.Column="1" Text="{Binding ToggleText}" Style="{StaticResource SmallButton}" Clicked="OnToggle" />
-                                <Button Grid.Column="2" Text="Delete" Style="{StaticResource DangerButton}" HeightRequest="48" FontSize="15" Clicked="OnDelete" />
+                            <Label Text="{Binding Code}" Style="{StaticResource Secondary}" />
+                            <Label Text="{Binding StageLine}" Style="{StaticResource Body}" />
+                            <Label Text="{Binding AuditText}" Style="{StaticResource Caption}" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0">
+                                <Button Text="Edit" Style="{StaticResource SecondaryButton}" Clicked="OnEdit" />
+                                <Button Grid.Column="1" Text="{Binding ToggleText}" Style="{StaticResource SecondaryButton}" Clicked="OnToggle" />
                             </Grid>
+                            <Button Text="Delete" Style="{StaticResource DangerTextButton}" HorizontalOptions="Start" Clicked="OnDelete" />
                         </VerticalStackLayout>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
+            <CollectionView.Footer><BoxView HeightRequest="16" Color="Transparent" /></CollectionView.Footer>
         </CollectionView>
     </Grid>
 </pages:AppPage>

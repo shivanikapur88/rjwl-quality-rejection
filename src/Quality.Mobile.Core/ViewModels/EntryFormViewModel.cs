@@ -56,6 +56,9 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	private bool _loadFailed;
 
+	/// <summary>App design round: the remarks box is shown (tapped "Add remarks", or remarks were already entered).</summary>
+	private bool _remarksOpen;
+
 	public static int MaxQuantity => 9999;
 
 	public Guid SubmissionId { get; private set; } = Guid.NewGuid();
@@ -123,6 +126,34 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	public string MachineText => ((object)_machine == null) ? "" : (_machine.MachineCode + " – " + _machine.MachineName);
 
+	/// <summary>App design round (A1): the one-line context header, e.g. "GDC Shop › GDC-02 – Die casting press 2".
+	/// The stage is left out when it is named like the shop (every shop has one stage today).</summary>
+	public string ContextText
+	{
+		get
+		{
+			var parts = new List<string>();
+			if (_shop is not null) parts.Add(_shop.ShopName);
+			if (_stage is not null && !string.Equals(_stage.StageName, _shop?.ShopName, StringComparison.OrdinalIgnoreCase)) parts.Add(_stage.StageName);
+			if (_machine is not null) parts.Add(MachineText);
+			return string.Join(" › ", parts);
+		}
+	}
+
+	/// <summary>App design round (A1): goes back to the phenomenon list (quantity and remarks are kept).</summary>
+	public AsyncCommand ChangePhenomenonCommand { get; }
+
+	/// <summary>App design round (A1): opens the remarks box.</summary>
+	public AsyncCommand AddRemarksCommand { get; }
+
+	/// <summary>The remarks box is visible: opened with "Add remarks", or there are remarks (e.g. a restored entry).</summary>
+	public bool IsRemarksOpen => _remarksOpen || Remarks.Length > 0;
+
+	public bool CanAddRemarks => !IsRemarksOpen;
+
+	/// <summary>Something was entered that "Clear" would throw away (it asks first).</summary>
+	public bool HasFormData => _selected is not null || Remarks.Length > 0 || _qty.Trim() != "1";
+
 	public string SearchText
 	{
 		get
@@ -149,6 +180,8 @@ public sealed class EntryFormViewModel : BaseViewModel
 			if (Set(ref _remarks, value ?? "", "Remarks"))
 			{
 				OnPropertyChanged("RemarksCounter");
+				OnPropertyChanged(nameof(IsRemarksOpen));
+				OnPropertyChanged(nameof(CanAddRemarks));
 				OnPropertyChanged("CanSubmit");
 				SubmitCommand.RaiseCanExecuteChanged();
 			}
@@ -169,6 +202,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 			{
 				OnPropertyChanged("SummaryText");
 				OnPropertyChanged("HasSelection");
+				OnPropertyChanged(nameof(IsChoosingPhenomenon));
 				OnPropertyChanged("CanSubmit");
 				SubmitCommand.RaiseCanExecuteChanged();
 			}
@@ -176,6 +210,9 @@ public sealed class EntryFormViewModel : BaseViewModel
 	}
 
 	public bool HasSelection => (object)_selected != null;
+
+	/// <summary>App design round (A1): no phenomenon chosen yet, so the search and the list fill the screen.</summary>
+	public bool IsChoosingPhenomenon => _selected is null;
 
 	public string SummaryText => ((object)_selected == null) ? "Select a rejection phenomenon above" : (_selected.PhenomenonName + "  ×  " + (ParsedQuantity?.ToString() ?? "?"));
 
@@ -190,9 +227,15 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_drafts = drafts;
 		Title = "Rejection entry";
 		SubmitCommand = new AsyncCommand(SubmitAsync, () => CanSubmit);
-		ResetCommand = new AsyncCommand(() =>
+		ResetCommand = new AsyncCommand(ClearAsync);   // app design round: asks first when something was entered
+		ChangePhenomenonCommand = new AsyncCommand(() =>
 		{
-			Reset();
+			SelectedPhenomenon = null;
+			return Task.CompletedTask;
+		});
+		AddRemarksCommand = new AsyncCommand(() =>
+		{
+			SetRemarksOpen(true);
 			return Task.CompletedTask;
 		});
 		IncreaseCommand = new AsyncCommand(() =>
@@ -206,6 +249,23 @@ public sealed class EntryFormViewModel : BaseViewModel
 			return Task.CompletedTask;
 		});
 		RetryCommand = new AsyncCommand(LoadPhenomenaAsync);
+	}
+
+	private void SetRemarksOpen(bool open)
+	{
+		_remarksOpen = open;
+		OnPropertyChanged(nameof(IsRemarksOpen));
+		OnPropertyChanged(nameof(CanAddRemarks));
+	}
+
+	/// <summary>"Clear": empties the form, after a confirmation when it holds anything worth keeping.</summary>
+	public async Task ClearAsync()
+	{
+		if (HasFormData && !await _dialogs.ConfirmAsync("Clear this entry?", "The selected phenomenon, quantity and remarks will be removed.", "Clear", "Keep"))
+		{
+			return;
+		}
+		Reset();
 	}
 
 	private void Adjust(int delta)
@@ -238,6 +298,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 		OnPropertyChanged("ShopText");
 		OnPropertyChanged("StageText");
 		OnPropertyChanged("MachineText");
+		OnPropertyChanged(nameof(ContextText));
 		if ((object)_shop == null || (object)_stage == null || (object)_machine == null)
 		{
 			ErrorMessage = "Selection incomplete. Go back and choose shop, stage and machine.";
@@ -321,6 +382,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 		Remarks = "";
 		SearchText = "";
 		QuantityText = "1";
+		SetRemarksOpen(false);
 		ErrorMessage = null;
 		if (_outcomeUnknown)
 		{
@@ -392,7 +454,8 @@ public sealed class EntryFormViewModel : BaseViewModel
 				await _nav.GoToAsync("confirmation", new Dictionary<string, object>
 				{
 					["entry"] = r.Value.Entry,
-					["already"] = r.Value.AlreadySubmitted
+					["already"] = r.Value.AlreadySubmitted,
+					["shopName"] = ShopText   // app design round: the confirmation shows the shop name, not its code
 				});
 				return;
 			}

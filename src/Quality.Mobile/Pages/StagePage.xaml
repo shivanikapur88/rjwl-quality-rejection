@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.StagePage" x:DataType="vm:StageViewModel" Title="Inspection stage">
-    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="12">
-        <Label Text="{Binding ShopName}" Style="{StaticResource H1}" />
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16,12,16,0" RowSpacing="12">
+        <Label Text="{Binding ShopName}" Style="{StaticResource ContextLine}" LineBreakMode="TailTruncation" MaxLines="1" />
         <ctl:StatusBar Grid.Row="1" />
         <CollectionView Grid.Row="2" ItemsSource="{Binding Stages}" SelectionMode="Single" SelectionChanged="OnSelected">
-            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="10" /></CollectionView.ItemsLayout>
+            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
+            <CollectionView.Header><Label Text="Choose the inspection stage" Style="{StaticResource Heading}" Margin="0,0,0,8" /></CollectionView.Header>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="dto:StageDto">
-                    <Border Style="{StaticResource Card}" Padding="0">
-                        <Grid Style="{StaticResource ListItem}" ColumnDefinitions="*,Auto" MinimumHeightRequest="72">
-                            <Label Text="{Binding StageName}" Style="{StaticResource H2}" VerticalOptions="Center" />
-                            <Label Grid.Column="1" Text="›" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center" />
+                    <Border Style="{StaticResource CardList}">
+                        <Grid Style="{StaticResource ListItem}" ColumnDefinitions="*,Auto" MinimumHeightRequest="64">
+                            <Label Text="{Binding StageName}" Style="{StaticResource Subheading}" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
                         </Grid>
                     </Border>
                 </DataTemplate>

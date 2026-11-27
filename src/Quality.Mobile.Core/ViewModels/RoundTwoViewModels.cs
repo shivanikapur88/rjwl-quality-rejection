@@ -166,6 +166,8 @@ public sealed record CorrectionItem(CorrectionDto Dto, bool CanDecide, bool CanW
 /// <summary>Supervisors/administrators: requests to decide. Inspectors: their own requests (withdraw while pending).</summary>
 public sealed class CorrectionsViewModel : BaseViewModel
 {
+    /// <summary>How often Reject asks for a reason before it gives up and shows the error on the page.</summary>
+    public const int MaxRejectPrompts = 3;
     private readonly IApiClient _api; private readonly ISession _session; private readonly IDialogs _dialogs;
     private bool _empty; private bool _showDecided;
     public CorrectionsViewModel(IApiClient api, ISession session, IDialogs dialogs)
@@ -212,8 +214,16 @@ public sealed class CorrectionsViewModel : BaseViewModel
 
     private async Task RejectAsync(CorrectionItem item)
     {
-        var note = await _dialogs.PromptAsync("Reject correction", "Why is the request rejected? The inspector will see this.", "Reject", "Cancel", "Reason");
-        if (note is null) return;
+        // App design round: an empty reason asks again (with an explanation) instead of closing; Cancel stops.
+        string? note = null;
+        for (var attempt = 0; attempt < MaxRejectPrompts; attempt++)
+        {
+            note = await _dialogs.PromptAsync("Reject correction",
+                attempt == 0 ? "Why is the request rejected? The inspector will see this." : "A reason is required. Why is the request rejected? The inspector will see this.",
+                "Reject", "Cancel", "Reason");
+            if (note is null) return;
+            if (!string.IsNullOrWhiteSpace(note)) break;
+        }
         if (string.IsNullOrWhiteSpace(note)) { ErrorMessage = "Give a reason for rejecting the request."; return; }
         await Decide(() => _api.RejectCorrectionAsync(item.Dto.Id, note.Trim()));
     }
@@ -243,8 +253,9 @@ public sealed class SummaryViewModel : BaseViewModel
     public SummaryViewModel(IApiClient api)
     {
         _api = api; Title = "Shift summary";
-        PreviousDayCommand = new AsyncCommand(() => { _day = _day.AddDays(-1); return LoadAsync(); });
-        NextDayCommand = new AsyncCommand(() => { if (_day < _today) _day = _day.AddDays(1); return LoadAsync(); });
+        PreviousDayCommand = new AsyncCommand(() => { SetDay(_day.AddDays(-1)); return LoadAsync(); });
+        // App design round (A7): "›" is disabled on today (it used to reload today).
+        NextDayCommand = new AsyncCommand(() => { if (_day < _today) SetDay(_day.AddDays(1)); return LoadAsync(); }, () => CanGoNext);
         RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(LoadAsync));   // review fix: only a pull sets IsRefreshing
     }
     public ObservableCollection<Option> ShiftOptions { get; } = new();
@@ -254,6 +265,30 @@ public sealed class SummaryViewModel : BaseViewModel
     public AsyncCommand PreviousDayCommand { get; }
     public AsyncCommand NextDayCommand { get; }
     public AsyncCommand RefreshCommand { get; }
+    /// <summary>The day shown is before today: "›" can move on.</summary>
+    public bool CanGoNext => _day != default && _day < _today;
+
+    private void SetDay(DateOnly day)
+    {
+        _day = day;
+        OnPropertyChanged(nameof(DayText));
+        OnPropertyChanged(nameof(CanGoNext));
+        NextDayCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Size of the top lists asked for; a list this long may be cut (its heading then says "Top 5").</summary>
+    public const int TopCount = 5;
+    public string TopPhenomenaHeading => TopPhenomena.Count >= TopCount ? $"Top {TopCount} phenomena" : "Phenomena";
+    public string TopMachinesHeading => TopMachines.Count >= TopCount ? $"Top {TopCount} machines" : "Machines";
+    public bool HasTopNote => TopPhenomena.Count >= TopCount || TopMachines.Count >= TopCount;
+    public string TopNote => $"Top {TopCount} lists show only the {TopCount} largest; others are not listed.";
+    public bool HasShops => Shops.Count > 0;
+    public bool HasTopPhenomena => TopPhenomena.Count > 0;
+    public bool HasTopMachines => TopMachines.Count > 0;
+
+    /// <summary>"1 entry", "12 entries".</summary>
+    public static string Entries(int n) => n == 1 ? "1 entry" : $"{n.ToString("N0", CultureInfo.CurrentCulture)} entries";
+
     public string DayText => _day == default ? "" : _day.ToString("ddd dd MMM yyyy", CultureInfo.CurrentCulture) + (_day == _today ? " (today)" : "");
     public string TotalText { get => _total; private set => Set(ref _total, value, nameof(TotalText)); }
     public string EntriesText { get => _entries; private set => Set(ref _entries, value, nameof(EntriesText)); }
@@ -271,6 +306,7 @@ public sealed class SummaryViewModel : BaseViewModel
             var firstTime = _day == default;
             _today = c.Value!.ProductionDate;
             if (firstTime || _day > _today) _day = _today;
+            SetDay(_day);   // "today" may have moved on: "›" may be enabled again
             _shiftCodes = c.Value.Shifts.Select(s => s.ShiftCode).ToList();
             var labels = c.Value.Shifts.Select((s, i) => $"{s.ShiftName} (from {s.StartTime})").ToList();
             if (firstTime || !ShiftOptions.Skip(1).Select(o => o.Name).SequenceEqual(labels))   // full review #12: shifts were edited
@@ -306,18 +342,26 @@ public sealed class SummaryViewModel : BaseViewModel
         var d = r.Value!;
         _shown = (day, code);
         TotalText = d.Total.Quantity.ToString("N0", CultureInfo.CurrentCulture);
-        EntriesText = $"rejected parts in {d.Total.Entries} entries";
+        EntriesText = $"{(d.Total.Quantity == 1 ? "rejected part" : "rejected parts")} in {Entries(d.Total.Entries)}";
         IncompleteNotice = d.UnavailableShops.Count == 0 ? "" : $"Incomplete: {string.Join(", ", d.UnavailableShops)} could not be read right now.";
-        Fill(Shops, d.Shops.Select(s => new SummaryLine(s.ShopName, $"{s.Entries} entries", s.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
+        Fill(Shops, d.Shops.Select(s => new SummaryLine(s.ShopName, Entries(s.Entries), s.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
         Fill(TopPhenomena, d.TopPhenomena.Select(p => new SummaryLine(p.PhenomenonName, p.ShopCode, p.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
         Fill(TopMachines, d.TopMachines.Select(m => new SummaryLine(m.MachineCode, $"{m.MachineName} · {m.ShopCode}", m.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
+        ListsChanged();
     });
+
+    private void ListsChanged()
+    {
+        foreach (var p in new[] { nameof(TopPhenomenaHeading), nameof(TopMachinesHeading), nameof(HasTopNote), nameof(HasShops), nameof(HasTopPhenomena), nameof(HasTopMachines) })
+            OnPropertyChanged(p);
+    }
 
     private void ClearResults()
     {
         _shown = null;
         TotalText = "–"; EntriesText = ""; IncompleteNotice = "";
         Shops.Clear(); TopPhenomena.Clear(); TopMachines.Clear();
+        ListsChanged();
     }
 
     private static void Fill(ObservableCollection<SummaryLine> target, IEnumerable<SummaryLine> items) { target.Clear(); foreach (var x in items) target.Add(x); }

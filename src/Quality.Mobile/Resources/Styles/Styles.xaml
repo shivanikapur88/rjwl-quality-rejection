@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- One shared style system for every page.
+     Type scale: Title 24 · Heading 20 · Subheading 17 bold · Body 17 · Secondary 15 · Caption 13 (body text never below 15).
+     Spacing scale: 4 / 8 / 12 / 16 / 24 (Space* below). Page padding 16 (PagePadding).
+     Buttons: Primary (filled, one per screen) · Secondary (outlined) · Tertiary (text) · Danger (outlined) · DangerText.
+     All buttons: sentence-case text, at least 48 dp high, corner radius 10, visible disabled state.
+     Status chips: Info · Warning · Danger · Muted · Success (applied by Controls/StatusChip). -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- ===== Spacing and page padding ===== -->
+    <x:Double x:Key="Space4">4</x:Double>
+    <x:Double x:Key="Space8">8</x:Double>
+    <x:Double x:Key="Space12">12</x:Double>
+    <x:Double x:Key="Space16">16</x:Double>
+    <x:Double x:Key="Space24">24</x:Double>
+    <Thickness x:Key="PagePadding">16</Thickness>
+
+    <!-- ===== Pages and shell ===== -->
     <Style TargetType="Page" ApplyToDerivedTypes="True">
         <Setter Property="BackgroundColor" Value="{StaticResource PageBackground}" />
     </Style>
@@ -8,54 +24,226 @@
         <Setter Property="Shell.ForegroundColor" Value="White" />
         <Setter Property="Shell.TitleColor" Value="White" />
     </Style>
-    <Style x:Key="H1" TargetType="Label">
-        <Setter Property="FontSize" Value="26" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource Primary}" />
+
+    <!-- ===== Type scale ===== -->
+    <!-- Implicit: any Label without a named style is Body (17, dark text) - never white on a light surface (A2). -->
+    <Style TargetType="Label">
+        <Setter Property="FontSize" Value="17" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
     </Style>
-    <Style x:Key="H2" TargetType="Label">
+    <Style x:Key="Title" TargetType="Label">
+        <Setter Property="FontSize" Value="24" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource Primary}" />
+    </Style>
+    <Style x:Key="Heading" TargetType="Label">
         <Setter Property="FontSize" Value="20" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
     </Style>
+    <Style x:Key="Subheading" TargetType="Label">
+        <Setter Property="FontSize" Value="17" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+    </Style>
     <Style x:Key="Body" TargetType="Label">
-        <Setter Property="FontSize" Value="18" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
     </Style>
-    <Style x:Key="Muted" TargetType="Label">
-        <Setter Property="FontSize" Value="14" /><Setter Property="TextColor" Value="{StaticResource TextMuted}" />
+    <Style x:Key="BodyStrong" TargetType="Label" BasedOn="{StaticResource Body}">
+        <Setter Property="FontAttributes" Value="Bold" />
     </Style>
+    <Style x:Key="Secondary" TargetType="Label">
+        <Setter Property="FontSize" Value="15" /><Setter Property="TextColor" Value="{StaticResource TextMuted}" />
+    </Style>
+    <!-- Label above a form field -->
+    <Style x:Key="FieldLabel" TargetType="Label">
+        <Setter Property="FontSize" Value="15" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource TextMuted}" />
+    </Style>
+    <Style x:Key="Caption" TargetType="Label">
+        <Setter Property="FontSize" Value="13" /><Setter Property="TextColor" Value="{StaticResource TextMuted}" />
+    </Style>
+    <Style x:Key="ErrorText" TargetType="Label">
+        <Setter Property="FontSize" Value="15" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource Danger}" />
+    </Style>
+    <!-- Big number (summary total, quantity on the confirmation) -->
+    <Style x:Key="Figure" TargetType="Label">
+        <Setter Property="FontSize" Value="40" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource Primary}" />
+    </Style>
+    <!-- Context line at the top of a step (shop › machine) -->
+    <Style x:Key="ContextLine" TargetType="Label" BasedOn="{StaticResource Subheading}">
+        <Setter Property="TextColor" Value="{StaticResource Primary}" />
+    </Style>
+    <!-- A count next to a row (summary lines) -->
+    <Style x:Key="MetricValue" TargetType="Label" BasedOn="{StaticResource Heading}">
+        <Setter Property="TextColor" Value="{StaticResource Primary}" />
+    </Style>
+    <Style x:Key="SuccessMark" TargetType="Label">
+        <Setter Property="FontSize" Value="48" /><Setter Property="TextColor" Value="{StaticResource Success}" />
+    </Style>
+    <Style x:Key="SuccessHeading" TargetType="Label" BasedOn="{StaticResource Heading}">
+        <Setter Property="TextColor" Value="{StaticResource Success}" />
+    </Style>
+    <Style x:Key="SuccessText" TargetType="Label">
+        <Setter Property="FontSize" Value="15" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource Success}" />
+    </Style>
+    <Style x:Key="WarningText" TargetType="Label">
+        <Setter Property="FontSize" Value="15" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+    </Style>
+    <!-- "›" at the end of a tappable row -->
+    <Style x:Key="Chevron" TargetType="Label">
+        <Setter Property="FontSize" Value="28" /><Setter Property="TextColor" Value="{StaticResource Primary}" /><Setter Property="VerticalOptions" Value="Center" />
+    </Style>
+    <!-- Header card on a navy surface -->
+    <Style x:Key="OnPrimaryTitle" TargetType="Label">
+        <Setter Property="FontSize" Value="20" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="White" />
+    </Style>
+    <Style x:Key="OnPrimarySecondary" TargetType="Label">
+        <Setter Property="FontSize" Value="15" /><Setter Property="TextColor" Value="{StaticResource OnPrimaryMuted}" />
+    </Style>
+
+    <!-- ===== Buttons ===== -->
     <Style x:Key="PrimaryButton" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Primary}" /><Setter Property="TextColor" Value="White" />
-        <Setter Property="FontSize" Value="18" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="HeightRequest" Value="56" /><Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextTransform" Value="None" />
+        <Setter Property="HeightRequest" Value="52" /><Setter Property="MinimumHeightRequest" Value="48" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="16,0" />
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList><VisualStateGroup x:Name="CommonStates">
                 <VisualState x:Name="Normal" />
-                <VisualState x:Name="Disabled"><VisualState.Setters><Setter Property="BackgroundColor" Value="{StaticResource Disabled}" /></VisualState.Setters></VisualState>
+                <VisualState x:Name="Disabled"><VisualState.Setters>
+                    <Setter Property="BackgroundColor" Value="{StaticResource Disabled}" /><Setter Property="TextColor" Value="White" />
+                </VisualState.Setters></VisualState>
             </VisualStateGroup></VisualStateGroupList>
         </Setter>
     </Style>
+    <!-- The one big action of a screen (Home: "Scan machine QR") -->
+    <Style x:Key="HeroButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+        <Setter Property="HeightRequest" Value="60" /><Setter Property="FontSize" Value="19" />
+    </Style>
+    <!-- Implicit: a Button without a named style is a Primary button with the same size and text rules. -->
+    <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}" />
     <Style x:Key="SecondaryButton" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Surface}" /><Setter Property="TextColor" Value="{StaticResource Primary}" />
         <Setter Property="BorderColor" Value="{StaticResource Primary}" /><Setter Property="BorderWidth" Value="2" />
-        <Setter Property="FontSize" Value="18" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="HeightRequest" Value="56" /><Setter Property="CornerRadius" Value="8" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextTransform" Value="None" />
+        <Setter Property="HeightRequest" Value="52" /><Setter Property="MinimumHeightRequest" Value="48" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="16,0" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList><VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="Disabled"><VisualState.Setters>
+                    <Setter Property="BackgroundColor" Value="{StaticResource DisabledSoft}" /><Setter Property="TextColor" Value="{StaticResource Disabled}" /><Setter Property="BorderColor" Value="{StaticResource Disabled}" />
+                </VisualState.Setters></VisualState>
+            </VisualStateGroup></VisualStateGroupList>
+        </Setter>
     </Style>
-    <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-        <Setter Property="TextColor" Value="{StaticResource Danger}" /><Setter Property="BorderColor" Value="{StaticResource Danger}" />
+    <!-- Text-only action ("Change", "Add remarks", "Server settings") -->
+    <Style x:Key="TertiaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" /><Setter Property="TextColor" Value="{StaticResource Primary}" />
+        <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextTransform" Value="None" />
+        <Setter Property="HeightRequest" Value="48" /><Setter Property="MinimumHeightRequest" Value="48" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="12,0" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList><VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="Disabled"><VisualState.Setters><Setter Property="TextColor" Value="{StaticResource Disabled}" /></VisualState.Setters></VisualState>
+            </VisualStateGroup></VisualStateGroupList>
+        </Setter>
     </Style>
-    <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-        <Setter Property="FontSize" Value="15" /><Setter Property="HeightRequest" Value="48" />
+    <Style x:Key="DangerButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Surface}" /><Setter Property="TextColor" Value="{StaticResource Danger}" />
+        <Setter Property="BorderColor" Value="{StaticResource Danger}" /><Setter Property="BorderWidth" Value="2" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextTransform" Value="None" />
+        <Setter Property="HeightRequest" Value="52" /><Setter Property="MinimumHeightRequest" Value="48" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="16,0" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList><VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="Disabled"><VisualState.Setters>
+                    <Setter Property="BackgroundColor" Value="{StaticResource DisabledSoft}" /><Setter Property="TextColor" Value="{StaticResource Disabled}" /><Setter Property="BorderColor" Value="{StaticResource Disabled}" />
+                </VisualState.Setters></VisualState>
+            </VisualStateGroup></VisualStateGroupList>
+        </Setter>
     </Style>
+    <!-- Destructive text action on its own line (e.g. Delete on an admin card) -->
+    <Style x:Key="DangerTextButton" TargetType="Button" BasedOn="{StaticResource TertiaryButton}">
+        <Setter Property="TextColor" Value="{StaticResource Danger}" />
+    </Style>
+    <!-- − / + next to the quantity -->
+    <Style x:Key="StepperButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+        <Setter Property="FontSize" Value="26" /><Setter Property="HeightRequest" Value="56" /><Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- ===== Inputs: explicit text and placeholder colours from the palette (A2) ===== -->
     <Style TargetType="Entry">
-        <Setter Property="FontSize" Value="18" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="PlaceholderColor" Value="{StaticResource TextMuted}" /><Setter Property="MinimumHeightRequest" Value="52" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="PlaceholderColor" Value="{StaticResource TextMuted}" />
+        <Setter Property="BackgroundColor" Value="Transparent" /><Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
+    <Style x:Key="QuantityEntry" TargetType="Entry">
+        <Setter Property="FontSize" Value="26" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="HorizontalTextAlignment" Value="Center" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="PlaceholderColor" Value="{StaticResource TextMuted}" />
+        <Setter Property="BackgroundColor" Value="Transparent" /><Setter Property="MinimumHeightRequest" Value="56" />
     </Style>
     <Style TargetType="Editor">
         <Setter Property="FontSize" Value="17" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="PlaceholderColor" Value="{StaticResource TextMuted}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
     </Style>
     <Style TargetType="Picker">
-        <Setter Property="FontSize" Value="18" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="MinimumHeightRequest" Value="52" />
+        <Setter Property="FontSize" Value="17" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="TitleColor" Value="{StaticResource TextMuted}" />
+        <Setter Property="BackgroundColor" Value="Transparent" /><Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
+    <Style TargetType="SearchBar">
+        <Setter Property="FontSize" Value="17" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="PlaceholderColor" Value="{StaticResource TextMuted}" />
+        <Setter Property="CancelButtonColor" Value="{StaticResource TextMuted}" /><Setter Property="BackgroundColor" Value="{StaticResource Surface}" /><Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
+    <Style TargetType="RadioButton">
+        <Setter Property="FontSize" Value="17" /><Setter Property="TextColor" Value="{StaticResource TextPrimary}" /><Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
+    <Style TargetType="CheckBox">
+        <Setter Property="Color" Value="{StaticResource Primary}" /><Setter Property="MinimumHeightRequest" Value="48" />
+    </Style>
+    <Style TargetType="Switch">
+        <Setter Property="OnColor" Value="{StaticResource Primary}" />
+    </Style>
+    <Style TargetType="ActivityIndicator">
+        <Setter Property="Color" Value="{StaticResource Primary}" />
+    </Style>
+    <Style TargetType="RefreshView">
+        <Setter Property="RefreshColor" Value="{StaticResource Primary}" />
+    </Style>
+    <!-- Text next to a CheckBox: tapping it toggles the box (handlers in the pages) -->
+    <Style x:Key="CheckLabel" TargetType="Label" BasedOn="{StaticResource Body}">
+        <Setter Property="VerticalOptions" Value="Center" /><Setter Property="MinimumHeightRequest" Value="48" /><Setter Property="VerticalTextAlignment" Value="Center" />
+    </Style>
+
+    <!-- ===== Surfaces ===== -->
     <Style x:Key="Card" TargetType="Border">
-        <Setter Property="BackgroundColor" Value="{StaticResource Surface}" /><Setter Property="Stroke" Value="{StaticResource Border}" /><Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 10" /><Setter Property="Padding" Value="16" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Surface}" /><Setter Property="Stroke" Value="{StaticResource Divider}" /><Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" /><Setter Property="Padding" Value="16" />
     </Style>
+    <Style x:Key="CardCompact" TargetType="Border" BasedOn="{StaticResource Card}">
+        <Setter Property="Padding" Value="12" />
+    </Style>
+    <!-- Card holding a list of tappable rows: rows bring their own padding -->
+    <Style x:Key="CardList" TargetType="Border" BasedOn="{StaticResource Card}">
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <!-- Header card on navy (Home) -->
+    <Style x:Key="HeaderCard" TargetType="Border" BasedOn="{StaticResource Card}">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" /><Setter Property="Stroke" Value="{StaticResource Primary}" />
+    </Style>
+    <Style x:Key="ErrorBanner" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}" /><Setter Property="Stroke" Value="{StaticResource Danger}" /><Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" /><Setter Property="Padding" Value="12" />
+    </Style>
+    <Style x:Key="WarningBanner" TargetType="Border" BasedOn="{StaticResource ErrorBanner}">
+        <Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}" /><Setter Property="Stroke" Value="{StaticResource Accent}" />
+    </Style>
+    <Style x:Key="InfoBanner" TargetType="Border" BasedOn="{StaticResource ErrorBanner}">
+        <Setter Property="BackgroundColor" Value="{StaticResource InfoSoft}" /><Setter Property="Stroke" Value="{StaticResource InfoSoft}" />
+    </Style>
+    <Style x:Key="SuccessBanner" TargetType="Border" BasedOn="{StaticResource ErrorBanner}">
+        <Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}" /><Setter Property="Stroke" Value="{StaticResource Success}" />
+    </Style>
+    <Style x:Key="DividerLine" TargetType="BoxView">
+        <Setter Property="HeightRequest" Value="1" /><Setter Property="Color" Value="{StaticResource Divider}" />
+    </Style>
+
+    <!-- Tappable row in a list (selection highlight for CollectionView rows) -->
     <Style x:Key="ListItem" TargetType="Grid">
-        <Setter Property="Padding" Value="16,14" /><Setter Property="MinimumHeightRequest" Value="64" />
+        <Setter Property="Padding" Value="16,12" /><Setter Property="MinimumHeightRequest" Value="56" />
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList><VisualStateGroup x:Name="CommonStates">
                 <VisualState x:Name="Normal"><VisualState.Setters><Setter Property="BackgroundColor" Value="{StaticResource Surface}" /></VisualState.Setters></VisualState>
@@ -63,4 +251,26 @@
             </VisualStateGroup></VisualStateGroupList>
         </Setter>
     </Style>
+    <!-- Navigation row in a CardList (Home) -->
+    <Style x:Key="NavRow" TargetType="Grid">
+        <Setter Property="Padding" Value="16,0" /><Setter Property="MinimumHeightRequest" Value="56" /><Setter Property="BackgroundColor" Value="Transparent" />
+    </Style>
+
+    <!-- ===== Status chips (used through Controls/StatusChip) ===== -->
+    <Style x:Key="ChipInfo" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource InfoSoft}" /><Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" /><Setter Property="Padding" Value="10,4" />
+        <Setter Property="HorizontalOptions" Value="Start" /><Setter Property="VerticalOptions" Value="Center" />
+    </Style>
+    <Style x:Key="ChipWarning" TargetType="Border" BasedOn="{StaticResource ChipInfo}"><Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}" /></Style>
+    <Style x:Key="ChipDanger" TargetType="Border" BasedOn="{StaticResource ChipInfo}"><Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}" /></Style>
+    <Style x:Key="ChipMuted" TargetType="Border" BasedOn="{StaticResource ChipInfo}"><Setter Property="BackgroundColor" Value="{StaticResource MutedChipSoft}" /></Style>
+    <Style x:Key="ChipSuccess" TargetType="Border" BasedOn="{StaticResource ChipInfo}"><Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}" /></Style>
+    <Style x:Key="ChipTextInfo" TargetType="Label">
+        <Setter Property="FontSize" Value="13" /><Setter Property="FontAttributes" Value="Bold" /><Setter Property="TextColor" Value="{StaticResource Info}" />
+    </Style>
+    <Style x:Key="ChipTextWarning" TargetType="Label" BasedOn="{StaticResource ChipTextInfo}"><Setter Property="TextColor" Value="{StaticResource Warning}" /></Style>
+    <Style x:Key="ChipTextDanger" TargetType="Label" BasedOn="{StaticResource ChipTextInfo}"><Setter Property="TextColor" Value="{StaticResource Danger}" /></Style>
+    <Style x:Key="ChipTextMuted" TargetType="Label" BasedOn="{StaticResource ChipTextInfo}"><Setter Property="TextColor" Value="{StaticResource MutedChip}" /></Style>
+    <Style x:Key="ChipTextSuccess" TargetType="Label" BasedOn="{StaticResource ChipTextInfo}"><Setter Property="TextColor" Value="{StaticResource Success}" /></Style>
 </ResourceDictionary>

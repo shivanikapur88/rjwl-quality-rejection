@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- App design round: status chips (correction requested / reversed / correction of), "›" shows a row opens its detail. -->
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.MyEntriesPage" x:DataType="vm:MyEntriesViewModel" Title="Entries">
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="16" RowSpacing="10">
-        <Label Text="{Binding Heading}" Style="{StaticResource H1}" />
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="16,12,16,0" RowSpacing="8">
+        <Label Text="{Binding Heading}" Style="{StaticResource Title}" />
         <ctl:StatusBar Grid.Row="1" />
-        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="12" IsVisible="{Binding IsIncomplete}">
-            <Label Text="{Binding IncompleteNotice}" Style="{StaticResource Body}" FontSize="15" />
+        <Border Grid.Row="2" Style="{StaticResource WarningBanner}" IsVisible="{Binding IsIncomplete}">
+            <Label Text="{Binding IncompleteNotice}" Style="{StaticResource WarningText}" />
         </Border>
         <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsRefreshing, Mode=TwoWay}">
             <Grid>
@@ -12,24 +13,27 @@
                     <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="vm:EntryRow">
-                            <Border Style="{StaticResource Card}" Padding="14">
-                                <VerticalStackLayout Spacing="3">
-                                    <Label Text="{Binding Line1}" Style="{StaticResource H2}" />
-                                    <Label Text="{Binding Line2}" Style="{StaticResource Body}" FontSize="15" />
-                                    <Label Text="{Binding Line3}" Style="{StaticResource Muted}" />
-                                    <Label Text="{Binding Badge}" IsVisible="{Binding HasBadge}" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource Primary}" />
-                                </VerticalStackLayout>
+                            <Border Style="{StaticResource CardList}">
+                                <Grid Style="{StaticResource ListItem}" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Line1}" Style="{StaticResource Subheading}" />
+                                        <Label Text="{Binding Line2}" Style="{StaticResource Body}" />
+                                        <Label Text="{Binding Line3}" Style="{StaticResource Secondary}" />
+                                        <ctl:StatusChip Text="{Binding Badge}" Margin="0,4,0,0" />
+                                    </VerticalStackLayout>
+                                    <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                     <CollectionView.Footer>
                         <VerticalStackLayout Margin="0,8,0,24" Spacing="8">
-                            <ActivityIndicator IsRunning="{Binding IsLoadingMore}" IsVisible="{Binding IsLoadingMore}" Color="{StaticResource Primary}" HeightRequest="32" />
+                            <ActivityIndicator IsRunning="{Binding IsLoadingMore}" IsVisible="{Binding IsLoadingMore}" HeightRequest="32" />
                             <Button Text="Load more" Command="{Binding LoadMoreCommand}" IsVisible="{Binding HasMore}" Style="{StaticResource SecondaryButton}" />
                         </VerticalStackLayout>
                     </CollectionView.Footer>
                 </CollectionView>
-                <Label Text="No entries yet." Style="{StaticResource Muted}" FontSize="18" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,40,0,0" IsVisible="{Binding IsEmpty}" />
+                <Label Text="No entries yet." Style="{StaticResource Secondary}" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,40,0,0" IsVisible="{Binding IsEmpty}" />
             </Grid>
         </RefreshView>
     </Grid>

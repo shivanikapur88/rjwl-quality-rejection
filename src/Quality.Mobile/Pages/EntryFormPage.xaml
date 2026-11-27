@@ -1,50 +1,76 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- App design round (A1): a one-line context header; the phenomenon list takes all the remaining height. Once a phenomenon
+     is chosen, the list gives way to the chosen phenomenon ("Change" brings the list back), the quantity, optional remarks
+     and Save, in a ScrollView that stays reachable with the keyboard open (the window resizes, see App.xaml.cs).
+     Errors and "Try again" sit in one compact banner. -->
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.EntryFormPage" x:DataType="vm:EntryFormViewModel" Title="Rejection entry">
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="12" RowSpacing="8">
-        <!-- Context chosen in the previous steps -->
-        <Border Grid.Row="0" Style="{StaticResource Card}" Padding="12" BackgroundColor="{StaticResource InfoSoft}">
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10">
-                <Label Text="Shop" Style="{StaticResource Muted}" /><Label Grid.Column="1" Text="{Binding ShopText}" FontAttributes="Bold" FontSize="16" />
-                <Label Grid.Row="1" Text="Stage" Style="{StaticResource Muted}" /><Label Grid.Row="1" Grid.Column="1" Text="{Binding StageText}" FontAttributes="Bold" FontSize="16" />
-                <Label Grid.Row="2" Text="Machine" Style="{StaticResource Muted}" /><Label Grid.Row="2" Grid.Column="1" Text="{Binding MachineText}" FontAttributes="Bold" FontSize="16" />
+    <Grid RowDefinitions="Auto,Auto,*" Padding="12,8,12,12" RowSpacing="8">
+        <!-- Context chosen in the previous steps, e.g. "GDC Shop › GDC-02 – Die casting press 2" -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MinimumHeightRequest="32">
+            <Label Text="{Binding ContextText}" Style="{StaticResource ContextLine}" LineBreakMode="TailTruncation" MaxLines="1" VerticalOptions="Center" />
+            <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="24" WidthRequest="24" VerticalOptions="Center" />
+        </Grid>
+
+        <!-- Compact error banner; "Try again" when the phenomena list failed to load (a kept entry is restored then) -->
+        <Border Grid.Row="1" Style="{StaticResource ErrorBanner}" Padding="12,8" IsVisible="{Binding HasError}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorText}" VerticalOptions="Center" />
+                <Button Grid.Column="1" Text="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetryLoad}" Style="{StaticResource TertiaryButton}" VerticalOptions="Center" AutomationId="retry-phenomena" />
             </Grid>
         </Border>
-        <VerticalStackLayout Grid.Row="1" Spacing="8">
-            <ctl:StatusBar />
-            <!-- Review fix: the phenomena list failed to load; try again without leaving the form (a kept entry is restored then). -->
-            <Button Text="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetryLoad}" Style="{StaticResource SecondaryButton}" AutomationId="retry-phenomena" />
-        </VerticalStackLayout>
-        <SearchBar Grid.Row="2" Text="{Binding SearchText}" Placeholder="Search rejection phenomenon" FontSize="17" />
-        <!-- Phenomena for THIS stage, loaded from the server -->
-        <CollectionView Grid.Row="3" ItemsSource="{Binding Phenomena}" SelectionMode="Single" SelectedItem="{Binding SelectedPhenomenon, Mode=TwoWay}">
-            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="4" /></CollectionView.ItemsLayout>
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="dto:PhenomenonDto">
-                    <Grid Style="{StaticResource ListItem}" MinimumHeightRequest="56">
-                        <Label Text="{Binding PhenomenonName}" Style="{StaticResource Body}" VerticalOptions="Center" />
+
+        <!-- Step 1: choose the phenomenon (phenomena for THIS stage, loaded from the server) -->
+        <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="8" IsVisible="{Binding IsChoosingPhenomenon}">
+            <SearchBar x:Name="Search" Text="{Binding SearchText}" Placeholder="Search rejection phenomenon" />
+            <Border Grid.Row="1" Style="{StaticResource CardList}">
+                <CollectionView ItemsSource="{Binding Phenomena}" SelectionMode="Single" SelectedItem="{Binding SelectedPhenomenon, Mode=TwoWay}" SelectionChanged="OnPhenomenonSelected">
+                    <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="0" /></CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="dto:PhenomenonDto">
+                            <Grid Style="{StaticResource ListItem}" RowDefinitions="*,Auto" Padding="0">
+                                <Label Text="{Binding PhenomenonName}" Style="{StaticResource Body}" Margin="16,14" VerticalOptions="Center" />
+                                <BoxView Grid.Row="1" Style="{StaticResource DividerLine}" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Border>
+        </Grid>
+
+        <!-- Step 2: quantity, remarks, save -->
+        <ScrollView Grid.Row="2" IsVisible="{Binding HasSelection}">
+            <VerticalStackLayout Spacing="12" Padding="0,0,0,8">
+                <Border Style="{StaticResource Card}" Padding="16,12">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+                        <Label Text="Rejection phenomenon" Style="{StaticResource FieldLabel}" />
+                        <Label Grid.Row="1" Text="{Binding SelectedPhenomenon.PhenomenonName}" Style="{StaticResource Heading}" />
+                        <Button Grid.Column="1" Grid.RowSpan="2" Text="Change" Command="{Binding ChangePhenomenonCommand}" Style="{StaticResource TertiaryButton}" VerticalOptions="Center" AutomationId="change-phenomenon" />
                     </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
-        <!-- Review + remarks + actions -->
-        <Border Grid.Row="4" Style="{StaticResource Card}" Padding="12">
-            <VerticalStackLayout Spacing="8">
-                <Label Text="Selected phenomenon" Style="{StaticResource Muted}" />
-                <Label Text="{Binding SummaryText}" FontSize="19" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
-                <Label Text="Rejected quantity (parts)" Style="{StaticResource Muted}" />
-                <Grid ColumnDefinitions="72,*,72" ColumnSpacing="8">
-                    <Button Text="−" Command="{Binding DecreaseCommand}" Style="{StaticResource SecondaryButton}" FontSize="28" AutomationId="qty-minus" />
-                    <Entry Grid.Column="1" Text="{Binding QuantityText}" Keyboard="Numeric" MaxLength="4" HorizontalTextAlignment="Center" FontSize="26" FontAttributes="Bold" AutomationId="quantity" />
-                    <Button Grid.Column="2" Text="+" Command="{Binding IncreaseCommand}" Style="{StaticResource SecondaryButton}" FontSize="28" AutomationId="qty-plus" />
-                </Grid>
-                <Label Text="{Binding QuantityHint}" TextColor="{StaticResource Danger}" FontSize="13" IsVisible="{Binding HasQuantityError}" />
-                <Editor Text="{Binding Remarks}" Placeholder="Remarks (optional)" MaxLength="500" HeightRequest="60" AutoSize="Disabled" />
-                <Label Text="{Binding RemarksCounter}" Style="{StaticResource Muted}" HorizontalTextAlignment="End" />
-                <Grid ColumnDefinitions="*,2*" ColumnSpacing="10">
-                    <Button Text="Clear" Command="{Binding ResetCommand}" Style="{StaticResource SecondaryButton}" />
+                </Border>
+                <Border Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Rejected quantity (parts)" Style="{StaticResource FieldLabel}" />
+                        <Grid ColumnDefinitions="64,*,64" ColumnSpacing="12">
+                            <Button Text="−" Command="{Binding DecreaseCommand}" Style="{StaticResource StepperButton}" SemanticProperties.Description="One part less" AutomationId="qty-minus" />
+                            <Entry Grid.Column="1" Text="{Binding QuantityText}" Style="{StaticResource QuantityEntry}" Keyboard="Numeric" MaxLength="4" AutomationId="quantity" />
+                            <Button Grid.Column="2" Text="+" Command="{Binding IncreaseCommand}" Style="{StaticResource StepperButton}" SemanticProperties.Description="One part more" AutomationId="qty-plus" />
+                        </Grid>
+                        <Label Text="{Binding QuantityHint}" Style="{StaticResource ErrorText}" IsVisible="{Binding HasQuantityError}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Button Text="+ Add remarks" Command="{Binding AddRemarksCommand}" Clicked="OnAddRemarks" IsVisible="{Binding CanAddRemarks}" Style="{StaticResource TertiaryButton}" HorizontalOptions="Start" AutomationId="add-remarks" />
+                <Border Style="{StaticResource Card}" Padding="16,12" IsVisible="{Binding IsRemarksOpen}">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Remarks (optional)" Style="{StaticResource FieldLabel}" />
+                        <Editor x:Name="RemarksEditor" Text="{Binding Remarks}" Placeholder="What did you see?" MaxLength="500" HeightRequest="96" AutoSize="Disabled" AutomationId="remarks" />
+                        <Label Text="{Binding RemarksCounter}" Style="{StaticResource Caption}" HorizontalTextAlignment="End" />
+                    </VerticalStackLayout>
+                </Border>
+                <Grid ColumnDefinitions="*,2*" ColumnSpacing="12">
+                    <Button Text="Clear" Command="{Binding ResetCommand}" Style="{StaticResource SecondaryButton}" AutomationId="clear" />
                     <Button Grid.Column="1" Text="Save entry" Command="{Binding SubmitCommand}" Style="{StaticResource PrimaryButton}" AutomationId="save" />
                 </Grid>
             </VerticalStackLayout>
-        </Border>
+        </ScrollView>
     </Grid>
 </pages:AppPage>
