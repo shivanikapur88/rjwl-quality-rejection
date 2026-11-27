@@ -170,3 +170,57 @@ After round 3, three independent reviewers (Claude Sonnet 5.5) read the whole ap
 | C11 | Low | Rate shown at full prominence at low coverage; same-named phenomena of two shops looked identical; template machine codes did not exist. | Warning below 80% coverage; shop shown when several shops are in view; template uses placeholders. | — |
 | C12 | Low | Not changed: sign-out leaves the previous user's lists until the next load; chart colours rely on the table view for accessibility; Back does not step through dashboard filters; CSV fields containing line breaks. | Documented here. | — |
 | C13 | Docs | Stale statements: shifts "not implemented", 14 pages, 77/49 tests, API table without round 2/3, "Save" vs "Save entry", 30 days vs 30 production days, debug certificate wording, full-review #10 closed too generously. | Corrected (#10 is now really fixed by C1). | — |
+
+## Third full application review (Sonnet 5.5)
+
+After the phone layout was added, three independent reviewers (Claude Sonnet 5.5) read the whole application again: server, database scripts, and the Android app with the dashboard and documents. **None found a high-severity defect.** Every finding was checked against the code.
+
+### Server
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| S1 | Medium | A caller that disconnected during the readiness check could cache "unavailable" for everyone for 10 s; slow probes made the cache useless. | Each check has its own 5 s limit, independent of the caller; the result is stamped when the check finishes; waiting callers can leave. | unit `Readiness_cache_is_stamped_after_a_slow_probe` |
+| S2 | Medium | Sign-ins that failed on a server error (database down) counted as failed attempts, locking users out after an outage. | Refunded on any error. | — |
+| S3 | Medium (plausible) | Throttle memory had no upper bound under a flood of random logins, and every request then scanned it. | Hard cap with eviction of the oldest keys; pruning at most every 30 s; IPv6 clients grouped by /64. | unit `A_flood_of_random_logins_is_capped`, `Ipv6_clients_are_grouped_by_their_64_bit_network` |
+| S4 | Low | A fallback shift calendar was kept for 5 minutes. | Retried after 15 s. | — |
+| S5 | Low | Torn read of the readiness cache. | Immutable entry. | — |
+| S6 | Low | A user assigned to a shop deactivated later could not be edited. | Existing assignments to inactive shops may be kept; new ones are refused with a clear message. | — |
+| S7 | Low | Readiness warnings were not in the specification. | Documented as public (they name only the store). | — |
+| S8 | Low | Shift times formatted with the server's culture. | Invariant. | — |
+| S9 | Low | Success/refund after a parallel sign-in could settle the wrong buckets. | The "known" state of the attempt is carried through. | — |
+| S10 | Low | Model-binding errors had no `code`. | `validation` problem documents. | — |
+| S11 | Low | 30 MB bodies accepted on every authenticated endpoint. | 64 KB default (Kestrel and IIS); the upload keeps 2 MB. | — |
+
+### Database
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| D1 | Medium | The 04 seed check passed when the stages were missing (03 not run). | Fails then. | — |
+| D2 | Medium | db/15 was not atomic, did not handle an orphaned user after a restore, and could not see role memberships such as `db_datawriter`. | One transaction; orphaned user re-mapped; role memberships listed with a warning. | upgrade-path step 10 (from the old schema-wide grants, run twice) |
+| D3 | Medium | The db/12 guard could be skipped (no active shifts, 11 not run); GDC/CNC cannot be compared; no compatibility-level requirement. | Guard cannot be skipped (50013/50014); runbook says to set the values for GDC/CNC; compatibility level ≥ 130 checked (50015) and documented. | upgrade-path steps 8 and 9 (05:59:59.700 value; refusal on mismatch) |
+| D4 | Medium (plausible) | An admin delete could queue behind slow entry saves and stall new saves; pool exhaustion under many PRE/FINAL saves. | Deletes give up after 3 s with 409; pool size guidance in BUILD_AND_DEPLOY. | — |
+| D5 | Low | Report index did not cover `MachineName`. | Included (rebuilt if needed). | — |
+| D6 | Low | Legacy usernames with unusual characters might not match the login lookup. | 08 lists them with a warning. | — |
+| D7 | Low | 03 refused to re-run once a shop or stage was added. | Checks the four required rows exist; rejects leftover old-layout mappings. | — |
+| D8 | Low | Scripts without `SET QUOTED_IDENTIFIER ON` fail under sqlcmd once filtered indexes exist. | Every script sets it; unit test per script; runbook: `sqlcmd -I` for ad-hoc SQL. | unit `Every_script_sets_quoted_identifier_on` |
+| D9 | Low | Runbook: missing error codes, wrong 07 wording, SchemaVersions note, version requirement; stale "NOT YET EXECUTED" headers. | Corrected. | — |
+| D10 | Low | Test tooling did not check values, refusal, db/15 or runbook order. | Added (see D2/D3). The fixture runs scripts through SqlClient; the sqlcmd path is covered by the two shell scripts. | — |
+| D11 | Low | Constraints. | Added: production day/shift set together; replacement self-reference; production-count shop must be the machine's shop (composite key); indexes for the proposal keys. Not added: blank-code checks and an `EntryStoreKey` check (validated by the API). | — |
+| D12 | Low (plausible) | A future feed could deadlock with an upload. | Template note: process machines in ascending id order, retry on 1205. | — |
+| D13 | Low | Python and SQL normalise non-ASCII names differently. | Documented; the workbook is ASCII. | — |
+
+### Dashboard and documents
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| W1 | Medium | The chart was not redrawn on resize or rotation. | Redrawn when its width changes. | browser check (1280 → 700 px) |
+| W2 | Medium (plausible) | Card layout on phones could drop table semantics. | Explicit table/row/cell roles. | browser check |
+| W3 | Medium | Machine and shop rates were shown without their coverage. | "⚠ N%" below 80% coverage, explained on the page. | — |
+| W4 | Low | `hidden` ignored where CSS sets `display` (nav on the sign-in screen). | `[hidden]` always hides. | browser check |
+| W5 | Low | Phone: Pareto numbers and filter selects could overflow; long machine codes. | Wider number columns, shrinkable filters, codes wrap on phones. | no horizontal overflow at Pixel 7 width |
+| W6 | Low | "▼ 100% fewer" while parts remained. | Shown as 99%. | — |
+| W7 | Low | Changing the upload file during a check. | File input locked while sending. | — |
+| W8 | Low | CR-only line endings. | Supported. | — |
+| W9 | Low | Labels from a shared link shown when unconfirmed. | Shown as `#id`. | browser check |
+| W10 | Low | Print before the QR images loaded. | Print enabled when all images settled. | — |
+| W11 | Docs | API examples (login limit, missing routes), README script range and dashboard wording, RECOVERY counts, "table semantics kept", phone layout undocumented. | Corrected; phone layout in the specification and user guide. | — |
