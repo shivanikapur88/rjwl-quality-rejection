@@ -51,10 +51,10 @@
       <p id="error" class="error" role="alert" hidden></p>
 
       <div class="tiles">
-        <div class="tile"><div class="tile-label">Rejected parts</div><div class="tile-value" id="tParts">–</div><div class="tile-delta" id="dParts"></div></div>
-        <div class="tile"><div class="tile-label">Entries</div><div class="tile-value" id="tEntries">–</div><div class="tile-delta" id="dEntries"></div></div>
-        <div class="tile"><div class="tile-label">Rejection rate <span class="muted small">(rejected ÷ produced)</span></div><div class="tile-value" id="tRate">–</div><div class="tile-delta" id="dRate"></div></div>
-        <div class="tile"><div class="tile-label">Correction requests waiting</div><div class="tile-value" id="tPending">–</div></div>
+        <div class="tile hero"><div class="tile-label">Rejected parts</div><div class="tile-value" id="tParts">–</div><div class="tile-delta" id="dParts"></div><div id="sParts"></div></div>
+        <div class="tile"><div class="tile-label">Entries</div><div class="tile-value" id="tEntries">–</div><div class="tile-delta" id="dEntries"></div><div id="sEntries"></div></div>
+        <div class="tile"><div class="tile-label" id="lRate">Rejection rate (rejected ÷ produced)</div><div class="tile-value" id="tRate">–</div><div class="tile-delta" id="dRate"></div></div>
+        <div class="tile"><div class="tile-label">Correction requests waiting <span class="muted">(all dates)</span></div><div class="tile-value" id="tPending">–</div><div class="tile-delta">Approve or reject them in the app.</div></div>
       </div>
 
       <div class="grid">

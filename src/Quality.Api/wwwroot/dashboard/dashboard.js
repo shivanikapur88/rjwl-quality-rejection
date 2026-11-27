@@ -9,13 +9,14 @@
   const SHIFT_SLOTS = ['--series-1', '--series-2', '--series-3', '--series-4'];   // fixed order by shift sort order, never by rank
   let shifts = [], cal = null, lastReport = null;
   const drill = { machineId: null, machineLabel: null, phenomenonId: null, phenomenonLabel: null };
-  const COLLAPSED_PARETO = 15, COLLAPSED_ENTRIES = 20;
+  const COLLAPSED_PARETO = 15, COLLAPSED_ENTRIES = 20, MACHINE_ROWS = 15;
   let showAllPareto = false, showAllEntries = false, lastEntries = null;
   let rangeBeforeDay = null;   // the date range in use before a day was clicked, restored when the "Day" chip is removed
   let lastHash = '';
 
   const isoDay = d => d.toISOString().slice(0, 10);
   const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return isoDay(d); };
+  const longDay = iso => new Date(iso + 'T00:00:00Z').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   const shortDay = iso => new Date(iso + 'T00:00:00Z').toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
   const pct = (x, digits = 1) => (x * 100).toFixed(digits) + '%';
   /** A real calendar day as YYYY-MM-DD (rejects 2026-02-31 and 2026-13-45, which the date pattern alone accepts). */
@@ -27,14 +28,17 @@
     return { from: h.get('from'), to: h.get('to'), shop: h.get('shop'), shift: h.get('shift'),
       m: h.get('m'), ml: h.get('ml'), p: h.get('p'), pl: h.get('pl') };
   }
+  let pushNext = false;   // the next hash write comes from a user action: add a history step so Back undoes it
   function writeHash() {
     const h = new URLSearchParams({ from: el('from').value, to: el('to').value });
     if (el('shop').value) h.set('shop', el('shop').value);
     if (el('shift').value) h.set('shift', el('shift').value);
     if (drill.machineId) { h.set('m', drill.machineId); h.set('ml', drill.machineLabel || ''); }
     if (drill.phenomenonId) { h.set('p', drill.phenomenonId); h.set('pl', drill.phenomenonLabel || ''); }
-    lastHash = '#' + h.toString();
-    history.replaceState(null, '', lastHash);
+    const next = '#' + h.toString();
+    if (pushNext && next !== lastHash) history.pushState(null, '', next); else history.replaceState(null, '', next);
+    pushNext = false;
+    lastHash = next;
   }
 
   /** Applies the URL state (on start, and when a shared link is pasted into a tab that already shows the dashboard). */
@@ -61,14 +65,22 @@
       el('from').max = el('to').max = c.productionDate;
       applyHash();
       window.addEventListener('hashchange', () => { if (location.hash !== lastHash) { applyHash(); load(); } });
-      text(el('status'), `Today's production date: ${shortDay(c.productionDate)}, current shift ${c.currentShift} (${c.timeZone}).`);
+      text(el('status'), `Today's production date: ${longDay(c.productionDate)}, current shift ${c.currentShift} (${c.timeZone}).`);
       document.querySelectorAll('.quick button').forEach(b => b.addEventListener('click', () => {
-        el('to').value = c.productionDate; el('from').value = addDays(c.productionDate, 1 - Number(b.dataset.days)); rangeBeforeDay = null; load();
+        el('to').value = c.productionDate; el('from').value = addDays(c.productionDate, 1 - Number(b.dataset.days)); rangeBeforeDay = null; pushNext = true; load();
       }));
-      el('filters').addEventListener('submit', ev => { ev.preventDefault(); rangeBeforeDay = null; load(); });
+      el('filters').addEventListener('submit', ev => { ev.preventDefault(); rangeBeforeDay = null; pushNext = true; load(); });
       await load();
     } catch (e) { showError(e); }
   });
+
+  /** The quick-range button matching the current dates shows as selected (aria-pressed). */
+  function markQuickRange() {
+    document.querySelectorAll('.quick button').forEach(b => {
+      const on = !!cal && el('to').value === cal.productionDate && el('from').value === addDays(cal.productionDate, 1 - Number(b.dataset.days));
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
 
   function showError(e) { text(el('error'), e.message); el('error').hidden = false; }
 
@@ -97,6 +109,7 @@
   async function load(focusChips = false) {
     el('error').hidden = true;
     el('tip').hidden = true;   // the hovered element is about to be rebuilt, so its mouseleave never fires
+    if (focusChips) pushNext = true;   // a drill-down or chip removal: Back undoes it
     writeHash();
     renderChips();
     const seq = ++loadSeq;
@@ -122,6 +135,7 @@
       renderEntries(entries);
       text(el('announce'), `Showing ${fmt(r.total.quantity)} rejected parts` + (el('chips').childElementCount ? `, filtered by ${[...el('chips').children].map(c => c.dataset.label).join(', ')}` : '') + '.');
       shown = snapshot();
+      markQuickRange();
       if (focusChips) {
         // No chip left (the last one was removed): focus the first filter instead of losing focus to the page.
         const target = el('chips').hidden ? el('shop') : (el('chips').querySelector('button') || el('chips'));
@@ -163,20 +177,58 @@
     return ch <= -100 && now > 0 ? -99 : ch;
   }
 
+  const periodText = r => r.previousFromDate === r.previousToDate ? shortDay(r.previousFromDate) : `${shortDay(r.previousFromDate)}–${shortDay(r.previousToDate)}`;
+  /** The selection ends today: the current production day is still running, so the comparison is "so far". */
+  const runningToday = r => cal && r.toDate === cal.productionDate;
+
   function delta(now, prev, r, noun) {
     if (prev === null || prev === undefined) return '';
-    const period = `${shortDay(r.previousFromDate)}–${shortDay(r.previousToDate)}`;
-    if (prev === 0) return now === 0 ? `same as ${period} (0)` : `${fmt(now)} more than ${period} (0 before)`;
+    const period = periodText(r), sofar = runningToday(r) ? ' (today still running)' : '';
+    if (prev === 0) return now === 0 ? `same as ${period} (0)` : `${fmt(now)} more than ${period} (0 before)${sofar}`;
     const ch = pctChange(now, prev);   // whole percent; under 0.5% counts as no change
-    if (ch === 0) return `about the same as ${period} (${fmt(prev)})`;
-    return `${ch > 0 ? '▲' : '▼'} ${Math.abs(ch)}% ${ch > 0 ? 'more' : 'fewer'} ${noun} than ${period} (${fmt(prev)})`;
+    if (ch === 0) return `about the same as ${period} (${fmt(prev)})${sofar}`;
+    return `${ch > 0 ? '▲' : '▼'} ${Math.abs(ch)}% ${ch > 0 ? 'more' : 'fewer'} ${noun} than ${period} (${fmt(prev)})${sofar}`;
+  }
+
+  /**
+   * Tile change line: a coloured badge (fewer rejections = good, green; more = bad, red; arrow + words, never colour
+   * alone) followed by the comparison period. Returns nodes for the tile.
+   */
+  function deltaNodes(now, prev, r) {
+    if (prev === null || prev === undefined) return [];
+    const period = periodText(r), sofar = runningToday(r) ? ' · today still running' : '';
+    if (prev === 0) return [document.createTextNode(now === 0 ? `Same as ${period} (0)` : `${fmt(now)} more than ${period} (0 before)` + sofar)];
+    const ch = pctChange(now, prev);
+    const cls = ch > 0 ? 'bad' : ch < 0 ? 'good' : '';
+    const badge = make('span', 'badge ' + cls, ch === 0 ? '± 0%' : `${ch > 0 ? '▲' : '▼'} ${Math.abs(ch)}% ${ch > 0 ? 'more' : 'fewer'}`);
+    return [badge, document.createTextNode(`vs ${period} (${fmt(prev)})${sofar}`)];
   }
   const shortDelta = (now, prev) => {
     if (prev === null || prev === undefined) return '';
     if (prev === 0) return now ? 'new' : '–';
     const ch = pctChange(now, prev);
-    return ch === 0 ? '＝ 0%' : (ch > 0 ? '▲ ' : '▼ ') + Math.abs(ch) + '%';
+    return ch === 0 ? '± 0%' : (ch > 0 ? '▲ ' : '▼ ') + Math.abs(ch) + '%';
   };
+
+  /** Share of rejected parts: "<1%" instead of a misleading "0%" for small non-zero shares. */
+  const sharePct = x => x > 0 && x < 0.005 ? '<1%' : pct(x, 0);
+  const cumHead = () => { const d = make('div', 'num'); d.append(make('span', 'cum-long', 'Cumulative'), make('span', 'cum-short', 'Cum.')); return d; };
+
+  /** Small trend line under a tile: one point per production day of the selection, the last day highlighted. */
+  function sparkline(host, r, pick, label) {
+    host.replaceChildren();
+    const days = []; for (let d = r.fromDate; d <= r.toDate; d = addDays(d, 1)) days.push(d);
+    if (days.length < 3) return;
+    const vals = days.map(d => r.byDayShift.filter(t => t.productionDate === d).reduce((a, t) => a + pick(t), 0));
+    const W = 240, H = 34, max = Math.max(1, ...vals);
+    const pts = vals.map((v, i) => [ (i / (vals.length - 1)) * (W - 6) + 3, H - 4 - (v / max) * (H - 8) ]);
+    const svg = svgEl('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': `${label}: ${vals.join(', ')}` });
+    const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join('');
+    svg.append(svgEl('path', { class: 'area', d: `${line}L${pts[pts.length - 1][0]},${H}L${pts[0][0]},${H}Z` }), svgEl('path', { class: 'line', d: line }));
+    const [lx, ly] = pts[pts.length - 1]; svg.append(svgEl('circle', { class: 'last', cx: lx, cy: ly, r: 3.5 }));
+    hover(svg, `${label} (${shortDay(days[0])}–${shortDay(days[days.length - 1])}): last day ${fmt(vals[vals.length - 1])}`, false);
+    host.append(svg);
+  }
 
   /** Rounded DOWN, for "less than 80%" warnings: 79.6% must not read "80%". */
   const floorPct = x => Math.floor(x * 100) + '%';
@@ -184,7 +236,9 @@
   /** Rate cell for machine/shop rows: "⚠" marks a rate based on less than 80% of that row's rejected parts (see the note). */
   function rowRate(rate) {
     if (!rate || rate.rate === null || rate.rate === undefined) return '–';
-    return pct(rate.rate, 2) + ((rate.coverage ?? 0) < 0.8 ? ` ⚠ ${floorPct(rate.coverage ?? 0)}` : '');
+    // The rate stays right-aligned with the others; the coverage mark goes on its own line underneath.
+    if ((rate.coverage ?? 0) >= 0.8) return pct(rate.rate, 2);
+    return { text: pct(rate.rate, 2), extra: `⚠ ${floorPct(rate.coverage ?? 0)} covered`, title: `Based on only ${floorPct(rate.coverage ?? 0)} of the rejected parts (production counts missing)` };
   }
 
   function rateText(rate) {
@@ -192,14 +246,20 @@
     const cov = rate.coverage ?? 0;
     // Below 80% coverage the rate describes only part of the selection: say so plainly, not in small grey text only.
     const warn = cov < 0.8 ? `⚠ Partial: based on only ${floorPct(cov)} of rejected parts (production counts missing). ` : '';
-    return { value: pct(rate.rate, 2), warn: !!warn, note: warn + `${fmt(rate.rejectedWithProduction)} rejected of ${fmt(rate.produced)} produced` + (warn ? '' : ` · based on ${pct(cov, 0)} of rejected parts`) };
+    return { value: pct(rate.rate, 2), warn: !!warn, note: warn + `${fmt(rate.rejectedWithProduction)} rejected of ${fmt(rate.produced)} produced` + (warn ? '' : ` · based on ${floorPct(cov)} of rejected parts`) };
   }
 
   function render(r) {
     text(el('tParts'), fmt(r.total.quantity));
     text(el('tEntries'), fmt(r.total.entries));
-    text(el('dParts'), delta(r.total.quantity, r.total.previousQuantity, r, 'rejected parts'));
-    text(el('dEntries'), delta(r.total.entries, r.total.previousEntries, r, 'entries'));
+    el('dParts').replaceChildren(...deltaNodes(r.total.quantity, r.total.previousQuantity, r));
+    el('dEntries').replaceChildren(...deltaNodes(r.total.entries, r.total.previousEntries, r));
+    el('dParts').title = delta(r.total.quantity, r.total.previousQuantity, r, 'rejected parts');
+    el('dEntries').title = delta(r.total.entries, r.total.previousEntries, r, 'entries');
+    sparkline(el('sParts'), r, t => t.quantity, 'Rejected parts per production day');
+    sparkline(el('sEntries'), r, t => t.entries, 'Entries per production day');
+    // With more than one shop in view, every shop's production is in the denominator (decision #13): say so.
+    text(el('lRate'), r.shops.length > 1 && !r.machineId && !r.phenomenonId ? 'Rejection rate (all shops in view)' : 'Rejection rate (rejected ÷ produced)');
     const rt = rateText(r.total.rate);
     text(el('tRate'), rt.value); text(el('dRate'), rt.note); el('dRate').classList.toggle('warn-text', !!rt.warn);
     el('incomplete').hidden = r.unavailableShops.length === 0;
@@ -208,12 +268,13 @@
     renderPareto(r);
     // Phone: machine code, parts, change and rate only (name, shop and produced are hidden below 600 px).
     renderTable(el('machines'), ['Machine', 'Name', 'Shop', 'Parts', 'vs prev.', 'Produced', 'Rate'],
-      r.topMachines.slice(0, 15).map(m => ({
+      r.topMachines.slice(0, MACHINE_ROWS).map(m => ({
         cells: [m.machineCode, m.machineName, m.shopCode, fmt(m.quantity), shortDelta(m.quantity, m.previousQuantity),
           m.rate ? fmt(m.rate.produced) : '–', rowRate(m.rate)],
         label: `Show only machine ${m.machineCode}`,
         onClick: () => { drill.machineId = String(m.machineId); drill.machineLabel = m.machineCode; load(true); },
       })), 'No rejections in this selection.', 3, 6, { phoneHide: [1, 2, 5] });
+    if (r.topMachines.length > MACHINE_ROWS) el('machines').append(make('p', 'muted small', `Top ${MACHINE_ROWS} of ${r.topMachines.length} machines shown. Drill down by shop to see the others.`));
     renderTable(el('shops'), ['Shop', 'Parts', 'Entries', 'Rate'],
       r.shops.map(s => ({
         cells: [s.shopName, fmt(s.quantity), fmt(s.entries), rowRate(s.rate)],
@@ -248,15 +309,17 @@
     legend.hidden = shown.length < 2;
 
     lastTrendWidth = host.clientWidth;
-    const W = Math.max(280, host.clientWidth || 640), H = 240, padL = 44, padB = 28, padT = 8, padR = 8;
+    if (!totals.some(t => t > 0)) { host.append(make('p', 'chart-empty', 'No rejected parts in this selection.')); renderTrendTable(); return; }
+    // At least 12 px per day: on a phone a long range scrolls sideways inside the chart instead of squeezing the bars.
+    const W = Math.max(280, host.clientWidth || 640, 44 + 8 + days.length * 12), H = 240, padL = 44, padB = 28, padT = 8, padR = 8;
     const plotW = W - padL - padR, plotH = H - padT - padB;
-    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W > (host.clientWidth || 0) ? W : '100%', height: H });
     for (let i = 0; i <= 4; i++) {
       const y = padT + plotH - (plotH * i) / 4;
       svg.append(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'grid' }));
       const t = svgEl('text', { x: padL - 6, y: y + 4, class: 'axis', 'text-anchor': 'end' }); t.textContent = fmt(Math.round((nice * i) / 4)); svg.append(t);
     }
-    const band = plotW / days.length, barW = Math.max(4, Math.min(48, band * 0.62));
+    const band = plotW / days.length, barW = Math.max(2, Math.min(48, band * 0.62));
     const labelEvery = Math.ceil(days.length / Math.max(1, Math.floor(plotW / 56)));
     days.forEach((d, i) => {
       const x = padL + band * i + (band - barW) / 2;
@@ -277,13 +340,18 @@
       hover(hit, `${shortDay(d)}: ${fmt(totals[i])} parts` + (shown.length > 1 ? ' — ' + shown.map(s => `${s.shiftCode} ${fmt(val(d, s.shiftCode))}`).join(', ') : '') + ' (click to show this day)');
       hit.addEventListener('click', () => pickDay(d));
       svg.append(hit);
-      if (i % labelEvery === 0) { const t = svgEl('text', { x: padL + band * i + band / 2, y: H - 8, class: 'axis', 'text-anchor': 'middle' }); t.textContent = shortDay(d); svg.append(t); }
+      // Every n-th day, and always the last one (the most recent day must be readable).
+      if (i % labelEvery === 0 && (i === days.length - 1 || days.length - 1 - i >= labelEvery / 2) || i === days.length - 1) { const t = svgEl('text', { x: padL + band * i + band / 2, y: H - 8, class: 'axis', 'text-anchor': 'middle' }); t.textContent = shortDay(d); svg.append(t); }
     });
     svg.setAttribute('aria-hidden', 'true');   // the container's role="img" label describes it; the table holds the numbers
     host.append(svg);
-    renderTable(el('trendTable'), ['Production day', ...shown.map(s => s.shiftName), 'Total'],
-      days.map((d, i) => ({ cells: [shortDay(d), ...shown.map(s => fmt(val(d, s.shiftCode))), fmt(totals[i])],
-        label: `Show only ${shortDay(d)}`, onClick: days.length > 1 ? () => pickDay(d) : null })), 'No data.', 1);
+    renderTrendTable();
+
+    function renderTrendTable() {
+      renderTable(el('trendTable'), ['Production day', ...shown.map(s => s.shiftName), 'Total'],
+        days.map((d, i) => ({ cells: [shortDay(d), ...shown.map(s => fmt(val(d, s.shiftCode))), fmt(totals[i])],
+          label: `Show only ${shortDay(d)}`, onClick: days.length > 1 ? () => pickDay(d) : null })), 'No data.', 1);
+    }
   }
   function pickDay(d) {
     if (el('from').value !== el('to').value) rangeBeforeDay = { from: el('from').value, to: el('to').value };
@@ -303,7 +371,7 @@
     text(el('paretoNote'), list.length === 1 ? 'One phenomenon causes all rejected parts in this selection.'
       : `${vital} of ${r.phenomenaCount} phenomena cause ${pct(cut, 0)} of rejected parts.`);
     const head = make('div', 'prow phead');
-    head.append(make('div', '', '#'), make('div', '', 'Phenomenon'), make('div', '', ''), make('div', 'num', 'Parts'), make('div', 'num', 'Share'), make('div', 'num', 'Cumulative'), make('div', 'num', 'vs prev.'));
+    head.append(make('div', '', '#'), make('div', '', 'Phenomenon'), make('div', '', ''), make('div', 'num', 'Parts'), make('div', 'num', 'Share'), cumHead(), make('div', 'num', 'vs prev.'));
     host.append(head);
     cum = 0;
     const visible = showAllPareto ? list : list.slice(0, Math.max(COLLAPSED_PARETO, vital));
@@ -316,7 +384,7 @@
       const name = make('button', 'barname rowbtn', label); name.type = 'button';
       name.setAttribute('aria-label', `${p.phenomenonName}: ${fmt(p.quantity)} parts, ${pct(p.quantity / total, 0)} of rejected parts, cumulative ${pct(cum / total, 0)}. Show only this phenomenon.`);
       row.append(make('div', 'muted', String(i + 1)), name, track, make('div', 'num', fmt(p.quantity)),
-        make('div', 'num', pct(p.quantity / total, 0)), make('div', 'num', pct(cum / total, 0)), make('div', 'num muted', shortDelta(p.quantity, p.previousQuantity)));
+        make('div', 'num', sharePct(p.quantity / total)), make('div', 'num', sharePct(cum / total)), make('div', 'num muted', shortDelta(p.quantity, p.previousQuantity)));
       hover(row, `${p.phenomenonName} (${p.shopCode}): ${fmt(p.quantity)} parts in ${fmt(p.entries)} entries, ${pct(p.quantity / total, 1)} of rejected parts; cumulative ${pct(cum / total, 1)}. Click to drill down.`, false);
       row.addEventListener('click', () => { drill.phenomenonId = String(p.phenomenonId); drill.phenomenonLabel = p.phenomenonName; load(true); });   // the button's click bubbles here
       host.append(row);
@@ -338,7 +406,7 @@
     const items = showAllEntries ? all : all.slice(0, COLLAPSED_ENTRIES);
     text(el('entriesNote'), all.length === 0 ? '' : `${res.hasMore ? 'Newest ' + all.length + ' loaded (more exist: narrow the selection)' : all.length + ' entries'}` + (res.unavailableShops.length ? ` · not available: ${res.unavailableShops.join(', ')}` : ''));
     renderTable(host, ['Saved', 'Day / shift', 'Shop', 'Machine', 'Phenomenon', 'Qty', 'Inspector', 'Remarks'],
-      items.map(e => ({ cells: [new Date(e.serverCreatedAtUtc).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+      items.map(e => ({ cells: [new Date(e.serverCreatedAtUtc).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: cal ? cal.timeZone : undefined }),
         `${e.productionDate ? shortDay(e.productionDate) : '–'} ${e.shiftCode ?? ''}`, e.shopCode, e.machineCode, e.phenomenonName, fmt(e.quantity),
         e.inspectorEmployeeCode, (e.correctsEntryId ? `[correction of #${e.correctsEntryId}] ` : '') + (e.remarks ?? '')] })),
       'No entries in this selection.', 5, 5, { stack: true });   // phone: each entry becomes a small card
@@ -373,8 +441,11 @@
         td.dataset.label = head[i];
         if (opts.stack) td.setAttribute('role', i === 0 ? 'rowheader' : 'cell');
         // Clickable rows keep their table semantics; the first cell holds a real button for keyboard and screen readers.
-        if (i === 0 && r.onClick) { const b = make('button', 'rowbtn', c); b.type = 'button'; if (r.label) b.title = r.label; td.append(b); }
-        else td.textContent = c;
+        // A cell is text, or { text, extra, title } where extra is a small second line (e.g. a coverage mark).
+        const ctext = c && typeof c === 'object' ? c.text : c;
+        if (i === 0 && r.onClick) { const b = make('button', 'rowbtn', ctext); b.type = 'button'; if (r.label) b.title = r.label; td.append(b); }
+        else td.textContent = ctext;
+        if (c && typeof c === 'object') { if (c.extra) td.append(make('span', 'cov', c.extra)); if (c.title) td.title = c.title; }
         row.append(td);
       });
       if (r.onClick) row.addEventListener('click', r.onClick);   // a click anywhere on the row (the button's click bubbles here)
@@ -493,7 +564,14 @@
   function svgEl(tag, attrs) { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; }
   function hover(node, label, setAriaLabel = true) {
     const tip = el('tip');
-    node.addEventListener('mousemove', ev => { tip.textContent = label; tip.hidden = false; tip.style.left = `${ev.clientX + 12}px`; tip.style.top = `${ev.clientY + 12}px`; });
+    node.addEventListener('mousemove', ev => {
+      tip.textContent = label; tip.hidden = false;
+      // Keep the whole tip on screen (it used to squeeze into a thin column at the right edge).
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      const x = ev.clientX + 12 + w > innerWidth - 8 ? ev.clientX - 12 - w : ev.clientX + 12;
+      const y = ev.clientY + 12 + h > innerHeight - 8 ? ev.clientY - 12 - h : ev.clientY + 12;
+      tip.style.left = `${Math.max(8, x)}px`; tip.style.top = `${Math.max(8, y)}px`;
+    });
     node.addEventListener('mouseleave', () => { tip.hidden = true; });
     if (setAriaLabel) node.setAttribute('aria-label', label);
   }

@@ -5,11 +5,17 @@
   const urls = [];
 
   wireLogin(async s => {
-    if (s.role !== 'Administrator') { text(el('who'), 'Labels are for administrators.'); return; }
+    if (s.role !== 'Administrator') {
+      // Shown in the page, not hidden in the header (a supervisor reaching this page sees why it is empty).
+      const card = make('section', 'card narrow'); card.append(make('h1', '', 'Machine QR labels'), make('p', 'muted', 'Printing machine labels is for administrators. Ask an administrator to print or replace a label.'));
+      document.querySelector('main').append(card); return;
+    }
     el('page').hidden = false;
     try {
       for (const sh of await api('/api/shops')) el('shop').append(new Option(sh.shopName, sh.id));
       el('filters').addEventListener('submit', ev => { ev.preventDefault(); load(); });
+      // Changing the shop or the inactive option shows the matching labels at once, so Print never prints a stale selection.
+      el('shop').addEventListener('change', load); el('inactive').addEventListener('change', load);
       el('print').addEventListener('click', () => window.print());   // enabled only once every QR image has loaded
       await load();
     } catch (e) { text(el('error'), e.message); el('error').hidden = false; }

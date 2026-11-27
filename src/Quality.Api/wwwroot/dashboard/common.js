@@ -48,7 +48,7 @@ const QR = (() => {
       ev.preventDefault();
       el('loginError').hidden = true;
       try { await login(el('user').value.trim(), el('pass').value); location.reload(); }
-      catch (e) { text(el('loginError'), e.message); el('loginError').hidden = false; }
+      catch (e) { text(el('loginError'), e.message); el('loginError').hidden = false; el('pass').focus(); el('pass').select(); }
     });
   }
 

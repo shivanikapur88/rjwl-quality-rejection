@@ -101,7 +101,11 @@ public sealed class ReportService
         }
 
         // ---- production counts for the rejection rate (round 3, #8) ----
-        var counts = await _master.GetProductionCountsAsync(shops.Where(s => !unavailable.Contains(s.ShopCode)).Select(s => s.Id).ToList(), from, to, shift, q.MachineId);
+        // With a phenomenon selected, only the shops where that phenomenon occurs (its stage's shop) put production into the
+        // denominator: "Pin Deep" is a GDC phenomenon, so CNC/PRE/FINAL production must not dilute its rate (UI review F1).
+        var rateShops = shops.Where(s => !unavailable.Contains(s.ShopCode)).Select(s => s.Id).ToList();
+        if (q.PhenomenonId is not null) rateShops = rateShops.Where(id => rows.Any(r => r.Shop.Id == id)).ToList();
+        var counts = await _master.GetProductionCountsAsync(rateShops, from, to, shift, q.MachineId);
         // Only machine/day/shift combinations that PRODUCED something put rejected parts into the rate: rejections logged on a
         // shift with 0 produced (stock, rework) would otherwise raise the rate with nothing added below the line. They are
         // left outside the rate and show up as lower coverage instead (second full review; rules still decision #13).
@@ -115,7 +119,7 @@ public sealed class ReportService
             if (!hasCounts) return null;   // no production data at all for this scope: no rate, not a zero rate
             var withProd = list.Where(r => produced.ContainsKey((r.Row.MachineId, r.Row.ProductionDate, r.Row.ShiftCode))).Sum(r => r.Row.Quantity);
             var qty = list.Sum(r => r.Row.Quantity);
-            return new RateDto(prod, withProd, prod > 0 ? Math.Round((decimal)withProd / prod, 6) : null, qty > 0 ? Math.Round((decimal)withProd / qty, 4) : null);
+            return new RateDto(prod, withProd, prod > 0 ? Math.Round((decimal)withProd / prod, 6) : null, qty > 0 ? Math.Round((decimal)withProd / qty, 6) : null);
         }
 
         var shopTotals = shops.Where(s => !unavailable.Contains(s.ShopCode))
