@@ -306,3 +306,44 @@ Three independent Fable reviewers read the whole application: server, database s
 Also added in this round, at the user's request: **iOS project parts** (iPhone and iPad). They are not built here, because Apple allows iOS builds only on macOS. See BUILD_AND_DEPLOY §6 and decision #20.
 
 **Found during the verification of this round:** in the first clean-clone run, one integration test failed in the READ_COMMITTED_SNAPSHOT **OFF** mode. A plain `GET` of the machine list was chosen as a deadlock victim against a machine delete running in another test, and the user got 409. The extra index on `qa.Machines` (db/13) makes such reader/writer deadlocks slightly more likely when reads take shared locks. **Fix:** GET requests are retried up to twice on a deadlock (they change nothing). Two further runs in that mode passed, but the deadlock did not occur in them, so the retry path itself has **not** been exercised by a test. With READ_COMMITTED_SNAPSHOT ON (the recommended setting for QualityMasterDB), reads take no shared locks and this deadlock cannot occur.
+
+## UI/UX review (Claude Fable) and redesign
+
+A Fable reviewer tested the live dashboard at desktop, tablet and phone sizes, in light and dark mode. It also reviewed the Android layouts statically (no emulator) and recomputed every displayed number from the API: **2,416 comparisons, 0 mismatches**. At the owner's request the dashboard and the app were then redesigned. The findings were fixed as part of that work.
+
+**Dashboard: redesign.**
+* One token-based design system: rem sizes, a spacing scale, status colours with icons, and visible focus and disabled states. Dark mode has its own brand and focus colours.
+* A hero tile with trend sparklines.
+* Change badges coloured by meaning (fewer rejections = good), always with an arrow and words, never colour alone.
+* A segmented quick-range control that shows the selected range, and a sticky filter bar on wide screens.
+* Cleaner tables and empty states.
+
+**Dashboard: fixes.**
+
+| Severity | Finding | Fix |
+|---|---|---|
+| High | "Top machines" lost its Produced/Rate columns between 761 and ~1090 px | Single column below 1100 px; words wrap at word boundaries; tables scroll inside their card if needed |
+| Medium | Dark mode: focus, chips and primary button almost invisible | Own dark-mode brand and focus colours |
+| Medium | Disabled buttons looked enabled | `:disabled` style |
+| Medium | Tooltip squeezed at the right edge or on phones | Clamped to the screen |
+| Medium | Back did not undo a drill-down | Drill-down steps are added to the browser history |
+| Medium | Coverage mark pushed the rate out of alignment | Shown on its own line under the rate |
+| Medium | Entry times in the browser's time zone | Plant time zone |
+| Medium | Labels page kept the old shop's labels after a shop change | Reloads on change |
+| Medium (phones) | Horizontal scroll at ≤ 360 px for administrators; tap targets under 44 px; long ranges overlapping bars | File input shrinks; 44 px targets on touch screens; long ranges scroll inside the chart |
+| Medium | **Rate with a phenomenon selected divided by every shop's production** | Only the shops where that phenomenon occurs count (integration test: CNC production does not dilute a GDC phenomenon). When several shops are in view, the tile says "all shops in view" (decision #13 still open). |
+| Low | Single-day period text; "today still running"; last day unlabelled; empty chart; "＝ 0%"; "0%" for small shares; pending tile scope; password focus; supervisor on the labels page; "more machines" note; coverage rounding (now 6 decimals, rounded down) | Fixed |
+
+**Android app (static; not run on a device).**
+
+| Severity | Finding | Fix |
+|---|---|---|
+| High | Entry form: about three list rows visible, none with the keyboard open | Two steps: (1) search and list use the whole screen; (2) chosen phenomenon with "Change", quantity, "+ Add remarks", Clear/Save in a scroll view. One-line context header; compact error banner with "Try again"; the keyboard resizes the page. |
+| High | Device dark mode could produce white text on light cards | Light theme locked; implicit styles give every label and input explicit colours |
+| Medium | Home did not scroll; Settings/sign-out unreachable on small phones | Whole page scrolls; large "Scan machine QR"; shop list; grouped actions |
+| Medium | Admin list filters fixed (~300 dp); three buttons per row clipped | Filters scroll away; Edit + Activate/Deactivate on one row, Delete as a red text button |
+| Medium | Secondary/Danger buttons had no disabled state | Added |
+| Medium | Shift summary: "›" active on today; "1 entries"; cut lists not marked | Fixed ("Top 5 …" with a note) |
+| Low | Checkbox labels not tappable; status colours; confirmation shop name and row order; Clear without confirmation; Reject with empty reason | Fixed |
+
+The shared style system has a named type scale (body never below 15, captions 13), a spacing scale, cards, a button hierarchy in sentence case (48 dp minimum) and status chips. The 18 new unit tests are in `MobileDesignTests.cs`. **Not verified on a device:** rendering, keyboard behaviour and text wrapping need the device checklist in BUILD_AND_DEPLOY.
