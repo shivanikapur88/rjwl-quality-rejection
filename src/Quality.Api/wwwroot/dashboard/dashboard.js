@@ -171,13 +171,14 @@
     text(el('incomplete'), r.unavailableShops.length ? `Incomplete: the entries of ${r.unavailableShops.join(', ')} could not be read right now. Totals below leave them out.` : '');
     renderTrend(r);
     renderPareto(r);
-    renderTable(el('machines'), ['Machine', 'Shop', 'Parts', 'vs prev.', 'Produced', 'Rate'],
+    // Phone: machine code, parts, change and rate only (name, shop and produced are hidden below 600 px).
+    renderTable(el('machines'), ['Machine', 'Name', 'Shop', 'Parts', 'vs prev.', 'Produced', 'Rate'],
       r.topMachines.slice(0, 15).map(m => ({
-        cells: [`${m.machineCode} – ${m.machineName}`, m.shopCode, fmt(m.quantity), shortDelta(m.quantity, m.previousQuantity),
+        cells: [m.machineCode, m.machineName, m.shopCode, fmt(m.quantity), shortDelta(m.quantity, m.previousQuantity),
           m.rate ? fmt(m.rate.produced) : '–', m.rate && m.rate.rate !== null ? pct(m.rate.rate, 2) : '–'],
         label: `Show only machine ${m.machineCode}`,
         onClick: () => { drill.machineId = String(m.machineId); drill.machineLabel = m.machineCode; load(true); },
-      })), 'No rejections in this selection.', 2);
+      })), 'No rejections in this selection.', 3, 6, { phoneHide: [1, 2, 5] });
     renderTable(el('shops'), ['Shop', 'Parts', 'Entries', 'Rate'],
       r.shops.map(s => ({
         cells: [s.shopName, fmt(s.quantity), fmt(s.entries), s.rate && s.rate.rate !== null ? pct(s.rate.rate, 2) : '–'],
@@ -296,7 +297,7 @@
       items.map(e => ({ cells: [new Date(e.serverCreatedAtUtc).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
         `${e.productionDate ? shortDay(e.productionDate) : '–'} ${e.shiftCode ?? ''}`, e.shopCode, e.machineCode, e.phenomenonName, fmt(e.quantity),
         e.inspectorEmployeeCode, (e.correctsEntryId ? `[correction of #${e.correctsEntryId}] ` : '') + (e.remarks ?? '')] })),
-      'No entries in this selection.', 5, 5);
+      'No entries in this selection.', 5, 5, { stack: true });   // phone: each entry becomes a small card
     if (items.length < all.length) {
       const more = make('button', 'link-dark', `Show ${all.length - items.length} more`); more.type = 'button';
       more.addEventListener('click', () => { showAllEntries = true; renderEntries(lastEntries); });
@@ -304,20 +305,27 @@
     }
   }
 
-  /** Rows: {cells, label?, onClick?}. Columns from numFrom to numTo are right-aligned numbers. */
-  function renderTable(host, head, rows, empty, numFrom = 1, numTo = head.length - 1) {
+  /**
+   * Rows: {cells, label?, onClick?}. Columns from numFrom to numTo are right-aligned numbers.
+   * opts.phoneHide: column indexes hidden on narrow screens; opts.stack: on narrow screens each row is shown as a card
+   * whose cells carry their column name (data-label), instead of a table too wide for a phone.
+   */
+  function renderTable(host, head, rows, empty, numFrom = 1, numTo = head.length - 1, opts = {}) {
     host.replaceChildren();
     if (!rows.length) { host.append(make('p', 'muted', empty)); return; }
     const isNum = i => i >= numFrom && i <= numTo;
-    const t = make('table'); const tr = make('tr');
-    head.forEach((h, i) => { const th = make('th', isNum(i) ? 'num' : '', h); th.scope = 'col'; tr.append(th); });
+    const hide = new Set(opts.phoneHide || []);
+    const cls = i => [isNum(i) ? 'num' : '', hide.has(i) ? 'phone-hide' : ''].filter(Boolean).join(' ');
+    const t = make('table', opts.stack ? 'stack' : ''); const tr = make('tr');
+    head.forEach((h, i) => { const th = make('th', cls(i), h); th.scope = 'col'; tr.append(th); });
     const thead = make('thead'); thead.append(tr); t.append(thead);
     const tb = make('tbody');
     rows.forEach(r => {
       const row = make('tr', r.onClick ? 'clickable' : '');
       r.cells.forEach((c, i) => {
-        const td = make(i === 0 ? 'th' : 'td', isNum(i) ? 'num' : '');
+        const td = make(i === 0 ? 'th' : 'td', cls(i));
         if (i === 0) td.scope = 'row';
+        td.dataset.label = head[i];
         // Clickable rows keep their table semantics; the first cell holds a real button for keyboard and screen readers.
         if (i === 0 && r.onClick) { const b = make('button', 'rowbtn', c); b.type = 'button'; if (r.label) b.title = r.label; td.append(b); }
         else td.textContent = c;

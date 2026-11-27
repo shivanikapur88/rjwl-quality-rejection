@@ -102,3 +102,26 @@ tr.clickable { cursor: pointer; }
 td.num, th.num { white-space: nowrap; }
 
 .warn-text { color: var(--warn); font-weight: 600; }
+
+/* ---- phone layout (second full review follow-up) ---- */
+@media (max-width: 600px) {
+  main { padding-left: 12px; padding-right: 12px; }
+  .card { padding: 14px 12px; }
+  th, td { padding: 6px 5px; }
+  .phone-hide { display: none; }
+  /* Pareto: rank, name (may wrap to two lines), parts, share, cumulative */
+  .prow { grid-template-columns: 20px 1fr 36px 40px 70px; gap: 6px; }
+  .prow .barname { white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+  /* Entries: one card per entry instead of an 8-column table */
+  table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.stack, table.stack tbody { display: block; }
+  table.stack tr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+  table.stack th, table.stack td { display: block; border: 0; padding: 0; text-align: left; min-width: 0; overflow-wrap: anywhere; }
+  table.stack th[data-label]::before, table.stack td[data-label]::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 400; color: var(--text-secondary); }
+  table.stack td:last-child { grid-column: 1 / -1; }
+  table.stack td:last-child:empty { display: none; }
+  .tiles { gap: 10px; }
+  .tile-value { font-size: 26px; }
+}
+/* Machine codes stay on one line (max 30 characters); the name column wraps instead. */
+#machines tbody th .rowbtn { white-space: nowrap; }
