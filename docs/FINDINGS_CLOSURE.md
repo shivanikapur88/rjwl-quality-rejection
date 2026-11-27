@@ -241,3 +241,66 @@ After the phone layout was added, three independent reviewers (Claude Sonnet 5.5
 | A10 | Low | Changing only the server path kept the session. | Scheme, host, port and path are compared. | `Changing_only_the_server_path_signs_out` |
 
 All fixes are verified by unit tests through the real API client with a scripted server; none has been tried on a device yet (no emulator in this environment).
+
+## Complete review by Claude Fable (after the third Sonnet review)
+
+Three independent Fable reviewers read the whole application: server, database scripts, and the app with the dashboard and documents. They found **two high-severity defects**, both introduced or missed by earlier rounds, and both now fixed. Every finding was checked against the code.
+
+### High
+
+| # | Finding | Fix | Evidence |
+|---|---|---|---|
+| H-DB | The "compatibility level ≥ 130" guard added in the third review was wrong. STRING_AGG and FOR JSON depend on the SQL Server version, not the level. The guard could stop the upgrade of the shared GDC/CNC databases, and it told operators to change another system's database setting. | Replaced by a SQL Server 2017+ version check. Database levels are never touched. Runbook corrected. | sqlcmd fresh install and upgrade path |
+| H-App | My entries: on a device, "Load more" reloaded page 1. The pull-to-refresh control ran its refresh command whenever the busy flag went true. The same coupling existed on Summary and Corrections. | Pull-to-refresh has its own flag, set only by the pull; "Load more" shows its own progress. | unit `Load_more_does_not_set_the_refresh_flag_and_a_pull_refreshes_once`, `Summary_and_corrections_loads_from_code_do_not_set_the_refresh_flag` |
+
+### Server
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| S1 | Medium | "Known login" exemptions lived only in memory, so the lock-out protection lapsed after every restart or IIS recycle. | Persisted in `qa.LoginKnownClients` (db/16), looked up when not in memory (at most every 5 min per pair). | unit `Known_logins_survive_a_restart_through_the_store`; integration `Role_refusals_have_a_code_and_sign_ins_are_remembered` |
+| S2 | Medium (plausible) | Throttle keys did not match the database's notion of the same login (zero-width characters, ß). | Keys are folded; anything that is not a valid identifier after folding shares one key. | unit `Login_keys_fold_variants_and_never_throw` |
+| S3 | Low | Anonymous 500 when the 50-character cut split an emoji. | Cut on a character boundary; never throws. | same |
+| S4 | Low | 403 (roles) and limiter 429 had no problem body or code. | `forbidden` / `too_many_attempts` with Retry-After. | integration test above |
+| S5 | Low | No proxy warning for a proxy on the same server. | Warns for loopback peers too (not in Development). | — |
+| S6 | Low | A stale token made anonymous endpoints depend on the master database. | Revocation check skipped on anonymous endpoints. | — |
+| S7 | Low | Connection-pool exhaustion gave 500. | 503 "server is busy". | — |
+| S8 | Low | A failed shift-table read was hidden while an older calendar was cached. | Readiness reports it; retried after 15 s. | — |
+| S9 | Low (plausible) | Throttle eviction could flush a targeted login's bucket. | Buckets at their limit are never evicted. | unit `Eviction_keeps_buckets_that_are_at_their_limit` |
+
+### Database
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| D1 | Medium (plausible) | db/12 added filtered indexes to the shared GDC/CNC databases. Their owners' maintenance jobs running with QUOTED_IDENTIFIER OFF would then fail. | No filtered indexes there: a plain index on ProductionDate; the redundant unique replacement index is removed (one replacement per correction is already guaranteed). | sqlcmd install and upgrade |
+| D2 | Medium | New constraints on existing tables had no pre-check. | db/13 lists rows whose shop is wrong (50016); the db/12 self-reference uses WITH NOCHECK and a warning. | — |
+| D3 | Low (plausible) | db/04 locked another index than the API. | Same statement as the API (by Id). | — |
+| D4 | Low | db/15 granted to an orphaned user without a login; problems with mapped or foreign users; tables were skipped silently. | Refuses with 50150-50153; re-maps only true orphans; warns about missing tables. | sqlcmd: run in all three databases; refuses `master` (50153) |
+| D5 | Low | db/10's character check depended on the collation. | Binary comparison. | — |
+| D6 | Low | Template 14 could hit a collation conflict. | `COLLATE DATABASE_DEFAULT`. | — |
+| D7 | Low | Docs and tooling wording (12 header, "seeded codes", upgrade-test description). | Corrected. | — |
+
+### Android app
+
+| # | Severity | Finding | Fix | Evidence (unit tests) |
+|---|---|---|---|---|
+| A1 | Medium | A kept entry draft could not be retried after the phenomena list failed to load. | "Try again" button; the draft is kept until restored. | `Failed_phenomena_load_can_be_retried_and_the_draft_is_kept_until_restored`, `A_draft_not_yet_restored_is_resumed_when_the_same_form_is_opened_again` |
+| A2 | Medium | The unknown-outcome protection was lost on leaving the form, so a re-entered save could duplicate. | The pending submission id is kept per user, shop, stage and machine until the outcome is known. | `An_unknown_outcome_survives_leaving_the_form_and_its_id_is_reused_for_the_same_selection`, `A_reused_id_with_other_details_gets_a_new_id_from_the_payload_mismatch_answer` |
+| A3 | Medium (plausible) | Certificate detection was too broad (any "SSL" text) and too narrow (some exception types). | Trust failures matched specifically, in any exception type; handshake resets and timeouts stay network errors. | `Certificate_trust_failures_are_recognised_in_any_exception_type`, `Handshake_resets_and_timeouts_stay_network_errors` |
+| A4 | Low | Unrelated answers cleared the unknown-outcome flag. | Only an answer of the entry endpoint does. | `Answers_not_from_the_entry_endpoint_do_not_settle_an_unknown_outcome` |
+| A5 | Low | Phenomenon editor: quick shop changes. | Sequence guard. | `Phenomenon_editor_quick_shop_changes_show_only_the_latest_shops_stages` |
+| A6 | Low | Home looked role-less after the token expired locally. | Returns to sign-in. | `Home_returns_to_sign_in_when_the_token_ran_out_while_the_app_was_open` |
+| A7 | Low | "Test connection" saved the address and signed out before the result. | Tests the typed address only; Save persists it. | `Test_connection_checks_the_typed_address_without_saving_it_or_signing_out` |
+
+### Dashboard and documents
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| W1 | Low | After a failed load the chips and URL showed the new selection over the old numbers. | The previous selection is restored, and the message says so. | browser check |
+| W2 | Low | Coverage warnings could read "⚠ 80%". | Rounded down. | — |
+| W3 | Low | Focus was lost after removing the last chip. | Moves to the first filter. | — |
+| W4 | Low | Too large uploads got a generic 413. | 5,000-row limit checked first. | — |
+| W5 | Low | Long remarks widened the table. | Text wraps. | — |
+| W6 | Low (plausible) | A PC clock far ahead made sign-in loop silently. | No client-clock expiry check; the server decides. | — |
+| W7 | Docs | "All fixed with tests", the stale readiness header, the stale evidence remark. | Corrected. | — |
+
+Also added in this round, at the user's request: **iOS project parts** (iPhone and iPad). They are not built here, because Apple allows iOS builds only on macOS. See BUILD_AND_DEPLOY §6 and decision #20.
