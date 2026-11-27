@@ -228,7 +228,7 @@ Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `6808bdd0778
 | db/15 via sqlcmd | OK in all three databases; refuses the `master` database (50153) |
 | Browser checks | A failed load (more than 92 days) restores the previous selection, and the message says so; no horizontal scrolling at phone width; no page errors |
 
-**Found during verification:** the first clean run (commit `518a164`) had one failure in the RCSI OFF mode: a `GET` of the machine list was a deadlock victim against a machine delete in another test (409). GET requests are now retried on a deadlock. This run, and two runs before it in that mode, passed, but none hit a deadlock, so the retry path has **not** been exercised by a test. The failed output is kept in the history of this file's commit (`evidence6`, not committed); the closure record describes it.
+**Found during verification:** the first clean run (commit `518a164`) had one failure in the RCSI OFF mode: a `GET` of the machine list was a deadlock victim against a machine delete in another test (409). GET requests are now retried on a deadlock. This run, and two runs before it in that mode, passed, but none hit a deadlock, so the retry path has **not** been exercised by a test. The failed run's output is in `evidence/fable/first_run_518a164_integration_OFF_FAILED.txt`; the closure record describes it.
 
 **iOS:**
 * **Not built.** Apple allows iOS builds only on macOS, and this environment is Linux.
