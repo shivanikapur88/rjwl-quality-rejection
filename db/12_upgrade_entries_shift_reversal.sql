@@ -1,6 +1,6 @@
 /* ============================================================================
    12_upgrade_entries_shift_reversal.sql  -  EVERY entry database
-   (GDC_AndonDB, MachineShopDB, and QualityMasterDB for PRE/FINAL). Run AFTER 09. Idempotent.
+   (GDC_AndonDB, MachineShopDB, and QualityMasterDB for PRE/FINAL). Run AFTER 09 (and, in QualityMasterDB, after 11). Idempotent.
    Touches only the Quality table qa.QualityRejectionEntries.
 
      ProductionDate / ShiftCode   production day and shift the entry belongs to (set by the API on save)
@@ -12,9 +12,11 @@
    BACKFILL of ProductionDate/ShiftCode for existing rows uses the plant offset and shift start times below.
    They must match qa.ShiftDefinitions and Plant:TimeZoneId (India Standard Time = UTC+05:30, no daylight saving).
    ============================================================================ */
--- STRING_AGG / FOR JSON need database compatibility level 130 (SQL Server 2016) or higher.
-IF (SELECT compatibility_level FROM sys.databases WHERE name = DB_NAME()) < 130
-    THROW 50015, N'This database has compatibility level below 130. Raise it (ALTER DATABASE ... SET COMPATIBILITY_LEVEL = 150) after checking with its owners.', 1;
+-- STRING_AGG needs SQL Server 2017 (version 14) or later, on any database compatibility level; the database's level is
+-- left alone (GDC_AndonDB and MachineShopDB belong to other systems). (Fable review: an earlier compatibility-level check
+-- here was wrong and could block the upgrade of those databases.)
+IF CAST(SERVERPROPERTY('ProductMajorVersion') AS int) < 14
+    THROW 50015, N'SQL Server 2017 or later is required.', 1;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 -- Required for filtered indexes and consistent behaviour; sqlcmd defaults QUOTED_IDENTIFIER to OFF.
@@ -89,19 +91,36 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_Shop_ProductionDa
         INCLUDE (Quantity, MachineId, MachineCode, MachineName, RejectionPhenomenonId, PhenomenonNameSnapshot, ReversedAt);
 GO
 -- Rows still without a production day (normally none): lets the readiness check find them without a table scan.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_NoProductionDate' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
-    CREATE INDEX IX_QRE_NoProductionDate ON qa.QualityRejectionEntries (Id) WHERE ProductionDate IS NULL;
+-- NO filtered indexes in the entry databases (Fable review): GDC_AndonDB and MachineShopDB belong to other systems, and once a
+-- table has a filtered index every write or index rebuild from a session with QUOTED_IDENTIFIER OFF (e.g. a SQL Agent
+-- maintenance job) fails with error 1934. A plain index on ProductionDate lets the readiness check find rows without one.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_NoProductionDate' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
+    DROP INDEX IX_QRE_NoProductionDate ON qa.QualityRejectionEntries;   -- filtered version from an earlier draft
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_ProductionDate' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
+    CREATE INDEX IX_QRE_ProductionDate ON qa.QualityRejectionEntries (ProductionDate);
 GO
 -- Production day and shift are set together (the API and the backfill always set both).
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_QRE_ProductionDay_Shift' AND parent_object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
     ALTER TABLE qa.QualityRejectionEntries WITH CHECK ADD CONSTRAINT CK_QRE_ProductionDay_Shift
         CHECK ((ProductionDate IS NULL AND ShiftCode IS NULL) OR (ProductionDate IS NOT NULL AND ShiftCode IS NOT NULL));
 -- A replacement points to an existing entry of the same table.
+-- Existing rows that point to a missing entry are kept (constraint added WITH NOCHECK and reported), not a failed upgrade.
 IF OBJECT_ID(N'qa.FK_QRE_CorrectsEntry', N'F') IS NULL
-    ALTER TABLE qa.QualityRejectionEntries WITH CHECK ADD CONSTRAINT FK_QRE_CorrectsEntry FOREIGN KEY (CorrectsEntryId) REFERENCES qa.QualityRejectionEntries(Id);
+BEGIN
+    IF EXISTS (SELECT 1 FROM qa.QualityRejectionEntries r WHERE r.CorrectsEntryId IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM qa.QualityRejectionEntries o WHERE o.Id = r.CorrectsEntryId))
+    BEGIN
+        PRINT N'WARNING: some replacement entries refer to an entry that does not exist; the foreign key is added without checking them.';
+        ALTER TABLE qa.QualityRejectionEntries WITH NOCHECK ADD CONSTRAINT FK_QRE_CorrectsEntry FOREIGN KEY (CorrectsEntryId) REFERENCES qa.QualityRejectionEntries(Id);
+    END
+    ELSE
+        ALTER TABLE qa.QualityRejectionEntries WITH CHECK ADD CONSTRAINT FK_QRE_CorrectsEntry FOREIGN KEY (CorrectsEntryId) REFERENCES qa.QualityRejectionEntries(Id);
+END;
 GO
--- Backstop for the cross-database approval: at most one replacement entry per corrected entry.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_QRE_CorrectsEntryId' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
-    CREATE UNIQUE INDEX UX_QRE_CorrectsEntryId ON qa.QualityRejectionEntries (CorrectsEntryId) WHERE CorrectsEntryId IS NOT NULL;
+-- No unique filtered index on CorrectsEntryId (see above): one replacement per correction is guaranteed by the unique
+-- SubmissionId (the replacement's id is fixed per correction request) and one approved correction per entry by the
+-- filtered unique index on qa.EntryCorrections in the master. An index from an earlier draft is removed.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_QRE_CorrectsEntryId' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
+    DROP INDEX UX_QRE_CorrectsEntryId ON qa.QualityRejectionEntries;
 GO
 PRINT N'12_upgrade_entries_shift_reversal.sql complete.';

@@ -35,6 +35,13 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_Machines_Id_Shop' AND object_id = OBJECT_ID(N'qa.Machines'))
     CREATE UNIQUE INDEX UX_Machines_Id_Shop ON qa.Machines (Id, ShopId);
 IF OBJECT_ID(N'qa.FK_ProductionCounts_MachineShop', N'F') IS NULL
+   AND EXISTS (SELECT 1 FROM qa.ProductionCounts c JOIN qa.Machines m ON m.Id = c.MachineId WHERE c.ShopId <> m.ShopId)
+BEGIN
+    SELECT c.Id, c.MachineId, c.ShopId AS StoredShopId, m.ShopId AS MachinesShopId, c.ProductionDate, c.ShiftCode
+    FROM qa.ProductionCounts c JOIN qa.Machines m ON m.Id = c.MachineId WHERE c.ShopId <> m.ShopId;
+    THROW 50016, N'Some production counts carry a shop that is not their machine''s shop (listed above). Correct ShopId (UPDATE qa.ProductionCounts SET ShopId = <machine''s shop>), then re-run 13.', 1;
+END;
+IF OBJECT_ID(N'qa.FK_ProductionCounts_MachineShop', N'F') IS NULL
     ALTER TABLE qa.ProductionCounts WITH CHECK ADD CONSTRAINT FK_ProductionCounts_MachineShop
         FOREIGN KEY (MachineId, ShopId) REFERENCES qa.Machines (Id, ShopId);
 GO

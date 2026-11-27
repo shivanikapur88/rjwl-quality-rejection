@@ -18,9 +18,11 @@
    ============================================================================ */
 SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
 SET ANSI_NULLS ON;
--- STRING_AGG / FOR JSON need database compatibility level 130 (SQL Server 2016) or higher.
-IF (SELECT compatibility_level FROM sys.databases WHERE name = DB_NAME()) < 130
-    THROW 50015, N'This database has compatibility level below 130. Raise it (ALTER DATABASE ... SET COMPATIBILITY_LEVEL = 150) after checking with its owners.', 1;
+-- FOR JSON needs SQL Server 2016; the scripts as a whole need SQL Server 2017 (version 14) or later, on any database compatibility level; the database's level is
+-- left alone (GDC_AndonDB and MachineShopDB belong to other systems). (Fable review: an earlier compatibility-level check
+-- here was wrong and could block the upgrade of those databases.)
+IF CAST(SERVERPROPERTY('ProductMajorVersion') AS int) < 14
+    THROW 50015, N'SQL Server 2017 or later is required.', 1;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
