@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Upgrade-path test: supplied schema (01-04, entries table without Quantity, users created the old way, including a
-# username/employee-code collision) -> 07, 09, 08. Creates and drops nothing but the database QRUP. NEVER run against production.
+# username/employee-code collision) -> 07, 08, 09, then 11, 12, 13, 16 and 15 (runbook order). Creates and drops nothing but the database QRUP. NEVER run against production.
 #   SQLCMD="sqlcmd -S localhost,14333 -U sa -P ... -C" DB_DIR=db tools/test-upgrade-path.sh
 set -e
 TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
@@ -16,7 +16,7 @@ $Q -d QRUP -Q "SET NOCOUNT ON; ALTER TABLE qa.QualityRejectionEntries DROP CONST
 echo "2. run 07 (quantity), as in the runbook before 08"
 $Q -d QRUP -i $DB_DIR/07_migration_add_quantity.sql >/dev/null
 $Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT '   old entry quantity = ' + CAST(Quantity AS varchar) FROM qa.QualityRejectionEntries"
-echo "3. run 08 with the collision present -> must stop and change nothing"
+echo "3. run 08 with the collision present -> must stop before any login identifier is written"
 if $Q -d QRUP -i $DB_DIR/08_upgrade_master_review_fixes.sql > "$TMP" 2>&1; then fail "08 succeeded despite the collision"; else grep -E "Msg 50080|E100" "$TMP" | head -3 | sed 's/^/   /'; fi
 $Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT '   LoginIdentifiers rows after refused run: ' + CAST(COUNT(*) AS varchar) FROM qa.LoginIdentifiers"
 echo "4. resolve the collision (rename one account) and re-run 08"
@@ -27,8 +27,8 @@ echo "5. re-run 08 again (idempotent), then 09 (runbook order: 08 before 09)"; $
 echo "6. trigger: deactivating the only admin is refused"
 $Q -d QRUP -Q "UPDATE qa.Users SET IsActive = 0 WHERE Username = 'admin1'" 2>&1 | grep -o "At least one active administrator must remain" | sed 's/^/   /'
 echo "7. round 2/3 upgrades on the same database: 11, 12 (backfills the old entry), 13; then all three again"
-for f in 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts; do $Q -d QRUP -i $DB_DIR/$f.sql >/dev/null; done
-for f in 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts; do $Q -d QRUP -i $DB_DIR/$f.sql >/dev/null; done
+for f in 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts 16_upgrade_master_login_known_clients; do $Q -d QRUP -i $DB_DIR/$f.sql >/dev/null; done
+for f in 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts 16_upgrade_master_login_known_clients; do $Q -d QRUP -i $DB_DIR/$f.sql >/dev/null; done
 n=$($Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL OR ShiftCode IS NULL" | tr -d '[:space:]')
 [ "$n" = "0" ] || fail "entries without production day after 12: $n"; echo "   old entry has a production day and shift"
 $Q -d QRUP -h -1 -Q "SET NOCOUNT ON; IF OBJECT_ID('qa.ProductionCounts') IS NULL THROW 50000, 'no ProductionCounts', 1; SELECT '   production counts table present'"

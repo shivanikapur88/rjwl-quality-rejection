@@ -8,11 +8,12 @@
 SET NOCOUNT ON; SET XACT_ABORT ON;
 SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON;   -- sqlcmd starts with QUOTED_IDENTIFIER OFF
 BEGIN TRANSACTION;
-DECLARE @inserted int = 0, @lock int;
+DECLARE @inserted int = 0, @lock int, @stageId int;
 DECLARE @seed TABLE (StageCode nvarchar(30) NOT NULL, Code nvarchar(30) NOT NULL, Name nvarchar(200) NOT NULL, Norm nvarchar(200) NOT NULL);
 
 -- GDC Shop: 25 Excel rows, 25 imported, 0 skipped (duplicate)
-SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE StageCode = N'GDC_SHOP';   -- same lock as the API's code allocation
+SELECT @stageId = Id FROM qa.InspectionStages WHERE StageCode = N'GDC_SHOP';
+SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE Id = @stageId;   -- same lock as the API
 INSERT INTO @seed (StageCode, Code, Name, Norm) VALUES
   (N'GDC_SHOP', N'GDC_SHOP-001', N'Bore B/H', N'BORE B/H'),
   (N'GDC_SHOP', N'GDC_SHOP-002', N'Spoke B.H', N'SPOKE B.H'),
@@ -57,7 +58,8 @@ FROM missing m CROSS JOIN hi;
 SET @inserted += @@ROWCOUNT;
 
 -- CNC Shop: 53 Excel rows, 52 imported, 1 skipped (duplicate)
-SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE StageCode = N'CNC_SHOP';   -- same lock as the API's code allocation
+SELECT @stageId = Id FROM qa.InspectionStages WHERE StageCode = N'CNC_SHOP';
+SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE Id = @stageId;   -- same lock as the API
 INSERT INTO @seed (StageCode, Code, Name, Norm) VALUES
   (N'CNC_SHOP', N'CNC_SHOP-001', N'BEARING BORE O/S', N'BEARING BORE O/S'),
   (N'CNC_SHOP', N'CNC_SHOP-002', N'CHATTERING', N'CHATTERING'),
@@ -129,7 +131,8 @@ FROM missing m CROSS JOIN hi;
 SET @inserted += @@ROWCOUNT;
 
 -- Pre-treatment Inspection: 34 Excel rows, 34 imported, 0 skipped (duplicate)
-SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE StageCode = N'PRE_TREATMENT';   -- same lock as the API's code allocation
+SELECT @stageId = Id FROM qa.InspectionStages WHERE StageCode = N'PRE_TREATMENT';
+SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE Id = @stageId;   -- same lock as the API
 INSERT INTO @seed (StageCode, Code, Name, Norm) VALUES
   (N'PRE_TREATMENT', N'PRE_TREATMENT-001', N'C.I. RING UNCLEAN', N'C.I. RING UNCLEAN'),
   (N'PRE_TREATMENT', N'PRE_TREATMENT-002', N'C.I. RING SHIFT', N'C.I. RING SHIFT'),
@@ -183,7 +186,8 @@ FROM missing m CROSS JOIN hi;
 SET @inserted += @@ROWCOUNT;
 
 -- FINAL Inspection: 34 Excel rows, 34 imported, 0 skipped (duplicate)
-SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE StageCode = N'FINAL';   -- same lock as the API's code allocation
+SELECT @stageId = Id FROM qa.InspectionStages WHERE StageCode = N'FINAL';
+SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE Id = @stageId;   -- same lock as the API
 INSERT INTO @seed (StageCode, Code, Name, Norm) VALUES
   (N'FINAL', N'FINAL-001', N'C.I. RING UNCLEAN', N'C.I. RING UNCLEAN'),
   (N'FINAL', N'FINAL-002', N'C.I. RING SHIFT', N'C.I. RING SHIFT'),

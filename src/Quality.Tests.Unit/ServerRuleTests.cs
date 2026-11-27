@@ -103,6 +103,55 @@ public sealed class LoginThrottleTests
         Assert.Equal(2, probes);
     }
 
+    /// <summary>Fable review: variants the database may treat as the same account share one key; odd input never throws.</summary>
+    [Fact]
+    public void Login_keys_fold_variants_and_never_throw()
+    {
+        Assert.Equal("ADMIN", LoginThrottle.LoginKey(" admín "));
+        Assert.Equal(LoginThrottle.OtherLoginKey, LoginThrottle.LoginKey("ad\u200Bmin"));        // zero-width space
+        Assert.Equal(LoginThrottle.OtherLoginKey, LoginThrottle.LoginKey("jeß"));
+        Assert.Equal(new string('A', 49), LoginThrottle.LoginKey(new string('a', 49) + "😀"));   // the cut drops the half emoji; no exception (was a 500)
+        Assert.Equal(LoginThrottle.OtherLoginKey, LoginThrottle.LoginKey("\uD800x"));             // lone surrogate
+        Assert.Equal("E1001", LoginThrottle.LoginKey("e1001"));
+    }
+
+    /// <summary>Fable review: flooding random logins must not evict a bucket that is at its limit.</summary>
+    [Fact]
+    public void Eviction_keeps_buckets_that_are_at_their_limit()
+    {
+        var th = new LoginThrottle(_t);
+        for (var i = 0; i < 10; i++) Fail(th, $"10.0.9.{i}", "admin");                 // l:ADMIN at its limit
+        for (var i = 0; i < 30_000; i++) { th.TryBegin($"10.{i / 65536 % 256}.{i / 256 % 256}.{i % 256}", $"rnd{i}"); if (i % 1000 == 0) _t.Now += TimeSpan.FromSeconds(2); }
+        _t.Now += TimeSpan.FromSeconds(31);
+        th.TryBegin("10.200.0.1", "trigger");                                            // prune runs
+        Assert.True(th.KeyCount <= LoginThrottle.MaxEntries);
+        Assert.NotNull(th.TryBegin("10.200.0.2", "admin"));                             // still refused from a new address
+    }
+
+    private sealed class MemoryStore : IKnownLoginStore
+    {
+        public readonly Dictionary<(string, string), DateTime> Rows = new();
+        public Task<DateTime?> LastSuccessAsync(string c, string l, CancellationToken ct) => Task.FromResult(Rows.TryGetValue((c, l), out var at) ? at : (DateTime?)null);
+        public Task SaveAsync(string c, string l, DateTime at, CancellationToken ct) { Rows[(c, l)] = at; return Task.CompletedTask; }
+    }
+
+    /// <summary>Fable review: a restart (new throttle instance) must not forget that a login is known on its tablet.</summary>
+    [Fact]
+    public async Task Known_logins_survive_a_restart_through_the_store()
+    {
+        var store = new MemoryStore();
+        var before = new LoginThrottle(_t, store);
+        await before.PrepareAsync("tablet-7", "admin", TestContext.Current.CancellationToken);
+        Assert.Null(before.TryBegin("tablet-7", "admin", out var known)); before.RecordSuccess("tablet-7", "admin", known);
+        await before.RememberAsync("tablet-7", "admin", TestContext.Current.CancellationToken);
+        _t.Now += TimeSpan.FromHours(2);
+        var after = new LoginThrottle(_t, store);                                        // API restarted
+        for (var i = 0; i < 10; i++) Fail(after, $"attacker-{i}", "admin");             // per-login bucket full
+        await after.PrepareAsync("tablet-7", "admin", TestContext.Current.CancellationToken);
+        Assert.Null(after.TryBegin("tablet-7", "admin"));                                // the usual tablet still signs in
+        Assert.NotNull(after.TryBegin("new-pc", "admin"));
+    }
+
     /// <summary>Accent and width variants of one login share a bucket (an accent-insensitive collation treats them as one account).</summary>
     [Fact]
     public void Accent_variants_of_a_login_share_one_bucket()

@@ -19,19 +19,30 @@ SET XACT_ABORT ON;
 
 DECLARE @ApiUser sysname = N'qr_api';
 
-IF SUSER_ID(@ApiUser) IS NULL AND DATABASE_PRINCIPAL_ID(@ApiUser) IS NULL
+-- The server login must exist (a database user without it cannot connect, even if this script grants it rights).
+IF SUSER_ID(@ApiUser) IS NULL
     THROW 50150, N'The API login does not exist on this server. Create it first (CREATE LOGIN), then run this script.', 1;
+-- This script works on the tables of this application only: refuse a database that has neither.
+IF OBJECT_ID(N'qa.Users', N'U') IS NULL AND OBJECT_ID(N'qa.QualityRejectionEntries', N'U') IS NULL
+    THROW 50153, N'Neither qa.Users nor qa.QualityRejectionEntries exists in this database: run the schema scripts (01/02a/02b/02c) first, or check the database name.', 1;
 
 DECLARE @u nvarchar(300) = QUOTENAME(@ApiUser), @sql nvarchar(max);
-IF DATABASE_PRINCIPAL_ID(@ApiUser) IS NULL
+DECLARE @loginSid varbinary(85) = SUSER_SID(@ApiUser);
+DECLARE @userSid varbinary(85) = (SELECT sid FROM sys.database_principals WHERE name = @ApiUser);
+DECLARE @mappedName sysname = (SELECT name FROM sys.database_principals WHERE sid = @loginSid);
+IF @mappedName IS NOT NULL AND @mappedName <> @ApiUser
+    THROW 50151, N'The API login is already mapped to another database user in this database. Grant to that user (set @ApiUser) or drop it first.', 1;
+IF @userSid IS NULL
 BEGIN
     SET @sql = N'CREATE USER ' + @u + N' FOR LOGIN ' + @u + N';';
     EXEC sys.sp_executesql @sql;
 END
--- After a restore onto another server the database user can be "orphaned" (its SID differs from the login's): re-map it.
-ELSE IF SUSER_SID(@ApiUser) IS NOT NULL
-     AND (SELECT sid FROM sys.database_principals WHERE name = @ApiUser) <> SUSER_SID(@ApiUser)
+ELSE IF @userSid <> @loginSid
 BEGIN
+    -- Re-map only a truly orphaned user (its SID belongs to no login, e.g. after a restore onto another server); a user
+    -- of this name that belongs to a different login is left alone and reported.
+    IF SUSER_SNAME(@userSid) IS NOT NULL
+        THROW 50152, N'A database user with the API name exists but belongs to a different login. Check with the DBA.', 1;
     SET @sql = N'ALTER USER ' + @u + N' WITH LOGIN = ' + @u + N';';
     EXEC sys.sp_executesql @sql;
     PRINT N'Re-mapped the orphaned database user ' + @ApiUser + N' to its login.';
@@ -55,7 +66,6 @@ IF OBJECT_ID(N'qa.Users', N'U') IS NOT NULL   -- the master database
         (N'qa.InspectionStages',    N'SELECT'),            -- the Q8 code allocation lock is SELECT ... WITH (UPDLOCK, HOLDLOCK)
         (N'qa.ShopStages',          N'SELECT'),
         (N'qa.ShiftDefinitions',    N'SELECT'),
-        (N'qa.SchemaVersions',      N'SELECT'),
         (N'qa.Users',               N'SELECT, INSERT, UPDATE'),
         (N'qa.LoginIdentifiers',    N'SELECT, INSERT'),
         (N'qa.UserShops',           N'SELECT, INSERT, DELETE'),
@@ -63,12 +73,17 @@ IF OBJECT_ID(N'qa.Users', N'U') IS NOT NULL   -- the master database
         (N'qa.RejectionPhenomena',  N'SELECT, INSERT, UPDATE, DELETE'),
         (N'qa.EntryCorrections',    N'SELECT, INSERT, UPDATE'),
         (N'qa.ProductionCounts',    N'SELECT, INSERT, UPDATE'),
+        (N'qa.LoginKnownClients',   N'SELECT, INSERT, UPDATE, DELETE'),   -- db/16: login throttle memory (expired rows removed)
         (N'qa.AuditLog',            N'SELECT, INSERT');    -- append-only: no UPDATE, no DELETE
 
 IF OBJECT_ID(N'qa.QualityRejectionEntries', N'U') IS NOT NULL   -- every entry database (and PRE/FINAL in the master)
     INSERT @grants VALUES
         (N'qa.QualityRejectionEntries', N'SELECT, INSERT'),
         (N'qa.QualityRejectionEntries', N'UPDATE (ReversedAt, ReversedByCorrectionId)');   -- approved corrections only
+
+-- Report expected tables that are missing here (their grant is skipped): usually a schema script not run yet.
+DECLARE @missing nvarchar(max) = (SELECT STRING_AGG(Obj, N', ') FROM (SELECT DISTINCT Obj FROM @grants WHERE OBJECT_ID(Obj, N'U') IS NULL) m);
+IF @missing IS NOT NULL PRINT N'WARNING: not granted because the table does not exist yet: ' + @missing + N'. Run the missing script, then this one again.';
 
 DECLARE @obj sysname, @perm nvarchar(200);
 DECLARE g CURSOR LOCAL FAST_FORWARD FOR SELECT Obj, Perm FROM @grants WHERE OBJECT_ID(Obj, N'U') IS NOT NULL;

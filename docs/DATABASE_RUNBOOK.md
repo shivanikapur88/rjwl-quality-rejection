@@ -4,7 +4,7 @@
 
 `<I>` = SQL Server instance. Use `-E` for Windows authentication, or `-U … -P …`.
 
-**Requirements:** SQL Server 2016 or later, with every database at compatibility level **130 or higher** (scripts 10 and 12 check this and stop with error 50015). Tested on SQL Server 2022. For any ad-hoc SQL against these tables with `sqlcmd`, add `-I` (QUOTED_IDENTIFIER ON); without it, writes to tables with filtered indexes fail with error 1934.
+**Requirements:** **SQL Server 2017 or later** (scripts 10 and 12 check the server version and stop with error 50015); any database compatibility level, so the levels of GDC_AndonDB and MachineShopDB are never changed. Tested on SQL Server 2022. The scripts add **no filtered indexes to GDC_AndonDB and MachineShopDB**, so maintenance jobs of the systems that own those databases are not affected by QUOTED_IDENTIFIER settings. For any ad-hoc SQL against these tables with `sqlcmd`, add `-I` (QUOTED_IDENTIFIER ON); without it, writes to tables with filtered indexes fail with error 1934.
 
 ## Script map
 
@@ -26,7 +26,8 @@
 | `12_upgrade_entries_shift_reversal.sql` | **each** entry DB | **yes** | **yes** | production date + shift, reversal markers; **backfills existing rows** (IST, A/B/C times written in the script) |
 | `13_upgrade_master_production_counts.sql` | QualityMasterDB | **yes** | **yes** | `qa.ProductionCounts` for the rejection rate |
 | `14_production_counts_feed_TEMPLATE.sql` | QualityMasterDB | no | when a feed is agreed | **template**: read-only feed of production counts from the production systems; fill in the source names first |
-| `15_api_permissions.sql` | **each** of the three databases | **yes** | **yes** | least-privilege rights for the API login (`@ApiUser`, default `qr_api`); replaces the older schema-wide grants |
+| `16_upgrade_master_login_known_clients.sql` | QualityMasterDB | **yes** | **yes** | remembers which logins signed in from which address, so login-throttle exemptions survive API restarts |
+| `15_api_permissions.sql` (run **after** 16) | **each** of the three databases | **yes** | **yes** | least-privilege rights for the API login (`@ApiUser`, default `qr_api`); replaces the older schema-wide grants |
 
 All scripts set `QUOTED_IDENTIFIER ON` themselves where needed. `sqlcmd` starts with it OFF, and SQL Server then refuses the filtered indexes in 11; a unit test now checks this for every script.
 
@@ -44,6 +45,7 @@ sqlcmd -S <I> -E -b -d QualityMasterDB -i db/09_upgrade_entries_indexes.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/11_upgrade_master_shifts_corrections.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/12_upgrade_entries_shift_reversal.sql
 sqlcmd -S <I> -E -b -d QualityMasterDB -i db/13_upgrade_master_production_counts.sql
+sqlcmd -S <I> -E -b -d QualityMasterDB -i db/16_upgrade_master_login_known_clients.sql
 ```
 3. Existing entry databases (check first that schema `qa` and `qa.QualityRejectionEntries` do not already exist there for something else):
 ```bash
@@ -85,7 +87,7 @@ Plan a short maintenance window. **Every user must sign in again once** after th
 5. `08_upgrade_master_review_fixes.sql` in QualityMasterDB.
    * If it stops with **error 50080**, two users share a username/employee code (possible with the old schema). It lists them. Rename one account of each pair in `qa.Users`, then run 08 again. The column additions from the first run are kept; that is harmless.
 6. `09_upgrade_entries_indexes.sql` in **each** entry database: GDC_AndonDB, MachineShopDB **and QualityMasterDB** (PRE/FINAL).
-7. `11_upgrade_master_shifts_corrections.sql` in QualityMasterDB, then `12_upgrade_entries_shift_reversal.sql` in **each** entry database (the same three), then `13_upgrade_master_production_counts.sql` in QualityMasterDB. 12 fills `ProductionDate`/`ShiftCode` for existing entries from their server time, using IST (UTC+05:30) and the A/B/C start times written at the top of the script. If the plant's shifts differ, edit those values **and** `qa.ShiftDefinitions` to match before running it. In QualityMasterDB the script refuses to run if they differ (error 50013), and it prints the parameters and row count it uses. On large tables it works through the table in id ranges of 4,000 rows (below SQL Server's lock-escalation threshold), committing each range; if it stops, run it again and it continues with the rows still empty.
+7. `11_upgrade_master_shifts_corrections.sql` in QualityMasterDB, then `12_upgrade_entries_shift_reversal.sql` in **each** entry database (the same three), then `13_upgrade_master_production_counts.sql` and `16_upgrade_master_login_known_clients.sql` in QualityMasterDB. 12 fills `ProductionDate`/`ShiftCode` for existing entries from their server time, using IST (UTC+05:30) and the A/B/C start times written at the top of the script. If the plant's shifts differ, edit those values **and** `qa.ShiftDefinitions` to match before running it. In QualityMasterDB the script refuses to run if they differ (error 50013), and it prints the parameters and row count it uses. On large tables it works through the table in id ranges of 4,000 rows (below SQL Server's lock-escalation threshold), committing each range; if it stops, run it again and it continues with the rows still empty.
 8. `15_api_permissions.sql` in each of the three databases (fresh-install step 6).
 9. Deploy the new API, start it, check `GET /api/health/ready` returns 200, then sign in.
 10. **After the new API is running, run 12 once more in each entry database.** It fills only rows that are still empty, i.e. any saved by the old API during the switch. Reports count only rows with a production day; `/api/health/ready` warns while such rows exist.
@@ -112,11 +114,13 @@ Administrators can also add or edit machines in the app (Admin → Machines) ins
 | 08 warning "may not be able to sign in" | Legacy usernames or codes with characters other than letters, digits, `. _ -` (listed). Rename them in the app. |
 | 09 / 12 errors 50010-50012 | The entries table is missing in that database: run the matching 02a/02b/02c first. |
 | 12 error 50013 / 50014 | The backfill shift times differ from `qa.ShiftDefinitions` (or 11 was not run in the master). Fix the times (or run 11), then re-run 12. In GDC_AndonDB and MachineShopDB the script cannot compare: set `@OffsetMinutes` and `@A/@B/@C` to the plant's real values before running it there. |
-| 10 / 12 error 50015 | Database compatibility level below 130. |
+| 10 / 12 error 50015 | The server is older than SQL Server 2017. |
+| 13 error 50016 | Production counts whose shop is not their machine's shop (listed). Correct `ShopId`, then re-run 13. |
+| 15 errors 50150-50153 | 50150: the login does not exist. 50151: the login is already mapped to another user in this database. 50152: a user with the API's name belongs to another login. 50153: wrong database (no application tables). 15 also warns about tables that do not exist yet (run the missing script, then 15 again) and about role memberships. |
 | 10 error 50100 | The machine list has problems (listed by row); nothing was changed. |
 | 15 error 50150 | The API login does not exist on the server: the DBA creates it first. 15 also re-maps an orphaned user after a restore and warns if the user is in database roles such as `db_datawriter`. |
 | 08 error 50090 ("At least one active administrator must remain") | A statement tried to remove the last active administrator. Reactivate or create an administrator first. |
-| Seed check 50001 | Some seeded codes are missing (03 not run, or rows were renamed/deleted by hand). Compare with `db/seed/phenomena_seed.json`. |
+| Seed check 50001 | Some seeded phenomena (by name), or their inspection stages, are missing (03 not run, or rows were renamed/deleted by hand). Compare with `db/seed/phenomena_seed.json`. |
 | New API misbehaves after the upgrade | Stop it. Preferred rollback: restore the backups (section 5) and redeploy the old API. |
 | Must run the **old** API on the upgraded database (no restore) | The 08/09 changes are additive (columns, a table, a trigger, indexes). One part breaks the old API: EF Core writes with an `OUTPUT` clause, which SQL Server refuses on a table with a trigger, so **every** user save fails while `qa.TR_Users_KeepActiveAdministrator` exists (this was seen in testing before the new API declared the trigger). Run `DROP TRIGGER qa.TR_Users_KeepActiveAdministrator;` first. Users created by the old API get no `qa.LoginIdentifiers` rows. Before returning to the new API, re-run 08: it recreates the trigger and backfills the identifiers. |
 

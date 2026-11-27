@@ -59,6 +59,9 @@ public static class ErrorHandling
             BadHttpRequestException { StatusCode: 413 } => (413, "request_too_large", "The request is too large (for uploads: at most 5,000 rows)."),
             BadHttpRequestException bre => (bre.StatusCode is >= 400 and < 500 ? bre.StatusCode : 400, "bad_request", "The request was not valid."),
             OperationCanceledException when ex is not TimeoutException => (499, "cancelled", "The request was cancelled."),
+            // Connection pool exhausted (all connections busy): SqlClient raises InvalidOperationException, not SqlException.
+            InvalidOperationException { Message: var pm } when pm.Contains("obtaining a connection from the pool", StringComparison.OrdinalIgnoreCase)
+                => (503, "database_unavailable", "The server is busy. Please try again shortly."),
             InvalidOperationException { Message: var m } when m.StartsWith("No connection string configured", StringComparison.Ordinal)
                 => (503, "store_not_configured", "The server is not fully configured. Contact your administrator."),
             _ when sql is not null => ClassifySql(sql),

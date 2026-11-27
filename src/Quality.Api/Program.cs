@@ -56,6 +56,7 @@ builder.Services.AddSingleton<IdentityPasswordVerifier>();
 builder.Services.AddSingleton<IPasswordVerifier>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
 builder.Services.AddSingleton<IPasswordHashService>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
 builder.Services.AddSingleton<ITokenIssuer, JwtTokenIssuer>();
+builder.Services.AddSingleton<IKnownLoginStore, EfKnownLoginStore>();
 builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddHostedService<BootstrapAdmin>();   // retries in the background; the API starts even if SQL Server is down
 
@@ -80,6 +81,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
             ctx.Response.StatusCode = 401; ctx.Response.ContentType = "application/problem+json";
             await ctx.Response.WriteAsJsonAsync(new ProblemDetails { Status = 401, Title = expired ? "Your session has expired. Please sign in again." : "Authentication required.", Extensions = { ["code"] = expired ? "token_expired" : "unauthenticated" } });
         },
+        // Role checks ([Authorize(Roles=...)]) answer with the same problem shape and a stable code (Fable review).
+        OnForbidden = async ctx =>
+        {
+            ctx.Response.StatusCode = 403; ctx.Response.ContentType = "application/problem+json";
+            await ctx.Response.WriteAsJsonAsync(new ProblemDetails { Status = 403, Title = "You do not have access to this function.", Extensions = { ["code"] = "forbidden" } });
+        },
     };
 });
 builder.Services.AddAuthorization();
@@ -90,6 +97,13 @@ var loginRequestsPerMinute = cfg.GetValue("LoginThrottle:RequestsPerMinutePerCli
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
+    // Same problem shape as the throttle's own 429, with Retry-After (Fable review).
+    o.OnRejected = async (ctx, ct) =>
+    {
+        ctx.HttpContext.Response.Headers.RetryAfter = "60";
+        ctx.HttpContext.Response.ContentType = "application/problem+json";
+        await ctx.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails { Status = 429, Title = "Too many requests. Wait a minute and try again.", Extensions = { ["code"] = "too_many_attempts" } }, ct);
+    };
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         LoginThrottle.ClientKey(ctx.Connection.RemoteIpAddress),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = loginRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -138,7 +152,9 @@ else
     var warned = 0;
     app.Use(async (ctx, next) =>
     {
-        if (warned == 0 && ctx.Request.Headers.ContainsKey("X-Forwarded-For") && ctx.Connection.RemoteIpAddress is { } ip && !IPAddress.IsLoopback(ip)
+        // Also for a loopback peer (a proxy on the same server, e.g. IIS ARR or nginx), except in Development (Fable review).
+        if (warned == 0 && ctx.Request.Headers.ContainsKey("X-Forwarded-For") && ctx.Connection.RemoteIpAddress is { } ip
+            && (!IPAddress.IsLoopback(ip) || !app.Environment.IsDevelopment())
             && Interlocked.Exchange(ref warned, 1) == 0)
             app.Logger.LogWarning("Requests arrive through a proxy ({Proxy}) but ReverseProxy:KnownProxies is not set: all clients share one address for login throttling. See docs/BUILD_AND_DEPLOY.md.", ip);
         await next();

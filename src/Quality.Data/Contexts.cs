@@ -21,6 +21,7 @@ public sealed class MasterDbContext : DbContext
     public DbSet<ShiftDefinition> ShiftDefinitions => Set<ShiftDefinition>();
     public DbSet<EntryCorrection> EntryCorrections => Set<EntryCorrection>();
     public DbSet<ProductionCount> ProductionCounts => Set<ProductionCount>();
+    public DbSet<LoginKnownClient> LoginKnownClients => Set<LoginKnownClient>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -77,6 +78,12 @@ public sealed class MasterDbContext : DbContext
             e.Property(x => x.Status).HasMaxLength(10);
             e.Property(x => x.RequestedAt).HasColumnType("datetime2(3)"); e.Property(x => x.DecidedAt).HasColumnType("datetime2(3)");
             e.Property(x => x.RowVer).IsRowVersion();
+        });
+        b.Entity<LoginKnownClient>(e =>   // db/16
+        {
+            e.ToTable("LoginKnownClients"); e.HasKey(x => new { x.ClientKey, x.LoginKey });
+            e.Property(x => x.ClientKey).HasMaxLength(64); e.Property(x => x.LoginKey).HasMaxLength(60);
+            e.Property(x => x.LastSuccessAt).HasColumnType("datetime2(0)");
         });
         b.Entity<ProductionCount>(e =>   // db/13
         {

@@ -5,7 +5,8 @@ const QR = (() => {
   const session = () => { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch { return null; } };
   const save = s => { try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch { /* private mode: session lasts this page only */ } };
   const clear = () => { try { sessionStorage.removeItem(KEY); } catch { } };
-  const valid = s => s && s.token && new Date(s.expiresAtUtc) > new Date();
+  // No expiry check against this PC's clock (it may be wrong by hours): the server decides; a 401 clears the session.
+  const valid = s => !!(s && s.token);
 
   async function api(path, opts = {}) {
     const s = session();

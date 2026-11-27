@@ -84,6 +84,16 @@
 
   let loadSeq = 0;
   /** focusChips: after a drill-down or chip removal, keyboard focus moves to the filter chips (the clicked control is rebuilt). */
+  // The filters of the view currently shown: restored when a new selection cannot be loaded (Fable review), so chips, URL
+  // and inputs never describe numbers that are not on the screen.
+  let shown = null;
+  const snapshot = () => ({ from: el('from').value, to: el('to').value, shop: el('shop').value, shift: el('shift').value, drill: { ...drill }, rangeBeforeDay });
+  function restore(st) {
+    el('from').value = st.from; el('to').value = st.to; el('shop').value = st.shop; el('shift').value = st.shift;
+    Object.assign(drill, st.drill); rangeBeforeDay = st.rangeBeforeDay;
+    writeHash(); renderChips();
+  }
+
   async function load(focusChips = false) {
     el('error').hidden = true;
     el('tip').hidden = true;   // the hovered element is about to be rebuilt, so its mouseleave never fires
@@ -111,8 +121,17 @@
       text(el('tPending'), pending === null ? '–' : fmt(pending));
       renderEntries(entries);
       text(el('announce'), `Showing ${fmt(r.total.quantity)} rejected parts` + (el('chips').childElementCount ? `, filtered by ${[...el('chips').children].map(c => c.dataset.label).join(', ')}` : '') + '.');
-      if (focusChips) (el('chips').querySelector('button') || el('chips')).focus();
-    } catch (e) { if (seq === loadSeq) showError(e); }   // an error of a superseded load must not cover the newer view
+      shown = snapshot();
+      if (focusChips) {
+        // No chip left (the last one was removed): focus the first filter instead of losing focus to the page.
+        const target = el('chips').hidden ? el('shop') : (el('chips').querySelector('button') || el('chips'));
+        target.focus();
+      }
+    } catch (e) {
+      if (seq !== loadSeq) return;   // an error of a superseded load must not cover the newer view
+      if (shown) { restore(shown); showError(new Error(e.message + ' The previous selection is still shown.')); }
+      else showError(e);
+    }
     finally { if (seq === loadSeq) document.body.classList.remove('busy'); }
   }
 
@@ -159,17 +178,20 @@
     return ch === 0 ? '＝ 0%' : (ch > 0 ? '▲ ' : '▼ ') + Math.abs(ch) + '%';
   };
 
+  /** Rounded DOWN, for "less than 80%" warnings: 79.6% must not read "80%". */
+  const floorPct = x => Math.floor(x * 100) + '%';
+
   /** Rate cell for machine/shop rows: "⚠" marks a rate based on less than 80% of that row's rejected parts (see the note). */
   function rowRate(rate) {
     if (!rate || rate.rate === null || rate.rate === undefined) return '–';
-    return pct(rate.rate, 2) + ((rate.coverage ?? 0) < 0.8 ? ` ⚠ ${pct(rate.coverage ?? 0, 0)}` : '');
+    return pct(rate.rate, 2) + ((rate.coverage ?? 0) < 0.8 ? ` ⚠ ${floorPct(rate.coverage ?? 0)}` : '');
   }
 
   function rateText(rate) {
     if (!rate || rate.rate === null || rate.rate === undefined) return { value: '–', note: rate ? 'Production counts exist but show 0 produced.' : 'No production data for this selection.' };
     const cov = rate.coverage ?? 0;
     // Below 80% coverage the rate describes only part of the selection: say so plainly, not in small grey text only.
-    const warn = cov < 0.8 ? `⚠ Partial: based on only ${pct(cov, 0)} of rejected parts (production counts missing). ` : '';
+    const warn = cov < 0.8 ? `⚠ Partial: based on only ${floorPct(cov)} of rejected parts (production counts missing). ` : '';
     return { value: pct(rate.rate, 2), warn: !!warn, note: warn + `${fmt(rate.rejectedWithProduction)} rejected of ${fmt(rate.produced)} produced` + (warn ? '' : ` · based on ${pct(cov, 0)} of rejected parts`) };
   }
 
@@ -428,6 +450,7 @@
         if (!f) throw new Error('Choose a CSV file first.');
         if (f.size > 1_500_000) throw new Error('The file is too large (max about 5,000 rows).');
         parsedRows = parseCsv(await f.text());
+        if (parsedRows.length > 5000) { parsedRows = null; throw new Error('The file has more than 5,000 rows. Split it into smaller files.'); }
       }
       const r = await api('/api/admin/production-counts', { method: 'POST', body: JSON.stringify({ rows: parsedRows.map(x => x.row), dryRun, source: 'upload' }) });
       if (r.problems.length) {

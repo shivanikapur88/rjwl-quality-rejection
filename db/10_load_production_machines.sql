@@ -45,14 +45,14 @@ SELECT i.RowNo, N'Unknown shop code ' + ISNULL(i.ShopCode, N'(empty)') FROM @in 
 UNION ALL SELECT i.RowNo, N'Machine code is empty' FROM @in i WHERE LEN(LTRIM(RTRIM(ISNULL(i.MachineCode, N'')))) = 0
 UNION ALL SELECT i.RowNo, N'Machine code longer than 30 characters' FROM @in i WHERE LEN(LTRIM(RTRIM(i.MachineCode))) > 30
 UNION ALL SELECT i.RowNo, N'Machine code has characters other than letters, digits, space . _ / -'
-          FROM @in i WHERE LTRIM(RTRIM(i.MachineCode)) LIKE N'%[^A-Za-z0-9 ._/-]%' OR LTRIM(RTRIM(i.MachineCode)) LIKE N'[^A-Za-z0-9]%'
+          FROM @in i WHERE LTRIM(RTRIM(i.MachineCode)) COLLATE Latin1_General_BIN2 LIKE N'%[^A-Za-z0-9 ._/-]%' OR LTRIM(RTRIM(i.MachineCode)) COLLATE Latin1_General_BIN2 LIKE N'[^A-Za-z0-9]%'
 UNION ALL SELECT i.RowNo, N'Machine name is empty' FROM @in i WHERE LEN(LTRIM(RTRIM(ISNULL(i.MachineName, N'')))) = 0
 UNION ALL SELECT i.RowNo, N'Machine name longer than 100 characters' FROM @in i WHERE LEN(LTRIM(RTRIM(i.MachineName))) > 100
 UNION ALL SELECT i.RowNo, N'Active flag must be 1 or 0' FROM @in i WHERE i.IsActive IS NULL
 UNION ALL SELECT i.RowNo, N'EXAMPLE row still present - replace the example rows with the approved list' FROM @in i WHERE LTRIM(RTRIM(i.MachineCode)) LIKE N'EXAMPLE-%'
 UNION ALL SELECT i.RowNo, N'DEV- codes are development placeholders and may not be loaded as production machines' FROM @in i WHERE LTRIM(RTRIM(i.MachineCode)) LIKE N'DEV-%'
 UNION ALL SELECT i.RowNo, N'Same machine code appears more than once for this shop in the list'
-          FROM @in i WHERE EXISTS (SELECT 1 FROM @in j WHERE j.RowNo <> i.RowNo AND j.ShopCode = i.ShopCode AND UPPER(LTRIM(RTRIM(j.MachineCode))) = UPPER(LTRIM(RTRIM(i.MachineCode))));
+          FROM @in i WHERE EXISTS (SELECT 1 FROM @in j WHERE j.RowNo <> i.RowNo AND j.ShopCode = i.ShopCode AND UPPER(LTRIM(RTRIM(j.MachineCode))) = UPPER(LTRIM(RTRIM(i.MachineCode))) COLLATE Latin1_General_CI_AI);
 
 IF EXISTS (SELECT 1 FROM @problems)
 BEGIN

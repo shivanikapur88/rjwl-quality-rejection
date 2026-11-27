@@ -79,7 +79,7 @@ def render_sql(stages, rows) -> str:
         "SET NOCOUNT ON; SET XACT_ABORT ON;",
         "SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON;   -- sqlcmd starts with QUOTED_IDENTIFIER OFF",
         "BEGIN TRANSACTION;",
-        "DECLARE @inserted int = 0, @lock int;",
+        "DECLARE @inserted int = 0, @lock int, @stageId int;",
         "DECLARE @seed TABLE (StageCode nvarchar(30) NOT NULL, Code nvarchar(30) NOT NULL, Name nvarchar(200) NOT NULL, Norm nvarchar(200) NOT NULL);",
         "",
     ]
@@ -87,7 +87,9 @@ def render_sql(stages, rows) -> str:
         st = stages[code]
         imported = [r for r in rows if r["stageCode"] == code and r["status"] == "IMPORTED"]
         out.append(f"-- {name}: {st['raw']} Excel rows, {st['imported']} imported, {st['skipped']} skipped (duplicate)")
-        out.append(f"SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE StageCode = N'{code}';   -- same lock as the API's code allocation")
+        # Same statement as the API's code allocation (lock on the clustered key, by Id), so both serialise (Fable review).
+        out.append(f"SELECT @stageId = Id FROM qa.InspectionStages WHERE StageCode = N'{code}';")
+        out.append("SELECT @lock = Id FROM qa.InspectionStages WITH (UPDLOCK, HOLDLOCK) WHERE Id = @stageId;   -- same lock as the API")
         out.append("INSERT INTO @seed (StageCode, Code, Name, Norm) VALUES")
         vals = [f"  (N'{code}', {sql_str(r['code'])}, {sql_str(r['original'])}, {sql_str(r['normalized'])})" for r in imported]
         out.append(",\n".join(vals) + ";")

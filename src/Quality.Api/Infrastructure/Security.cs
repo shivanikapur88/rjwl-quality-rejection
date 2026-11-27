@@ -78,6 +78,13 @@ public static class TokenRevocation
             ctx.Fail("Token is missing required claims.");   // includes tokens issued before db/08 (no "tv"): users sign in again once
             return;
         }
+        // Anonymous endpoints (health, readiness, login) do not use the identity: a stale token sent along must not make them
+        // depend on the master database (Fable review). The token is simply ignored there.
+        if (ctx.HttpContext.GetEndpoint()?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null)
+        {
+            ctx.NoResult();
+            return;
+        }
         var db = ctx.HttpContext.RequestServices.GetRequiredService<MasterDbContext>();
         var u = await db.Users.AsNoTracking().Where(x => x.Id == id)
             .Select(x => new { x.IsActive, x.TokenVersion, Role = x.Role!.RoleName }).FirstOrDefaultAsync(ctx.HttpContext.RequestAborted);

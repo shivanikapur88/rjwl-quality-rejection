@@ -153,6 +153,14 @@ public class EntryCorrection
     public bool IsReverseOnly => ProposedMachineId is null && ProposedPhenomenonId is null && ProposedQuantity is null && ProposedRemarks is null;
 }
 
+/// <summary>A (client address, login) pair that signed in successfully: exempt from some throttle limits (db/16).</summary>
+public class LoginKnownClient
+{
+    public string ClientKey { get; set; } = "";
+    public string LoginKey { get; set; } = "";
+    public DateTime LastSuccessAt { get; set; }
+}
+
 /// <summary>Parts produced per machine, production day and shift (db/13), for the rejection rate. Not measured by this system.</summary>
 public class ProductionCount
 {

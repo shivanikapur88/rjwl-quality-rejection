@@ -1,6 +1,6 @@
 # Release-candidate readiness
 
-Status at commit `3313612` (verified 2026-11-26). Key: ✅ done · ◐ partly · ✗ not done · — not applicable.
+Status per round: see the sections below (round 1 at commit `3313612`, then round 2, round 3 and the reviews).
 
 | Area | Implemented | Built | Tested with substitutes | Tested against SQL Server | Tested on Android | Business accepted | Blocked / unverified |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|---|
@@ -63,6 +63,6 @@ The dashboard now works at phone width. Three more Sonnet 5.5 reviewers found **
 * chart resize and per-row rate coverage;
 * several app state issues.
 
-All are fixed with tests; see [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#third-full-application-review-sonnet-55). New deployment requirements: database compatibility level 130 or higher, and `sqlcmd -I` for ad-hoc SQL (runbook).
+All are fixed; most have tests, some are covered only by browser checks (listed per item). See [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#third-full-application-review-sonnet-55). Deployment requirements: SQL Server 2017 or later (corrected by the Fable review: an earlier "compatibility level 130" requirement was wrong), and `sqlcmd -I` for ad-hoc SQL (runbook).
 
 **Release-candidate verdict:** the server, database and app logic are complete and tested against SQL Server. The build is **not** ready for production use until the ✗ items in the "Tested on Android" and "Blocked" columns are done: the device acceptance run, the machine list, the package id, keystore and certificate, and business acceptance. See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) and the checklist in [TEST_EVIDENCE.md §3](TEST_EVIDENCE.md).

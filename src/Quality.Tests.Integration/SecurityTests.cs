@@ -185,4 +185,17 @@ public sealed class SecurityTests(SqlFixture f) : SqlTest(f)
         Assert.Equal("ok", dto.Components["master"]);
         Assert.Equal(HttpStatusCode.OK, (await factory.CreateClient().GetAsync("/api/health")).StatusCode);   // liveness unaffected
     }
+
+    /// <summary>Fable review: role refusals carry the documented problem code, and a successful sign-in is remembered durably
+    /// (qa.LoginKnownClients, db/16) so the throttle's "known login" exemption survives an API restart.</summary>
+    [Fact]
+    public async Task Role_refusals_have_a_code_and_sign_ins_are_remembered()
+    {
+        var (_, user, pw) = await F.CreateUserAsync("QualityInspector", "GDC");
+        var inspector = F.Client(await F.LoginAsync(user, pw));
+        var r = await inspector.GetAsync("/api/admin/users");
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, r.StatusCode);
+        Assert.Equal("forbidden", await Code(r));
+        Assert.Equal(1, await SqlFixture.Scalar<int>(F.MasterCs, "SELECT COUNT(*) FROM qa.LoginKnownClients WHERE LoginKey = @k", ("@k", user.ToUpperInvariant())));
+    }
 }

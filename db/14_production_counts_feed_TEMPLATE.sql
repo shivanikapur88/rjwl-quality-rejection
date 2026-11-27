@@ -24,7 +24,7 @@ MERGE qa.ProductionCounts WITH (HOLDLOCK) AS t
 USING (
     SELECT m.ShopId, m.Id AS MachineId, src.ProductionDate, src.ShiftCode, SUM(src.GoodPlusRejected) AS Produced
     FROM [<SOURCE_DATABASE>].[<schema>].[<production_table>] AS src          -- PLACEHOLDER
-    JOIN qa.Machines m ON m.MachineCode = src.<machine_code_column>           -- PLACEHOLDER
+    JOIN qa.Machines m ON m.MachineCode = src.<machine_code_column> COLLATE DATABASE_DEFAULT   -- PLACEHOLDER (COLLATE: the source database may use another collation)
     JOIN qa.Shops s ON s.Id = m.ShopId AND s.ShopCode = N'CNC'                -- one MERGE per source system/shop
     WHERE src.ProductionDate >= @From
     GROUP BY m.ShopId, m.Id, src.ProductionDate, src.ShiftCode

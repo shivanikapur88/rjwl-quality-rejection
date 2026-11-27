@@ -130,3 +130,6 @@ td.num, th.num { white-space: nowrap; }
 
 /* Elements with the hidden attribute stay hidden even where a rule sets display (nav, legend, chips). */
 [hidden] { display: none !important; }
+
+/* Long unbroken text (remarks) wraps instead of widening the table; numbers stay on one line (td.num). */
+td { overflow-wrap: anywhere; }

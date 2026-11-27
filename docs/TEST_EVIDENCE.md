@@ -6,7 +6,7 @@ Every result below was produced from a **fresh clone** of this repository at the
 
 | | |
 |---|---|
-| Source commit | `3313612a00a13179f572afd3e8b3d4cd590d522c` (later commits change only documentation and evidence files) |
+| Source commit | `3313612a00a13179f572afd3e8b3d4cd590d522c` (round-1 evidence; later rounds have their own sections below) |
 | Date | 2026-11-26 (UTC) |
 | Environment | Linux container (cloud session), .NET SDK 10.0.404, MAUI Android workload 10.0.110, Android SDK platform 36 / build-tools 36.0.0, JDK 21 |
 | Database | **Real SQL Server**: Microsoft SQL Server 2022 (RTM-CU28) 16.0.4325.4, Linux container image `mcr.microsoft.com/mssql/server:2022-latest` |

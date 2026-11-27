@@ -41,8 +41,10 @@ public sealed class HealthController : ControllerBase
         components["master"] = await CanConnect(t => master.Database.CanConnectAsync(t));
         foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(t => router.CanConnectAsync(key, t));
         // Round 2: entries are stamped with shifts from qa.ShiftDefinitions; a fallback calendar means those are not being used.
-        var calendar = await HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>().GetAsync();
-        components["shifts"] = calendar.IsFallback ? "unavailable" : "ok";
+        var calendarProvider = HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>();
+        var calendar = await calendarProvider.GetAsync();
+        // "unavailable" also when an older calendar is still in use because the latest read of the shift table failed.
+        components["shifts"] = calendar.IsFallback || calendarProvider.LastLoadFailed ? "unavailable" : "ok";
         // Full review #5: entries without a production day are left out of reports; say so instead of silently under-counting.
         var warnings = new List<string>();
         foreach (var key in router.Keys)
@@ -106,6 +108,7 @@ public sealed class AuthController : ApiControllerBase
     {
         var client = LoginThrottle.ClientKey(HttpContext.Connection.RemoteIpAddress);
         var login = request?.Username ?? "";
+        await _throttle.PrepareAsync(client, login, HttpContext.RequestAborted);   // known logins survive restarts (db/16)
         if (_throttle.TryBegin(client, login, out var known) is { } wait)   // checks AND reserves the attempt atomically (full review #2)
         {
             Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -119,7 +122,7 @@ public sealed class AuthController : ApiControllerBase
             _throttle.Refund(client, login, known);
             throw;
         }
-        if (result.IsSuccess) _throttle.RecordSuccess(client, login, known);
+        if (result.IsSuccess) { _throttle.RecordSuccess(client, login, known); await _throttle.RememberAsync(client, login, CancellationToken.None); }
         else if (result.Error!.Kind != ErrorKind.Unauthorized) _throttle.Refund(client, login, known);   // never reached the password check
         return Map(result);
     }
