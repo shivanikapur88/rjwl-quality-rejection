@@ -49,6 +49,14 @@ public static class ErrorHandling
         await ctx.Response.WriteAsJsonAsync(new ProblemDetails { Status = status, Title = msg, Extensions = { ["code"] = code } });
     });
 
+    /// <summary>True if the exception (or an inner one) is SQL Server error 1205, "chosen as the deadlock victim".</summary>
+    public static bool IsDeadlock(Exception? ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e is SqlException { Number: 1205 }) return true;
+        return false;
+    }
+
     public static (int Status, string Code, string Message) Classify(Exception? ex)
     {
         var sql = ex as SqlException ?? ex?.InnerException as SqlException ?? ex?.InnerException?.InnerException as SqlException;

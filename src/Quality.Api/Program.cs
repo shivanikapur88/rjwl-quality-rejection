@@ -182,6 +182,23 @@ if (app.Environment.IsDevelopment() || cfg.GetValue<bool>("Swagger:Enabled")) { 
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// A read can be chosen as a deadlock victim when the database runs without READ_COMMITTED_SNAPSHOT (reader/writer
+// deadlock with, e.g., a machine delete). Reads change nothing, so GET requests are retried (up to twice) before the
+// caller sees an error (Fable review verification run).
+app.Use(async (ctx, next) =>
+{
+    if (!HttpMethods.IsGet(ctx.Request.Method)) { await next(); return; }
+    for (var attempt = 1; ; attempt++)
+    {
+        try { await next(); return; }
+        catch (Exception ex) when (attempt < 3 && !ctx.Response.HasStarted && ErrorHandling.IsDeadlock(ex))
+        {
+            ctx.RequestServices.GetRequiredService<ILogger<Program>>().LogInformation("Read chosen as deadlock victim; retrying ({Attempt}).", attempt);
+            ctx.RequestServices.GetService<MasterDbContext>()?.ChangeTracker.Clear();
+            await Task.Delay(Random.Shared.Next(20, 120), ctx.RequestAborted);
+        }
+    }
+});
 app.MapControllers();
 
 app.Run();
