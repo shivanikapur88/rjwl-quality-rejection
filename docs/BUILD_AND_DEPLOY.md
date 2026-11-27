@@ -105,3 +105,36 @@ The app has no built-in server address. On first launch: **Server settings** →
 
 ### Emulator and phone (development)
 Emulator: API address `https://10.0.2.2:<port>`. Phone over USB: `adb reverse tcp:<port> tcp:<port>`, then `https://localhost:<port>`.
+
+## 6. iOS app (iPhone and iPad)
+
+The app is .NET MAUI, so the same screens and logic run on iOS. **Apple allows iOS apps to be built and signed only on a Mac with Xcode**, so the iOS build has **not** been compiled or run in this project's environment (Linux). What is in the repository: the iOS target (added automatically on macOS), `Platforms/iOS` (start-up, `Info.plist` with the camera reason and no plain-HTTP exceptions, Keychain entitlement for the sign-in token), a launch screen, and signing settings read from environment variables. Unit tests check those iOS settings statically.
+
+### What RJWL needs
+* A **Mac** with the current Xcode required by .NET 10 MAUI (`dotnet workload install maui-ios` tells you if Xcode is too old), the .NET 10 SDK, and the `maui-ios` workload. Visual Studio on Windows can also build iOS when paired with that Mac (set `QR_ENABLE_IOS=true`).
+* An **Apple Developer account** in RJWL's name, an **App ID** equal to the app's `ApplicationId` (decide the final id first: decision #10), and a way to put the app on company devices: **TestFlight** (simple, test builds expire after 90 days), **Apple Business Manager custom app** (private App Store distribution), or the **Apple Developer Enterprise Program** (in-house distribution; Apple restricts eligibility). See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) #20.
+* iPhones or iPads with **iOS 15 or later**.
+
+### Build on the Mac
+```bash
+dotnet workload install maui-ios
+```
+```bash
+dotnet build src/Quality.Mobile -f net10.0-ios -c Debug
+```
+Run on the simulator from Visual Studio Code (C# Dev Kit + .NET MAUI extension) or with `dotnet build -t:Run -f net10.0-ios`. The simulator reaches an API running on the same Mac as `https://localhost:<port>` (debug builds accept the development certificate for localhost only).
+
+Release, signed (values come from the Apple Developer account; never commit them):
+```bash
+QR_IOS_CODESIGN_KEY="Apple Distribution: <team>" QR_IOS_PROVISION="<profile name>" dotnet publish src/Quality.Mobile -f net10.0-ios -c Release
+```
+The `.ipa` is uploaded to App Store Connect (Transporter app) for TestFlight or Business Manager distribution.
+
+### First-device checklist (iOS)
+1. The app starts and shows **Server settings**; enter `https://<server>:<port>` and **Test connection**. The server's certificate must be trusted by iOS (public CA, or an internal CA installed and **enabled for full trust** by MDM).
+2. Sign in as an inspector; close and reopen the app: still signed in (Keychain).
+3. Record an entry; double-tap Save → one entry; airplane mode → Save → message; reconnect → Save → "already saved".
+4. **Scan machine**: iOS asks for the camera with the reason text; scanning a printed label opens the entry form for that machine; Back does not reopen it at once.
+5. Rotate the device; iPad split view; dark mode.
+6. Sign out; sign in as a supervisor: shift summary and corrections.
+7. Repeat steps 3-4 on the oldest supported device.

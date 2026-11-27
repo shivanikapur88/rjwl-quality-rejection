@@ -14,6 +14,7 @@ An Android app (.NET MAUI), an ASP.NET Core Web API and SQL Server, used to reco
 | Reviews | Independent reviews by Claude Fable (round 2, round 3) and three full-application reviews by Claude Sonnet 5.5; findings and fixes in [docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md) |
 | Tests | 127 unit and 55 SQL Server integration tests, all passing on a clean checkout; the API runs as a least-privilege login in the tests ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
 | Android | Debug APK builds. **Not yet tested on an emulator or device**; no signed release APK yet. |
+| iOS | iOS project parts added (iPhone and iPad, iOS 15+). **Not built yet**: Apple allows iOS builds only on a Mac ([BUILD_AND_DEPLOY.md §6](docs/BUILD_AND_DEPLOY.md)). |
 | Production readiness | **Not yet.** See [docs/READINESS.md](docs/READINESS.md) for what is blocked: device acceptance, the real machine list, package id, keystore and certificate, and business acceptance. |
 
 ## Documents

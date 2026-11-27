@@ -27,6 +27,7 @@ Status per round: see the sections below (round 1 at commit `3313612`, then roun
 | Error mapping (no false "database unavailable") | ✅ | ✅ | ✅ | ✅ | — | ✗ | — |
 | Android APK | ✅ | ✅ **debug** only | — | — | ✗ | ✗ | **package id, keystore, certificate** |
 | Signed release APK | ◐ (csproj ready) | ✗ | — | — | ✗ | ✗ | package id, keystore |
+| iOS app (iPhone/iPad) | ◐ project parts and settings | ✗ **needs a Mac** | ◐ settings checked by unit tests | — | ✗ | ✗ | **Mac with Xcode, Apple Developer account, distribution route (decision #20)** |
 | Deployment, backup, restore, rollback guidance | ✅ docs | — | — | ◐ (rollback trigger issue found in tests) | — | ✗ | restore drill on RJWL servers |
 | Inspector / supervisor / admin instructions | ✅ docs | — | — | — | ✗ | ✗ | screenshots after the device test |
 

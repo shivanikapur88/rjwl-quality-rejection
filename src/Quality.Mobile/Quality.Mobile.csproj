@@ -1,8 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Android-only .NET MAUI app. Needs the .NET 10 SDK with the "maui-android" workload (Visual Studio 2026, or
-       `dotnet workload install maui-android` plus an Android SDK with platform 36). See docs/BUILD.md. -->
+  <!-- .NET MAUI app for Android and iOS.
+       Android: .NET 10 SDK with the "maui-android" workload (Visual Studio 2026, or `dotnet workload install maui-android`
+       plus an Android SDK with platform 36).
+       iOS: only on a Mac with Xcode and the "maui-ios" workload (Apple allows iOS builds and signing on macOS only). The iOS
+       target is added automatically on macOS, or on Windows with a paired Mac when QR_ENABLE_IOS=true.
+       See docs/BUILD_AND_DEPLOY.md. -->
   <PropertyGroup>
     <TargetFrameworks>net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx')) Or '$(QR_ENABLE_IOS)' == 'true'">net10.0-android;net10.0-ios</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>Quality.Mobile</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -15,6 +20,21 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <!-- iOS 15 or later (iPhone 6s / iPad 5th generation and newer). -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <!-- iOS: Keychain access for SecureStorage (sign-in token). The ApplicationId above must match the App ID registered with Apple. -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <CodesignEntitlements>Platforms/iOS/Entitlements.plist</CodesignEntitlements>
+  </PropertyGroup>
+  <!-- iOS signing for distribution: supply the values as environment variables on the Mac (never commit them).
+       QR_IOS_CODESIGN_KEY = signing identity (e.g. "Apple Distribution: RJWL ..."), QR_IOS_PROVISION = provisioning profile name. -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' And '$(Configuration)' == 'Release' And '$(QR_IOS_CODESIGN_KEY)' != ''">
+    <CodesignKey>$(QR_IOS_CODESIGN_KEY)</CodesignKey>
+    <CodesignProvision>$(QR_IOS_PROVISION)</CodesignProvision>
+    <ArchiveOnBuild>true</ArchiveOnBuild>
+    <RuntimeIdentifier>ios-arm64</RuntimeIdentifier>
   </PropertyGroup>
 
   <!-- Signed release APK: supply the values as environment variables (never commit them). See README "Signed release APK". -->
@@ -32,6 +52,8 @@
 
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#1F3A5F" />
+    <!-- iOS needs a launch screen (otherwise the app runs letter-boxed); Android keeps its existing start-up unchanged. -->
+    <MauiSplashScreen Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" Include="Resources\Splash\splash.svg" Color="#1F3A5F" BaseSize="128,128" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" />

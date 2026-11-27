@@ -58,7 +58,8 @@ public static class MauiProgram
     private static HttpMessageHandler CreateHandler()
     {
 #if DEBUG
-        // Development only: accept the ASP.NET Core dev certificate, and ONLY for the emulator host alias / localhost.
+        // Development only: accept the ASP.NET Core dev certificate, and ONLY for the Android emulator host alias (10.0.2.2) /
+        // localhost (the iOS simulator reaches the Mac's API as localhost). Release builds on both platforms validate normally.
         return new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback = (msg, _, _, errors) =>

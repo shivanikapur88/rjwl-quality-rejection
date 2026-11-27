@@ -1,5 +1,7 @@
 # User guide
 
+The app works the same on Android phones and, once RJWL builds it on a Mac, on iPhones and iPads (iOS 15 or later). On iOS the first QR scan asks for camera access: tap **Allow**. If you tapped "Don't Allow", turn it on in **Settings → Quality Rejection → Camera**.
+
 ## Everyone
 
 * **Sign in** with your username **or** employee code and your password. After several wrong passwords, sign-in for that name pauses for a few minutes ("Too many attempts. Wait a minute and try again."); wait, or ask an administrator to reset your password.
