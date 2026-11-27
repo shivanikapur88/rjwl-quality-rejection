@@ -9,6 +9,8 @@
    IX_QRE_Machine: the "is this machine used?" check before a machine is deleted
    previously scanned the whole table.
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID(N'qa.QualityRejectionEntries', N'U') IS NULL

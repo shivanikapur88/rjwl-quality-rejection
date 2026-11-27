@@ -21,9 +21,9 @@ The solution file listed 9 projects; only 4 had source.
 | `Quality.Core` | source | source, .NET 10 |
 | `Quality.Data` | source | source, .NET 10 |
 | `Quality.Api` | source | source, .NET 10 |
-| `Quality.Mobile` | `.csproj`, `App`, `AppShell`, `MauiProgram`, `Controls/StatusBar` only | complete (14 pages, styles, platform code, Android entry points, manifest) |
+| `Quality.Mobile` | `.csproj`, `App`, `AppShell`, `MauiProgram`, `Controls/StatusBar` only | complete at recovery (14 pages, styles, platform code, Android entry points, manifest); 18 pages now (round 2 added 4) |
 | `Quality.Mobile.Core` | **missing** (only the compiled DLL) | recovered source (section 3) |
-| `Quality.ServiceTests`, `Quality.Mobile.Tests`, `Quality.Verify`, `Quality.Mobile.XamlCheck` | **missing** | replaced by `Quality.Tests.Unit` (27 tests) and `Quality.Tests.Integration` (37 tests on SQL Server) |
+| `Quality.ServiceTests`, `Quality.Mobile.Tests`, `Quality.Verify`, `Quality.Mobile.XamlCheck` | **missing** | replaced by `Quality.Tests.Unit` (27 tests at recovery; see TEST_EVIDENCE for current counts) and `Quality.Tests.Integration` (37 tests at recovery on SQL Server) |
 | `Quality.UserSqlGen` | **missing** | not rebuilt: the first administrator comes from `Bootstrap:*` settings and all others are created in the app. See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) if a scripted path is still wanted. |
 | `tools/import_excel.py`, `tools/run_checks.ps1` | **missing** (described in README) | `import_excel.py` rebuilt and proven against the supplied output (section 4); checks are in [TEST_EVIDENCE.md](TEST_EVIDENCE.md) |
 

@@ -77,6 +77,7 @@ def render_sql(stages, rows) -> str:
         "-- number of its stage instead, under the same per-stage lock the API uses, so a re-run never fails on a duplicate code.",
         "-- The check at the end verifies that every seeded NAME is present. Read docs/DATABASE_RUNBOOK.md before re-running.",
         "SET NOCOUNT ON; SET XACT_ABORT ON;",
+        "SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON;   -- sqlcmd starts with QUOTED_IDENTIFIER OFF",
         "BEGIN TRANSACTION;",
         "DECLARE @inserted int = 0, @lock int;",
         "DECLARE @seed TABLE (StageCode nvarchar(30) NOT NULL, Code nvarchar(30) NOT NULL, Name nvarchar(200) NOT NULL, Norm nvarchar(200) NOT NULL);",
@@ -114,9 +115,10 @@ FROM missing m CROSS JOIN hi;""")
     out.append(f"    VALUES (NULL, N'EXCEL_IMPORT', N'RejectionPhenomena', NULL, NULL, {sql_str(summary)});")
     out.append("")
     out.append("-- Post-condition check: abort and roll back unless every seeded (stage, name) is present")
-    out.append("IF EXISTS (SELECT 1 FROM @seed sd JOIN qa.InspectionStages s ON s.StageCode = sd.StageCode")
-    out.append("           WHERE NOT EXISTS (SELECT 1 FROM qa.RejectionPhenomena p WHERE p.InspectionStageId = s.Id AND p.NormalizedName = sd.Norm))")
-    out.append("    THROW 50001, N'Seed check failed: some seeded phenomena are missing after the import.', 1;")
+    out.append("-- (LEFT JOIN: a missing stage - 03 not run - must fail, not be skipped)")
+    out.append("IF EXISTS (SELECT 1 FROM @seed sd LEFT JOIN qa.InspectionStages s ON s.StageCode = sd.StageCode")
+    out.append("           WHERE s.Id IS NULL OR NOT EXISTS (SELECT 1 FROM qa.RejectionPhenomena p WHERE p.InspectionStageId = s.Id AND p.NormalizedName = sd.Norm))")
+    out.append("    THROW 50001, N'Seed check failed: some seeded phenomena (or their inspection stages: run 03 first) are missing.', 1;")
     for _, _, code, _ in STAGES:
         n = stages[code]["imported"]
         out.append(f"IF (SELECT COUNT(*) FROM @seed WHERE StageCode = N'{code}') <> {n} THROW 50001, N'Seed check failed for {code}: the script should hold {n} seeded names', 1;")

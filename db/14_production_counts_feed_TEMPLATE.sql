@@ -1,3 +1,6 @@
+/* NOTE (third full review): when you fill this in, process machines in ascending MachineId order (e.g. stage the rows
+   in a table and MERGE ORDER BY MachineId), the same order the API's upload locks them in, and retry on error 1205.
+*/
 /* ============================================================================
    14_production_counts_feed_TEMPLATE.sql  -  TEMPLATE, NOT RUN BY ANY INSTALL STEP
 

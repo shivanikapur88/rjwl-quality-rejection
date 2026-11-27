@@ -102,10 +102,11 @@
       lastReport = r; showAllPareto = false; showAllEntries = false;
       // Chip labels from a shared link are replaced by the names in the report (a link cannot relabel another machine).
       const m = drill.machineId && r.topMachines.find(x => String(x.machineId) === drill.machineId);
-      if (m) drill.machineLabel = m.machineCode;
+      // A label that cannot be confirmed (not among the report's machines) is shown as the id, not the link's text.
+      if (m) drill.machineLabel = m.machineCode; else if (drill.machineId) drill.machineLabel = '#' + drill.machineId;
       const p = drill.phenomenonId && r.topPhenomena.find(x => String(x.phenomenonId) === drill.phenomenonId);
-      if (p) drill.phenomenonLabel = p.phenomenonName;
-      if (m || p) { writeHash(); renderChips(); }
+      if (p) drill.phenomenonLabel = p.phenomenonName; else if (drill.phenomenonId) drill.phenomenonLabel = '#' + drill.phenomenonId;
+      if (drill.machineId || drill.phenomenonId) { writeHash(); renderChips(); }
       render(r);
       text(el('tPending'), pending === null ? '–' : fmt(pending));
       renderEntries(entries);
@@ -137,20 +138,32 @@
   }
 
   // ---- comparison text ----
+  /** Whole-percent change; never "100% fewer" while something is left (300 → 1 is 99.7%, shown as 99%). */
+  function pctChange(now, prev) {
+    const ch = Math.round(((now - prev) / prev) * 100);
+    return ch <= -100 && now > 0 ? -99 : ch;
+  }
+
   function delta(now, prev, r, noun) {
     if (prev === null || prev === undefined) return '';
     const period = `${shortDay(r.previousFromDate)}–${shortDay(r.previousToDate)}`;
     if (prev === 0) return now === 0 ? `same as ${period} (0)` : `${fmt(now)} more than ${period} (0 before)`;
-    const ch = Math.round(((now - prev) / prev) * 100);   // whole percent; under 0.5% counts as no change
+    const ch = pctChange(now, prev);   // whole percent; under 0.5% counts as no change
     if (ch === 0) return `about the same as ${period} (${fmt(prev)})`;
     return `${ch > 0 ? '▲' : '▼'} ${Math.abs(ch)}% ${ch > 0 ? 'more' : 'fewer'} ${noun} than ${period} (${fmt(prev)})`;
   }
   const shortDelta = (now, prev) => {
     if (prev === null || prev === undefined) return '';
     if (prev === 0) return now ? 'new' : '–';
-    const ch = Math.round(((now - prev) / prev) * 100);
+    const ch = pctChange(now, prev);
     return ch === 0 ? '＝ 0%' : (ch > 0 ? '▲ ' : '▼ ') + Math.abs(ch) + '%';
   };
+
+  /** Rate cell for machine/shop rows: "⚠" marks a rate based on less than 80% of that row's rejected parts (see the note). */
+  function rowRate(rate) {
+    if (!rate || rate.rate === null || rate.rate === undefined) return '–';
+    return pct(rate.rate, 2) + ((rate.coverage ?? 0) < 0.8 ? ` ⚠ ${pct(rate.coverage ?? 0, 0)}` : '');
+  }
 
   function rateText(rate) {
     if (!rate || rate.rate === null || rate.rate === undefined) return { value: '–', note: rate ? 'Production counts exist but show 0 produced.' : 'No production data for this selection.' };
@@ -175,17 +188,25 @@
     renderTable(el('machines'), ['Machine', 'Name', 'Shop', 'Parts', 'vs prev.', 'Produced', 'Rate'],
       r.topMachines.slice(0, 15).map(m => ({
         cells: [m.machineCode, m.machineName, m.shopCode, fmt(m.quantity), shortDelta(m.quantity, m.previousQuantity),
-          m.rate ? fmt(m.rate.produced) : '–', m.rate && m.rate.rate !== null ? pct(m.rate.rate, 2) : '–'],
+          m.rate ? fmt(m.rate.produced) : '–', rowRate(m.rate)],
         label: `Show only machine ${m.machineCode}`,
         onClick: () => { drill.machineId = String(m.machineId); drill.machineLabel = m.machineCode; load(true); },
       })), 'No rejections in this selection.', 3, 6, { phoneHide: [1, 2, 5] });
     renderTable(el('shops'), ['Shop', 'Parts', 'Entries', 'Rate'],
       r.shops.map(s => ({
-        cells: [s.shopName, fmt(s.quantity), fmt(s.entries), s.rate && s.rate.rate !== null ? pct(s.rate.rate, 2) : '–'],
+        cells: [s.shopName, fmt(s.quantity), fmt(s.entries), rowRate(s.rate)],
         label: `Show only ${s.shopName}`,
         onClick: () => { el('shop').value = String(s.shopId); load(true); },
       })), 'No shops.', 1);
   }
+
+  // Redraw the chart when its width changes (window resize, phone rotation): its size is computed from the width.
+  let lastTrendWidth = 0, resizeTimer = 0;
+  if (window.ResizeObserver) new ResizeObserver(entries => {
+    const w = Math.round(entries[0].contentRect.width);
+    if (!lastReport || !w || Math.abs(w - lastTrendWidth) < 8) return;
+    clearTimeout(resizeTimer); resizeTimer = setTimeout(() => renderTrend(lastReport), 150);
+  }).observe(el('trend'));
 
   // ---- stacked bars: one bar per production day, segments = shifts (fixed slot per shift); click = that day ----
   function renderTrend(r) {
@@ -204,7 +225,8 @@
     shown.forEach(s => { const i = make('span', 'key'); const sw = make('span', 'swatch'); sw.style.background = `var(${slot(s)})`; i.append(sw, document.createTextNode(s.shiftName)); legend.append(i); });
     legend.hidden = shown.length < 2;
 
-    const W = Math.max(320, host.clientWidth || 640), H = 240, padL = 44, padB = 28, padT = 8, padR = 8;
+    lastTrendWidth = host.clientWidth;
+    const W = Math.max(280, host.clientWidth || 640), H = 240, padL = 44, padB = 28, padT = 8, padR = 8;
     const plotW = W - padL - padR, plotH = H - padT - padB;
     const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
     for (let i = 0; i <= 4; i++) {
@@ -322,10 +344,12 @@
     const tb = make('tbody');
     rows.forEach(r => {
       const row = make('tr', r.onClick ? 'clickable' : '');
+      if (opts.stack) row.setAttribute('role', 'row');
       r.cells.forEach((c, i) => {
         const td = make(i === 0 ? 'th' : 'td', cls(i));
         if (i === 0) td.scope = 'row';
         td.dataset.label = head[i];
+        if (opts.stack) td.setAttribute('role', i === 0 ? 'rowheader' : 'cell');
         // Clickable rows keep their table semantics; the first cell holds a real button for keyboard and screen readers.
         if (i === 0 && r.onClick) { const b = make('button', 'rowbtn', c); b.type = 'button'; if (r.label) b.title = r.label; td.append(b); }
         else td.textContent = c;
@@ -334,6 +358,11 @@
       if (r.onClick) row.addEventListener('click', r.onClick);   // a click anywhere on the row (the button's click bubbles here)
       tb.append(row);
     });
+    if (opts.stack) {
+      // Shown as cards on phones (display: block/grid), which makes some browsers drop the table semantics: state them.
+      t.setAttribute('role', 'table'); thead.setAttribute('role', 'rowgroup'); tb.setAttribute('role', 'rowgroup');
+      tr.setAttribute('role', 'row'); tr.querySelectorAll('th').forEach(th => th.setAttribute('role', 'columnheader'));
+    }
     t.append(tb); host.append(t);
   }
 
@@ -366,7 +395,7 @@
 
   /** Returns rows with the FILE line number of each (blank lines are skipped but still counted). Throws listing bad lines. */
   function parseCsv(textIn) {
-    const lines = textIn.replace(/^\uFEFF/, '').split(/\r?\n/).map((t, i) => ({ t, line: i + 1 })).filter(l => l.t.trim() !== '');
+    const lines = textIn.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/).map((t, i) => ({ t, line: i + 1 })).filter(l => l.t.trim() !== '');
     if (!lines.length) throw new Error('The file is empty.');
     const sep = lines[0].t.includes(';') && !lines[0].t.includes(',') ? ';' : ',';
     const head = csvFields(lines[0].t, sep).map(h => h.toLowerCase());
@@ -391,7 +420,7 @@
   async function upload(dryRun) {
     if (uploading) return;   // no double submit
     const out = el('prodResult'); out.replaceChildren();
-    uploading = true; el('prodCheck').disabled = el('prodApply').disabled = true;
+    uploading = true; el('prodCheck').disabled = el('prodApply').disabled = el('prodFile').disabled = true;   // no file change mid-request
     let applyEnabled = false;
     try {
       if (dryRun || !parsedRows) {
@@ -416,7 +445,7 @@
       if (e.lines) problemList(out, e.message, e.lines); else out.append(make('p', 'error', e.message));
       parsedRows = null;
     } finally {
-      uploading = false; el('prodCheck').disabled = false; el('prodApply').disabled = !applyEnabled;
+      uploading = false; el('prodCheck').disabled = el('prodFile').disabled = false; el('prodApply').disabled = !applyEnabled;
     }
   }
   function problemList(out, title, lines) {

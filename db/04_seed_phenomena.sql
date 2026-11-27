@@ -6,6 +6,7 @@
 -- number of its stage instead, under the same per-stage lock the API uses, so a re-run never fails on a duplicate code.
 -- The check at the end verifies that every seeded NAME is present. Read docs/DATABASE_RUNBOOK.md before re-running.
 SET NOCOUNT ON; SET XACT_ABORT ON;
+SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON;   -- sqlcmd starts with QUOTED_IDENTIFIER OFF
 BEGIN TRANSACTION;
 DECLARE @inserted int = 0, @lock int;
 DECLARE @seed TABLE (StageCode nvarchar(30) NOT NULL, Code nvarchar(30) NOT NULL, Name nvarchar(200) NOT NULL, Norm nvarchar(200) NOT NULL);
@@ -241,9 +242,10 @@ IF @inserted > 0
     VALUES (NULL, N'EXCEL_IMPORT', N'RejectionPhenomena', NULL, NULL, N'{"GDC_SHOP": {"raw": 25, "imported": 25, "skipped": 0}, "CNC_SHOP": {"raw": 53, "imported": 52, "skipped": 1}, "PRE_TREATMENT": {"raw": 34, "imported": 34, "skipped": 0}, "FINAL": {"raw": 34, "imported": 34, "skipped": 0}}');
 
 -- Post-condition check: abort and roll back unless every seeded (stage, name) is present
-IF EXISTS (SELECT 1 FROM @seed sd JOIN qa.InspectionStages s ON s.StageCode = sd.StageCode
-           WHERE NOT EXISTS (SELECT 1 FROM qa.RejectionPhenomena p WHERE p.InspectionStageId = s.Id AND p.NormalizedName = sd.Norm))
-    THROW 50001, N'Seed check failed: some seeded phenomena are missing after the import.', 1;
+-- (LEFT JOIN: a missing stage - 03 not run - must fail, not be skipped)
+IF EXISTS (SELECT 1 FROM @seed sd LEFT JOIN qa.InspectionStages s ON s.StageCode = sd.StageCode
+           WHERE s.Id IS NULL OR NOT EXISTS (SELECT 1 FROM qa.RejectionPhenomena p WHERE p.InspectionStageId = s.Id AND p.NormalizedName = sd.Norm))
+    THROW 50001, N'Seed check failed: some seeded phenomena (or their inspection stages: run 03 first) are missing.', 1;
 IF (SELECT COUNT(*) FROM @seed WHERE StageCode = N'GDC_SHOP') <> 25 THROW 50001, N'Seed check failed for GDC_SHOP: the script should hold 25 seeded names', 1;
 IF (SELECT COUNT(*) FROM @seed WHERE StageCode = N'CNC_SHOP') <> 52 THROW 50001, N'Seed check failed for CNC_SHOP: the script should hold 52 seeded names', 1;
 IF (SELECT COUNT(*) FROM @seed WHERE StageCode = N'PRE_TREATMENT') <> 34 THROW 50001, N'Seed check failed for PRE_TREATMENT: the script should hold 34 seeded names', 1;

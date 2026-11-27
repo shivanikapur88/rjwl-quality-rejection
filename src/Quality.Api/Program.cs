@@ -91,11 +91,11 @@ builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        LoginThrottle.ClientKey(ctx.Connection.RemoteIpAddress),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = loginRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     // Anonymous readiness probe: monitoring needs a few calls a minute, not thousands.
     o.AddPolicy("health", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        LoginThrottle.ClientKey(ctx.Connection.RemoteIpAddress),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = cfg.GetValue("Health:RequestsPerMinutePerClient", 60), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddSingleton<Quality.Api.Controllers.ReadinessCache>();
@@ -106,7 +106,20 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     foreach (var ip in knownProxies) o.KnownProxies.Add(IPAddress.Parse(ip));
 });
-builder.Services.AddControllers();
+builder.Services.AddControllers().ConfigureApiBehaviorOptions(o =>
+    // Model-binding errors (missing body, wrong type) get the same problem shape with a stable "code" as every other error.
+    o.InvalidModelStateResponseFactory = ctx =>
+    {
+        var problem = new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(ctx.ModelState)
+        { Status = 400, Title = "The request was not valid.", Detail = "Check the fields and try again." };
+        problem.Extensions["code"] = "validation";
+        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
+    });
+// Request bodies: 64 KB by default (entries, corrections, admin edits are small); the production-count upload raises its
+// own limit with [RequestSizeLimit]. Applies to Kestrel and to IIS in-process hosting (third full review).
+const long DefaultMaxBody = 64 * 1024;
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = DefaultMaxBody);
+builder.Services.Configure<Microsoft.AspNetCore.Builder.IISServerOptions>(o => o.MaxRequestBodySize = DefaultMaxBody);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

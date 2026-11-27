@@ -27,7 +27,7 @@ public sealed class ReportService
     {
         var cal = await _calendar.GetAsync();
         var (day, shift) = cal.Resolve(_time.GetUtcNow().UtcDateTime);
-        return new CalendarDto(day, shift, cal.Zone.Id, cal.Shifts.Select(s => new ShiftDto(s.ShiftCode, s.ShiftName, s.StartTime.ToString("HH:mm"))).ToList());
+        return new CalendarDto(day, shift, cal.Zone.Id, cal.Shifts.Select(s => new ShiftDto(s.ShiftCode, s.ShiftName, s.StartTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))).ToList());
     }
 
     private sealed record Scope(IReadOnlyList<Shop> Shops, DateOnly From, DateOnly To, string? Shift, int Top);

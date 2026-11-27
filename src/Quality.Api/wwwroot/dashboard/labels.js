@@ -10,7 +10,7 @@
     try {
       for (const sh of await api('/api/shops')) el('shop').append(new Option(sh.shopName, sh.id));
       el('filters').addEventListener('submit', ev => { ev.preventDefault(); load(); });
-      el('print').addEventListener('click', () => window.print());
+      el('print').addEventListener('click', () => window.print());   // enabled only once every QR image has loaded
       await load();
     } catch (e) { text(el('error'), e.message); el('error').hidden = false; }
   });
@@ -29,6 +29,10 @@
       const s = session();
       if (!s) { location.reload(); return; }   // signed out meanwhile: show the sign-in form
       if (!machines.length) { host.append(make('p', 'muted', 'No machines in this shop.')); return; }
+      // Print would print blank labels while QR images are still loading: keep it disabled until all have settled.
+      let pending = machines.length;
+      el('print').disabled = true;
+      const settled = () => { if (--pending === 0 && seq === loadSeq) el('print').disabled = false; };
       for (const m of machines) {
         const card = make('div', 'label');
         const img = make('img'); img.alt = `QR code for machine ${m.machineCode}`;
@@ -37,8 +41,9 @@
         // The SVG needs the bearer token, so fetch it and show it through a blob: URL (allowed by the page's CSP).
         fetch(`/api/admin/machines/${m.id}/qr.svg`, { headers: { Authorization: 'Bearer ' + s.token } })
           .then(r => { if (r.status === 401) { clear(); location.reload(); throw new Error('session'); } return r.ok ? r.blob() : Promise.reject(new Error('QR ' + r.status)); })
-          .then(b => { const u = URL.createObjectURL(b); urls.push(u); img.src = u; })
-          .catch(() => { img.replaceWith(make('div', 'error', 'QR code could not be loaded')); });
+          .then(b => new Promise(res => { const u = URL.createObjectURL(b); urls.push(u); img.onload = img.onerror = res; img.src = u; }))
+          .catch(() => { img.replaceWith(make('div', 'error', 'QR code could not be loaded')); })
+          .finally(settled);
       }
     } catch (e) { if (seq === loadSeq) { text(el('error'), e.message); el('error').hidden = false; } }
   }

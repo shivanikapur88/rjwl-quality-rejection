@@ -16,6 +16,11 @@
    Set @DeactivatePlaceholders = 1 to deactivate the DEV-* placeholder machines from script 05 at the same time.
    Run it first with @DryRun = 1: it reports what it WOULD do and rolls back.
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
+-- STRING_AGG / FOR JSON need database compatibility level 130 (SQL Server 2016) or higher.
+IF (SELECT compatibility_level FROM sys.databases WHERE name = DB_NAME()) < 130
+    THROW 50015, N'This database has compatibility level below 130. Raise it (ALTER DATABASE ... SET COMPATIBILITY_LEVEL = 150) after checking with its owners.', 1;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 

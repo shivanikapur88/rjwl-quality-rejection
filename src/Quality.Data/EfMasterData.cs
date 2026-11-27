@@ -74,14 +74,16 @@ public sealed class EfMasterData : IMasterData
     public async Task LockMachineExclusiveAsync(int machineId)
     {
         RequireTransaction();
-        await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE qa.Machines SET IsActive = IsActive WHERE Id = {machineId}");
+        // LOCK_TIMEOUT: if entry saves hold the machine (e.g. a slow insert into a shared entry database), the delete gives up
+        // after 3 s with 409 instead of queueing - a waiting exclusive lock would also stall every new save (third full review).
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SET LOCK_TIMEOUT 3000; UPDATE qa.Machines SET IsActive = IsActive WHERE Id = {machineId}; SET LOCK_TIMEOUT -1;");
         if (_db.ChangeTracker.Entries<Machine>().FirstOrDefault(e => e.Entity.Id == machineId) is { } tracked) await tracked.ReloadAsync();
     }
 
     public async Task LockPhenomenonExclusiveAsync(int phenomenonId)
     {
         RequireTransaction();
-        await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE qa.RejectionPhenomena SET IsActive = IsActive WHERE Id = {phenomenonId}");
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SET LOCK_TIMEOUT 3000; UPDATE qa.RejectionPhenomena SET IsActive = IsActive WHERE Id = {phenomenonId}; SET LOCK_TIMEOUT -1;");
         if (_db.ChangeTracker.Entries<RejectionPhenomenon>().FirstOrDefault(e => e.Entity.Id == phenomenonId) is { } tracked) await tracked.ReloadAsync();
     }
 

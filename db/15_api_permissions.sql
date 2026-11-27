@@ -12,6 +12,8 @@
    Set @ApiUser to the database user / login name of the API (default qr_api). The login must already exist on the
    server (CREATE LOGIN ... is a server-level step for the DBA, see docs/DATABASE_RUNBOOK.md).
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
@@ -25,7 +27,18 @@ IF DATABASE_PRINCIPAL_ID(@ApiUser) IS NULL
 BEGIN
     SET @sql = N'CREATE USER ' + @u + N' FOR LOGIN ' + @u + N';';
     EXEC sys.sp_executesql @sql;
+END
+-- After a restore onto another server the database user can be "orphaned" (its SID differs from the login's): re-map it.
+ELSE IF SUSER_SID(@ApiUser) IS NOT NULL
+     AND (SELECT sid FROM sys.database_principals WHERE name = @ApiUser) <> SUSER_SID(@ApiUser)
+BEGIN
+    SET @sql = N'ALTER USER ' + @u + N' WITH LOGIN = ' + @u + N';';
+    EXEC sys.sp_executesql @sql;
+    PRINT N'Re-mapped the orphaned database user ' + @ApiUser + N' to its login.';
 END;
+
+-- The REVOKE and the GRANTs below are one transaction: a failure part-way leaves the previous rights in place.
+BEGIN TRANSACTION;
 
 -- Remove the broad schema-level rights of earlier runbook versions.
 IF SCHEMA_ID(N'qa') IS NOT NULL
@@ -82,6 +95,17 @@ BEGIN
     SET @sql = N'REVOKE UPDATE, DELETE ON qa.QualityRejectionEntries FROM ' + @u + N';
                 GRANT UPDATE ON qa.QualityRejectionEntries (ReversedAt, ReversedByCorrectionId) TO ' + @u + N';';
     EXEC sys.sp_executesql @sql;
+END;
+
+COMMIT TRANSACTION;
+
+-- Role memberships grant rights this script cannot see table by table (e.g. db_datawriter can UPDATE the audit log).
+IF EXISTS (SELECT 1 FROM sys.database_role_members rm WHERE rm.member_principal_id = DATABASE_PRINCIPAL_ID(@ApiUser))
+BEGIN
+    SELECT r.name AS [Role the API user is a member of] FROM sys.database_role_members rm
+    JOIN sys.database_principals r ON r.principal_id = rm.role_principal_id WHERE rm.member_principal_id = DATABASE_PRINCIPAL_ID(@ApiUser);
+    PRINT N'WARNING: the API user is a member of the database roles listed above. They grant more than this script (for example';
+    PRINT N'db_datawriter allows editing the audit log and saved entries). Remove the memberships unless another system needs them.';
 END;
 
 SELECT OBJECT_SCHEMA_NAME(p.major_id) + N'.' + OBJECT_NAME(p.major_id) AS [Object],

@@ -31,7 +31,12 @@ public sealed class LoginThrottle
     public static readonly Limit PerLogin = new(10, TimeSpan.FromMinutes(15));
     public static readonly Limit PerClient = new(30, TimeSpan.FromMinutes(15));
     public static readonly TimeSpan KnownClientFor = TimeSpan.FromDays(30);
-    private const int MaxLoginKeyLength = 50, MaxEntries = 50_000;
+    private const int MaxLoginKeyLength = 50;
+    public const int MaxEntries = 50_000;
+    private static readonly TimeSpan PruneEvery = TimeSpan.FromSeconds(30);
+    private DateTime _lastPrune = DateTime.MinValue;
+    /// <summary>Number of live keys (tests and diagnostics).</summary>
+    public int KeyCount { get { lock (_gate) return _failures.Count; } }
 
     private readonly object _gate = new();
     private readonly Dictionary<string, Queue<DateTime>> _failures = new();
@@ -65,12 +70,17 @@ public sealed class LoginThrottle
     /// Atomically checks the limits and, if the attempt may go ahead, reserves it as a failure in every bucket.
     /// Returns how long to wait when refused (nothing is reserved then).
     /// </summary>
-    public TimeSpan? TryBegin(string client, string login)
+    public TimeSpan? TryBegin(string client, string login) => TryBegin(client, login, out _);
+
+    /// <param name="known">Whether the login counted as known on this address when the attempt began; pass it back to
+    /// <see cref="RecordSuccess(string,string,bool)"/> / <see cref="Refund(string,string,bool)"/> so exactly the reserved buckets are settled.</param>
+    public TimeSpan? TryBegin(string client, string login, out bool known)
     {
         var now = _time.GetUtcNow().UtcDateTime;
         lock (_gate)
         {
-            var buckets = Buckets(client, login, IsKnown(client, login, now)).ToList();
+            known = IsKnown(client, login, now);
+            var buckets = Buckets(client, login, known).ToList();
             TimeSpan? wait = null;
             foreach (var (key, limit) in buckets)
             {
@@ -88,7 +98,7 @@ public sealed class LoginThrottle
                 if (!_failures.TryGetValue(key, out var q)) _failures[key] = q = new Queue<DateTime>();
                 q.Enqueue(now);
             }
-            if (_failures.Count > MaxEntries || _known.Count > MaxEntries) Prune(now);
+            if ((_failures.Count > MaxEntries || _known.Count > MaxEntries) && now - _lastPrune > PruneEvery) Prune(now);
             return null;
         }
     }
@@ -97,7 +107,9 @@ public sealed class LoginThrottle
     public void RecordFailure(string client, string login) { }
 
     /// <summary>Signed in: clear this login's counters, give back the client reservation, remember the client as known.</summary>
-    public void RecordSuccess(string client, string login)
+    public void RecordSuccess(string client, string login) => RecordSuccess(client, login, IsKnownNow(client, login));
+
+    public void RecordSuccess(string client, string login, bool knownAtBegin)
     {
         var now = _time.GetUtcNow().UtcDateTime;
         lock (_gate)
@@ -105,19 +117,37 @@ public sealed class LoginThrottle
             var l = Login(login);
             _failures.Remove($"cl:{client}|{l}");
             _failures.Remove($"l:{l}");
-            if (!IsKnown(client, login, now)) RemoveNewest($"c:{client}");   // a known login reserved nothing there
+            if (!knownAtBegin) RemoveNewest($"c:{client}");   // a known login reserved nothing there
             _known[$"{client}|{l}"] = now;
         }
     }
 
     /// <summary>The request never reached the password check (e.g. empty fields): give the reservation back.</summary>
-    public void Refund(string client, string login)
+    public void Refund(string client, string login) => Refund(client, login, IsKnownNow(client, login));
+
+    /// <summary>Gives back exactly the reservation made by <see cref="TryBegin(string,string,out bool)"/>.</summary>
+    public void Refund(string client, string login, bool knownAtBegin)
     {
         lock (_gate)
         {
-            var now = _time.GetUtcNow().UtcDateTime;
-            foreach (var (key, _) in Buckets(client, login, IsKnown(client, login, now))) RemoveNewest(key);
+            foreach (var (key, _) in Buckets(client, login, knownAtBegin)) RemoveNewest(key);
         }
+    }
+
+    private bool IsKnownNow(string client, string login) { lock (_gate) return IsKnown(client, login, _time.GetUtcNow().UtcDateTime); }
+
+    /// <summary>
+    /// The address used for throttling: IPv4 as is; IPv6 by its /64 network, because one client controls a whole /64 and
+    /// could otherwise rotate addresses to get fresh per-address buckets (third full review).
+    /// </summary>
+    public static string ClientKey(System.Net.IPAddress? address)
+    {
+        if (address is null) return "unknown";
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6) return address.ToString();
+        var b = address.GetAddressBytes();
+        for (var i = 8; i < 16; i++) b[i] = 0;
+        return new System.Net.IPAddress(b) + "/64";
     }
 
     private void RemoveNewest(string key)
@@ -150,10 +180,21 @@ public sealed class LoginThrottle
         while (q.Count > 0 && q.Peek() <= now - window) q.Dequeue();
     }
 
+    /// <summary>
+    /// Removes expired keys. Runs at most every <see cref="PruneEvery"/> (not on every call once the table is large), and
+    /// enforces a hard cap: if live keys still exceed it (a flood of random logins), the keys with the OLDEST last failure
+    /// are dropped down to three quarters of the cap, so memory and the cost of a prune stay bounded (third full review).
+    /// Known logins are capped the same way, oldest sign-in first.
+    /// </summary>
     private void Prune(DateTime now)
     {
+        _lastPrune = now;
         var longest = new[] { PerClientAndLogin.Window, PerLogin.Window, PerClient.Window }.Max();
         foreach (var key in _failures.Where(kv => kv.Value.Count == 0 || kv.Value.Last() <= now - longest).Select(kv => kv.Key).ToList()) _failures.Remove(key);
         foreach (var key in _known.Where(kv => now - kv.Value >= KnownClientFor).Select(kv => kv.Key).ToList()) _known.Remove(key);
+        if (_failures.Count > MaxEntries)
+            foreach (var key in _failures.OrderBy(kv => kv.Value.Last()).Take(_failures.Count - MaxEntries * 3 / 4).Select(kv => kv.Key).ToList()) _failures.Remove(key);
+        if (_known.Count > MaxEntries)
+            foreach (var key in _known.OrderBy(kv => kv.Value).Take(_known.Count - MaxEntries * 3 / 4).Select(kv => kv.Key).ToList()) _known.Remove(key);
     }
 }

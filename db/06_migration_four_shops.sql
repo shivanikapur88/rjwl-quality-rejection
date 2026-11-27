@@ -7,8 +7,10 @@
    database (it adds fake machines); load the real list with 10_load_production_machines.sql instead.
    Corrected 2026-11-26: earlier text said to re-run 03 AND 05. See docs/DATABASE_RUNBOOK.md.
    Existing entries in GDC_AndonDB / MachineShopDB are NOT touched (their ShopId values stay valid).
-   Review before running. NOT YET EXECUTED against SQL Server.
+   Review before running. NOT covered by the automated tests (it needs an old two-shop database): test on a copy first.
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON; SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 

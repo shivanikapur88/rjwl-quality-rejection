@@ -122,7 +122,7 @@ Safeguards: no self-deactivation or self-demotion; at least one active administr
 | `GET /api/shops`, `/shops/{id}/stages`, `/shops/{id}/stages/{id}/machines`, `/…/phenomena` | signed in | only assigned shops; active items only |
 | `POST /api/rejection-entries` | inspector | 201 new / 200 replay |
 | `GET /api/rejection-entries`, `/page`, `/{shopId}/{id}` | signed in | role-scoped (section 7) |
-| Round 2/3: `/api/corrections` (+ `/count`, `{id}/approve`, `/reject`, `/withdraw`), `/api/reports/calendar`, `/totals`, `/entries`, `/api/machines/lookup`, `/api/admin/machines/{id}/qr.svg`, `POST /api/admin/production-counts` | by role | see sections 12 and 13 |
+| Round 2/3: `POST /api/rejection-entries/{shopId}/{id}/corrections`, `/api/corrections` (+ `/count`, `{id}/approve`, `/reject`, `/withdraw`), `/api/reports/calendar`, `/totals`, `/entries`, `/api/machines/lookup`, `/api/admin/machines/{id}/qr.svg`, `POST /api/admin/production-counts` | by role | see sections 12 and 13 |
 | `/api/admin/phenomena`, `/api/admin/machines`, `/api/admin/users` (+ `PATCH {id}/status`, `POST users/{id}/reset-password`, `DELETE`) | administrator | section 8 |
 
 Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `unauthenticated`/`token_expired` 401, `forbidden`/`shop_not_assigned` 403, `*_not_found` 404, conflicts 409 (`concurrent_edit`, `concurrent_change`, `duplicate*`, `last_admin`, `*_in_use`, `*_inactive`, `submission_*`), `value_too_long` 400, `too_many_attempts` 429, `database_unavailable`/`store_not_configured` 503, `server_error` 500. **Only real connectivity problems** are reported as 503 (previously every constraint error was "database unavailable"). Bodies never contain SQL text, stack traces or secrets.
@@ -179,6 +179,8 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 ### 12.5 Web dashboard (#6)
 
 Read-only for supervisors. From round 3, administrators can also upload production counts on it (§13.4).
+
+**Phone layout:** below 600 px wide, "Top machines" shows code, parts, change and rate only; entries are shown as one card per entry with labelled fields (still exposed as a table to screen readers); the Pareto shows rank, name, parts, share and cumulative share; the page never scrolls sideways. The chart redraws when the width changes (rotation). Rates of machines and shops based on less than 80% of their rejected parts carry "⚠ N%".
 * Served by the API at `/dashboard/`. Supervisors and administrators sign in with their normal credentials; same roles and shop scope as the API.
 * Shows: rejected parts and entries, waiting correction requests, a stacked bar chart per production day by shift (with a table view), top phenomena with share of rejected parts, top machines, and totals by shop.
 * Plain HTML/JS with no external libraries, so it works on an offline plant network. Strict Content-Security-Policy: own scripts only, no inline script, no framing. The token is kept in the browser tab's session storage and cleared on sign-out or expiry.

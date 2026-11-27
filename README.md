@@ -9,7 +9,7 @@ An Android app (.NET MAUI), an ASP.NET Core Web API and SQL Server, used to reco
 | Source | Complete and editable. The mobile source missing from the supplied package was **recovered from its compiled DLLs** ([docs/RECOVERY.md](docs/RECOVERY.md)). |
 | Framework | **.NET 10** for every project (the API and libraries were on .NET 8, which left support on 10 Nov 2026) |
 | Review findings Q1-Q9 | Fixed and tested on SQL Server 2022 ([docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md)) |
-| Round 2 | Entry corrections, shift and production date, app shift summary, machine QR codes, read-only web dashboard at `/dashboard/` ([SPECIFICATION.md §12](docs/SPECIFICATION.md)), checked by an independent review |
+| Round 2 | Entry corrections, shift and production date, app shift summary, machine QR codes, web dashboard at `/dashboard/` (read-only; from round 3 administrators also upload production counts there) ([SPECIFICATION.md §12](docs/SPECIFICATION.md)), checked by an independent review |
 | Round 3 | Dashboard drill-down, previous-period comparison, Pareto, and rejection rate from uploaded production counts ([SPECIFICATION.md §13](docs/SPECIFICATION.md)), checked by an independent review |
 | Reviews | Independent reviews by Claude Fable (round 2, round 3) and two full-application reviews by Claude Sonnet 5.5; findings and fixes in [docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md) |
 | Tests | 97 unit and 55 SQL Server integration tests, all passing on a clean checkout; the API runs as a least-privilege login in the tests ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
@@ -36,7 +36,7 @@ An Android app (.NET MAUI), an ASP.NET Core Web API and SQL Server, used to reco
 
 ```
 incoming/                 the supplied ZIP, unchanged (on main)
-db/                       SQL scripts 01-12 (see the runbook for which database each belongs to) + seed/ (workbook, JSON)
+db/                       SQL scripts 01-15 (see the runbook for which database each belongs to) + seed/ (workbook, JSON)
 tools/                    import_excel.py, create-test-databases.sh, test-upgrade-path.sh
 docs/                     documentation and evidence
 src/

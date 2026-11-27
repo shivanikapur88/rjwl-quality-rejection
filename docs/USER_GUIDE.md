@@ -47,6 +47,8 @@
   * **Drill down:** click a day in the chart (or a day button in "Show as table"), a phenomenon in the Pareto, or a machine or shop row. Everything filters to it, and the entries behind it are listed at the bottom. Chips above the tiles show the active filters; click × to remove one. You can copy the address to share the same view.
   * **Comparison:** the tiles and the "vs prev." columns compare with the previous period of the same length (for example the 7 days before).
   * **Pareto:** phenomena from most to fewest rejected parts, with the cumulative share and a line where 80% of rejected parts is reached. These are the few causes worth attacking first.
+  * **On a phone:** the same page works; tables show fewer columns and each entry is a small card. Turn the phone sideways for a wider chart.
+  * **"⚠ 40%" next to a rate:** that machine's or shop's rate is based on only 40% of its rejected parts (production counts are missing for the rest), so treat it with care.
   * **Rejection rate:** rejected ÷ produced parts. It appears only where production counts have been loaded, and the "based on N% of rejected parts" note says how much of the data it covers.
 
 ## Administrator

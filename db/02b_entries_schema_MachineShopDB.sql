@@ -9,8 +9,10 @@
      the wrong shop cannot be stored in this database even if the backend routes badly.
    * Cross-database foreign keys are impossible in SQL Server, so master ids are stored
      together with immutable snapshots (names/codes). Master edits never change history.
-   * NOT YET EXECUTED against SQL Server (none available during authoring).
+   Executed against SQL Server 2022 by the automated tests (docs/TEST_EVIDENCE.md).
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 GO

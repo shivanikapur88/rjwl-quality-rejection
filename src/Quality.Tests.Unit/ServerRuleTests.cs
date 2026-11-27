@@ -64,6 +64,45 @@ public sealed class LoginThrottleTests
         Assert.NotNull(th.TryBegin("plant-nat", "ravi.k"));         // ... but keeps its own 5-per-5-minutes limit
     }
 
+    /// <summary>Third full review: one client controls a whole IPv6 /64, so it is throttled as one address.</summary>
+    [Fact]
+    public void Ipv6_clients_are_grouped_by_their_64_bit_network()
+    {
+        Assert.Equal(LoginThrottle.ClientKey(System.Net.IPAddress.Parse("2001:db8:1:2:aaaa::1")), LoginThrottle.ClientKey(System.Net.IPAddress.Parse("2001:db8:1:2:ffff:1:2:3")));
+        Assert.NotEqual(LoginThrottle.ClientKey(System.Net.IPAddress.Parse("2001:db8:1:2::1")), LoginThrottle.ClientKey(System.Net.IPAddress.Parse("2001:db8:1:3::1")));
+        Assert.Equal("10.0.0.5", LoginThrottle.ClientKey(System.Net.IPAddress.Parse("::ffff:10.0.0.5")));
+        Assert.Equal("unknown", LoginThrottle.ClientKey(null));
+    }
+
+    /// <summary>Third full review: a flood of random logins cannot grow the throttle's memory without bound.</summary>
+    [Fact]
+    public void A_flood_of_random_logins_is_capped()
+    {
+        var th = new LoginThrottle(_t);
+        for (var i = 0; i < 40_000; i++) { th.TryBegin($"10.{i / 65536 % 256}.{i / 256 % 256}.{i % 256}", $"rnd{i}"); if (i % 1000 == 0) _t.Now += TimeSpan.FromSeconds(1); }
+        Assert.True(th.KeyCount <= LoginThrottle.MaxEntries + 3 * 1000 * 30, $"{th.KeyCount} keys");   // pruned at most every 30 s
+        _t.Now += TimeSpan.FromMinutes(1);
+        th.TryBegin("10.9.9.9", "last");
+        Assert.True(th.KeyCount <= LoginThrottle.MaxEntries, $"{th.KeyCount} keys after the next prune");
+    }
+
+    /// <summary>Third full review: a slow probe is cached from when it FINISHED, and concurrent callers share one probe.</summary>
+    [Fact]
+    public async Task Readiness_cache_is_stamped_after_a_slow_probe()
+    {
+        var cache = new Quality.Api.Controllers.ReadinessCache(_t);
+        var probes = 0;
+        var dto = new Quality.Core.Dtos.ReadinessDto("ok", new Dictionary<string, string>(), new List<string>());
+        Task<(int, Quality.Core.Dtos.ReadinessDto)> Slow() { probes++; _t.Now += TimeSpan.FromSeconds(30); return Task.FromResult((200, dto)); }   // databases slow
+        await cache.GetAsync(Slow, TestContext.Current.CancellationToken);
+        _t.Now += TimeSpan.FromSeconds(5);
+        await cache.GetAsync(Slow, TestContext.Current.CancellationToken);
+        Assert.Equal(1, probes);    // 35 s after the start, but only 5 s after the probe finished: cached
+        _t.Now += TimeSpan.FromSeconds(6);
+        await cache.GetAsync(Slow, TestContext.Current.CancellationToken);
+        Assert.Equal(2, probes);
+    }
+
     /// <summary>Accent and width variants of one login share a bucket (an accent-insensitive collation treats them as one account).</summary>
     [Fact]
     public void Accent_variants_of_a_login_share_one_bucket()

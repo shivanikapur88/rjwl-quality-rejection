@@ -12,6 +12,9 @@ namespace Quality.Api.Infrastructure;
 public sealed class ShiftCalendarProvider : IShiftCalendarProvider
 {
     private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(5);
+    /// <summary>A FALLBACK calendar (the table could not be read) is retried after 15 seconds, not kept for 5 minutes:
+    /// entries are stamped with it and their shift is never recomputed (third full review).</summary>
+    private static readonly TimeSpan FallbackFor = TimeSpan.FromSeconds(15);
     private readonly IServiceScopeFactory _scopes; private readonly TimeProvider _time; private readonly ILogger<ShiftCalendarProvider> _log;
     private readonly TimeZoneInfo _zone;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -26,11 +29,11 @@ public sealed class ShiftCalendarProvider : IShiftCalendarProvider
     public async Task<ShiftCalendar> GetAsync()
     {
         var now = _time.GetUtcNow().UtcDateTime;
-        if (_cached is not null && now - _loadedAt < CacheFor) return _cached;
+        if (_cached is not null && now - _loadedAt < (_cached.IsFallback ? FallbackFor : CacheFor)) return _cached;
         await _gate.WaitAsync();
         try
         {
-            if (_cached is not null && now - _loadedAt < CacheFor) return _cached;
+            if (_cached is not null && now - _loadedAt < (_cached.IsFallback ? FallbackFor : CacheFor)) return _cached;
             try
             {
                 using var scope = _scopes.CreateScope();

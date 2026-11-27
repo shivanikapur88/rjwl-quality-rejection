@@ -100,6 +100,12 @@ BEGIN
         ALTER TABLE qa.EntryCorrections WITH CHECK ADD CONSTRAINT FK_EntryCorrections_ProposedPhenomenon FOREIGN KEY (ProposedPhenomenonId) REFERENCES qa.RejectionPhenomena(Id);
 END;
 GO
+-- Indexes for the two foreign keys: a machine or phenomenon delete checks them without scanning all requests.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_EntryCorrections_ProposedMachine' AND object_id = OBJECT_ID(N'qa.EntryCorrections'))
+    CREATE INDEX IX_EntryCorrections_ProposedMachine ON qa.EntryCorrections (ProposedMachineId) WHERE ProposedMachineId IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_EntryCorrections_ProposedPhenomenon' AND object_id = OBJECT_ID(N'qa.EntryCorrections'))
+    CREATE INDEX IX_EntryCorrections_ProposedPhenomenon ON qa.EntryCorrections (ProposedPhenomenonId) WHERE ProposedPhenomenonId IS NOT NULL;
+GO
 
 IF NOT EXISTS (SELECT 1 FROM qa.SchemaVersions WHERE Script = N'11_upgrade_master_shifts_corrections')
     INSERT INTO qa.SchemaVersions (Script) VALUES (N'11_upgrade_master_shifts_corrections');

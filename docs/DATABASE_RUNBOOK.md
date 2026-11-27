@@ -4,6 +4,8 @@
 
 `<I>` = SQL Server instance. Use `-E` for Windows authentication, or `-U … -P …`.
 
+**Requirements:** SQL Server 2016 or later, with every database at compatibility level **130 or higher** (scripts 10 and 12 check this and stop with error 50015). Tested on SQL Server 2022. For any ad-hoc SQL against these tables with `sqlcmd`, add `-I` (QUOTED_IDENTIFIER ON); without it, writes to tables with filtered indexes fail with error 1934.
+
 ## Script map
 
 | Script | Database | Fresh install | Upgrade | Notes |
@@ -57,7 +59,7 @@ sqlcmd -S <I> -E -b -d MachineShopDB -i db/12_upgrade_entries_shift_reversal.sql
 ```sql
 SELECT s.StageCode, COUNT(*) FROM qa.RejectionPhenomena p JOIN qa.InspectionStages s ON s.Id = p.InspectionStageId GROUP BY s.StageCode;
 -- GDC_SHOP 25, CNC_SHOP 52, PRE_TREATMENT 34, FINAL 34
-SELECT Script, AppliedAt FROM qa.SchemaVersions;   -- 08_upgrade_master_review_fixes
+SELECT Script, AppliedAt FROM qa.SchemaVersions;   -- 08, 11 and 13 register here (09, 12 and 15 do not; check them by their objects)
 ```
 6. API database login (least privilege; the API never needs DDL rights). The DBA creates the server login once (`CREATE LOGIN [qr_api] ...`, or a Windows/domain account), then:
 ```bash
@@ -104,8 +106,15 @@ Administrators can also add or edit machines in the app (Admin → Machines) ins
 
 | Situation | Action |
 |---|---|
-| A script stopped with an error | Scripts use `SET XACT_ABORT ON`, and the batches that must be all-or-nothing (03, 04, 06, 08's identifier backfill, 10) run in a transaction. The backfills in 07 and 12 commit as they go (12 per id range), and schema changes are separate batches. In every case: read the message, fix the cause and run the **same** script again; it continues where it stopped. Do not continue with the next script. |
+| A script stopped with an error | Scripts use `SET XACT_ABORT ON`, and the batches that must be all-or-nothing (03, 04, 06, 08's identifier backfill, 10, 15's grants) run in a transaction. 12's backfill commits as it goes (per id range); 07 only adds a column with a default. Schema changes are separate batches. In every case: read the message, fix the cause and run the **same** script again; it continues where it stopped. Do not continue with the next script. |
 | 08 error 50080 | Section 2, step 5. |
+| 08 error 50081 | Users with an employee code shorter than 2 or longer than 30 characters (listed). Correct them in `qa.Users`, then re-run 08. |
+| 08 warning "may not be able to sign in" | Legacy usernames or codes with characters other than letters, digits, `. _ -` (listed). Rename them in the app. |
+| 09 / 12 errors 50010-50012 | The entries table is missing in that database: run the matching 02a/02b/02c first. |
+| 12 error 50013 / 50014 | The backfill shift times differ from `qa.ShiftDefinitions` (or 11 was not run in the master). Fix the times (or run 11), then re-run 12. In GDC_AndonDB and MachineShopDB the script cannot compare: set `@OffsetMinutes` and `@A/@B/@C` to the plant's real values before running it there. |
+| 10 / 12 error 50015 | Database compatibility level below 130. |
+| 10 error 50100 | The machine list has problems (listed by row); nothing was changed. |
+| 15 error 50150 | The API login does not exist on the server: the DBA creates it first. 15 also re-maps an orphaned user after a restore and warns if the user is in database roles such as `db_datawriter`. |
 | 08 error 50090 ("At least one active administrator must remain") | A statement tried to remove the last active administrator. Reactivate or create an administrator first. |
 | Seed check 50001 | Some seeded codes are missing (03 not run, or rows were renamed/deleted by hand). Compare with `db/seed/phenomena_seed.json`. |
 | New API misbehaves after the upgrade | Stop it. Preferred rollback: restore the backups (section 5) and redeploy the old API. |

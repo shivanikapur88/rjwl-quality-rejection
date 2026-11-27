@@ -27,15 +27,19 @@ public sealed class HealthController : ControllerBase
     public async Task<IActionResult> Ready([FromServices] Quality.Data.MasterDbContext master, [FromServices] Quality.Core.Abstractions.IEntryStoreRouter router,
         [FromServices] ReadinessCache cache, CancellationToken ct)
     {
-        var (status, dto) = await cache.GetAsync(() => Probe(master, router, ct));
+        var (status, dto) = await cache.GetAsync(() => Probe(master, router), ct);
         return StatusCode(status, dto);
     }
 
-    private async Task<(int, ReadinessDto)> Probe(Quality.Data.MasterDbContext master, Quality.Core.Abstractions.IEntryStoreRouter router, CancellationToken ct)
+    /// <summary>Each check gets its own time limit and is NOT tied to the calling request: a caller that disconnects must not
+    /// turn a healthy database into a cached "unavailable" for everybody (third full review).</summary>
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
+
+    private async Task<(int, ReadinessDto)> Probe(Quality.Data.MasterDbContext master, Quality.Core.Abstractions.IEntryStoreRouter router)
     {
         var components = new Dictionary<string, string>();
-        components["master"] = await CanConnect(() => master.Database.CanConnectAsync(ct));
-        foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(() => router.CanConnectAsync(key, ct));
+        components["master"] = await CanConnect(t => master.Database.CanConnectAsync(t));
+        foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(t => router.CanConnectAsync(key, t));
         // Round 2: entries are stamped with shifts from qa.ShiftDefinitions; a fallback calendar means those are not being used.
         var calendar = await HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>().GetAsync();
         components["shifts"] = calendar.IsFallback ? "unavailable" : "ok";
@@ -46,7 +50,8 @@ public sealed class HealthController : ControllerBase
             if (components["entries:" + key] != "ok") continue;
             try
             {
-                var n = await router.For(key).CountWithoutProductionDateAsync(ct);
+                using var cts = new CancellationTokenSource(ProbeTimeout);
+                var n = await router.For(key).CountWithoutProductionDateAsync(cts.Token);
                 if (n > 0) warnings.Add($"entries:{key}: some entries have no production day and are not in reports (see the database runbook, script 12).");
             }
             catch (Exception) { /* reachability is already reported above */ }
@@ -54,9 +59,10 @@ public sealed class HealthController : ControllerBase
         var ok = components.Values.All(v => v == "ok");
         return (ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));
 
-        static async Task<string> CanConnect(Func<Task<bool>> probe)
+        static async Task<string> CanConnect(Func<CancellationToken, Task<bool>> probe)
         {
-            try { return await probe() ? "ok" : "unavailable"; } catch (Exception) { return "unavailable"; }
+            using var cts = new CancellationTokenSource(ProbeTimeout);
+            try { return await probe(cts.Token) ? "ok" : "unavailable"; } catch (Exception) { return "unavailable"; }
         }
     }
 }
@@ -66,23 +72,24 @@ public sealed class ReadinessCache(TimeProvider time)
 {
     public static readonly TimeSpan For = TimeSpan.FromSeconds(10);
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private (DateTime At, int Status, ReadinessDto Dto)? _last;
+    private sealed record Entry(DateTime At, int Status, ReadinessDto Dto);   // immutable: read without the lock, never torn
+    private volatile Entry? _last;
 
-    public async Task<(int Status, ReadinessDto Dto)> GetAsync(Func<Task<(int, ReadinessDto)>> probe)
+    public async Task<(int Status, ReadinessDto Dto)> GetAsync(Func<Task<(int, ReadinessDto)>> probe, CancellationToken ct = default)
     {
-        var now = time.GetUtcNow().UtcDateTime;
-        if (_last is { } l && now - l.At < For) return (l.Status, l.Dto);
-        await _gate.WaitAsync();
+        if (Fresh() is { } hit) return (hit.Status, hit.Dto);
+        await _gate.WaitAsync(ct);   // a caller that gives up leaves the queue
         try
         {
-            now = time.GetUtcNow().UtcDateTime;
-            if (_last is { } l2 && now - l2.At < For) return (l2.Status, l2.Dto);
+            if (Fresh() is { } hit2) return (hit2.Status, hit2.Dto);
             var (status, dto) = await probe();
-            _last = (now, status, dto);
+            _last = new Entry(time.GetUtcNow().UtcDateTime, status, dto);   // stamped when the probe FINISHED
             return (status, dto);
         }
         finally { _gate.Release(); }
     }
+
+    private Entry? Fresh() => _last is { } l && time.GetUtcNow().UtcDateTime - l.At < For ? l : null;
 }
 
 [ApiController, Route("api/auth")]
@@ -97,16 +104,23 @@ public sealed class AuthController : ApiControllerBase
     [ProducesResponseType(typeof(LoginResponse), 200), ProducesResponseType(429)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var client = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var client = LoginThrottle.ClientKey(HttpContext.Connection.RemoteIpAddress);
         var login = request?.Username ?? "";
-        if (_throttle.TryBegin(client, login) is { } wait)   // checks AND reserves the attempt atomically (full review #2)
+        if (_throttle.TryBegin(client, login, out var known) is { } wait)   // checks AND reserves the attempt atomically (full review #2)
         {
             Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return ProblemFor(429, "too_many_attempts", "Too many failed sign-in attempts. Wait a few minutes and try again.");
         }
-        var result = await _auth.LoginAsync(request!);
-        if (result.IsSuccess) _throttle.RecordSuccess(client, login);
-        else if (result.Error!.Kind != ErrorKind.Unauthorized) _throttle.Refund(client, login);   // never reached the password check
+        ServiceResult<LoginResponse> result;
+        try { result = await _auth.LoginAsync(request!); }
+        catch
+        {
+            // Database down, timeout, client gone: not a wrong password, so it must not count (third full review).
+            _throttle.Refund(client, login, known);
+            throw;
+        }
+        if (result.IsSuccess) _throttle.RecordSuccess(client, login, known);
+        else if (result.Error!.Kind != ErrorKind.Unauthorized) _throttle.Refund(client, login, known);   // never reached the password check
         return Map(result);
     }
 }

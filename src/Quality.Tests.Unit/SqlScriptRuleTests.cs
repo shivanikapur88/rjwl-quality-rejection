@@ -27,6 +27,15 @@ public sealed class SqlScriptRuleTests
         Assert.True(set.Success && set.Index < filtered.Index, "SET QUOTED_IDENTIFIER ON must come before the first filtered index.");
     }
 
+    /// <summary>Third full review: sqlcmd starts with QUOTED_IDENTIFIER OFF, and ANY write to a table that has a filtered index
+    /// fails then, so every script sets it (not only the ones that create such indexes).</summary>
+    [Theory, MemberData(nameof(Scripts))]
+    public void Every_script_sets_quoted_identifier_on(string script)
+    {
+        var sql = File.ReadAllText(Path.Combine(DbDir(), script));
+        Assert.Matches(new Regex(@"SET\s+QUOTED_IDENTIFIER\s+ON", RegexOptions.IgnoreCase), sql);
+    }
+
     [Theory, MemberData(nameof(Scripts))]
     public void Every_script_stops_on_error_inside_transactions(string script)
     {

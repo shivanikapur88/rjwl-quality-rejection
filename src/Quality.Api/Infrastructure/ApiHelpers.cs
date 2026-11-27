@@ -72,10 +72,11 @@ public static class ErrorHandling
         2601 or 2627 => (409, "duplicate", "A record with the same unique value already exists."),
         547 => (409, "constraint_violation", "This change conflicts with related data. Refresh and try again."),
         2628 or 8152 => (400, "value_too_long", "One of the values is too long."),
+        1222 => (409, "concurrent_change", "This record is in use by entries being saved right now. Please try again in a moment."),
         1205 => (409, "concurrent_change", "Someone else was changing the same data at the same moment. Please try again."),
         50090 => (409, "last_admin", "At least one active administrator must remain."),
         // Connectivity, login, timeouts and server-unavailable errors.
-        -2 or -1 or 2 or 53 or 40 or 64 or 121 or 233 or 4060 or 4064 or 10053 or 10054 or 10060 or 10061 or 11001 or 18456 or 40613 or 1222
+        -2 or -1 or 2 or 53 or 40 or 64 or 121 or 233 or 4060 or 4064 or 10053 or 10054 or 10060 or 10061 or 11001 or 18456 or 40613
             => (503, "database_unavailable", "The database is temporarily unavailable. Please try again shortly."),
         _ when sql.Class >= 20 => (503, "database_unavailable", "The database is temporarily unavailable. Please try again shortly."),
         _ => (500, "server_error", "Something went wrong. Please try again."),

@@ -94,6 +94,16 @@ BEGIN TRANSACTION;
     WHERE NOT EXISTS (SELECT 1 FROM qa.LoginIdentifiers x WHERE x.NormalizedIdentifier = i.NormalizedIdentifier);
 COMMIT TRANSACTION;
 GO
+-- Legacy accounts whose username or employee code has characters the API does not accept (space, tab, accented letters...):
+-- SQL and the API may upper-case them differently, so such a user might not be able to sign in. List them for renaming.
+IF EXISTS (SELECT 1 FROM qa.Users WHERE Username COLLATE Latin1_General_BIN2 LIKE N'%[^A-Za-z0-9._-]%' OR EmployeeCode COLLATE Latin1_General_BIN2 LIKE N'%[^A-Za-z0-9._-]%')
+BEGIN
+    SELECT Id, Username, EmployeeCode, IsActive FROM qa.Users
+    WHERE Username COLLATE Latin1_General_BIN2 LIKE N'%[^A-Za-z0-9._-]%' OR EmployeeCode COLLATE Latin1_General_BIN2 LIKE N'%[^A-Za-z0-9._-]%';
+    PRINT N'WARNING: the users listed above have characters other than letters, digits, . _ - in their username or employee code.';
+    PRINT N'They may not be able to sign in. Rename them (Admin -> Users) to letters, digits, . _ - only.';
+END;
+GO
 
 /* ---------- 4. Database backstop: always keep one active administrator ---------- */
 -- The API already serialises role changes/deactivations with locks (see EfMasterData.LockActiveAdministratorsAsync).

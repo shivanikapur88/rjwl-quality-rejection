@@ -48,6 +48,8 @@ No secrets are in source. The API refuses to start without these settings (user-
 | `ConnectionStrings:Master` | QualityMasterDB |
 | `ConnectionStrings:GdcEntries` / `CncEntries` | GDC_AndonDB / MachineShopDB |
 | `ConnectionStrings:PreEntries` / `FinalEntries` | **same as Master** (PRE/FINAL entries live there) |
+
+Connection pool: a PRE/FINAL save holds one master connection and opens a second one from the same pool for the entry insert. With many simultaneous saves the default pool (100) can run out; add `Max Pool Size=200` to the Master/PRE/FINAL connection strings if more than about 50 inspectors save at once. Admin deletes of a machine or phenomenon that is being used by saves at that moment give up after 3 seconds with "in use … try again" instead of waiting.
 | `Jwt:Key` | random, at least 32 bytes. Changing it signs everybody out. |
 | `Jwt:Issuer` / `Audience` / `ExpiryMinutes` | defaults in `appsettings.json` (480 min) |
 | `Bootstrap:AdminEmployeeCode` / `AdminUsername` / `AdminPassword` / `AdminDisplayName` | only for the very first start (empty Users table); password at least 12 characters; **remove after the first start** |

@@ -30,6 +30,14 @@ CREATE TABLE qa.ProductionCounts (
     CONSTRAINT UQ_ProductionCounts_Machine_Day_Shift UNIQUE (MachineId, ProductionDate, ShiftCode)
 );
 GO
+-- The stored shop must be the machine's shop (third full review): enforced by the database, not only by the upload and the
+-- feed template. Machines(Id, ShopId) is unique because Id is; the index lets the foreign key reference the pair.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_Machines_Id_Shop' AND object_id = OBJECT_ID(N'qa.Machines'))
+    CREATE UNIQUE INDEX UX_Machines_Id_Shop ON qa.Machines (Id, ShopId);
+IF OBJECT_ID(N'qa.FK_ProductionCounts_MachineShop', N'F') IS NULL
+    ALTER TABLE qa.ProductionCounts WITH CHECK ADD CONSTRAINT FK_ProductionCounts_MachineShop
+        FOREIGN KEY (MachineId, ShopId) REFERENCES qa.Machines (Id, ShopId);
+GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ProductionCounts_Shop_Day' AND object_id = OBJECT_ID(N'qa.ProductionCounts'))
     CREATE INDEX IX_ProductionCounts_Shop_Day ON qa.ProductionCounts (ShopId, ProductionDate, ShiftCode) INCLUDE (MachineId, ProducedQuantity);
 GO
