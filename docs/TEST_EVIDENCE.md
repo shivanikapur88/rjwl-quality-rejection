@@ -1,6 +1,6 @@
 # Test evidence
 
-> **Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+> **Complete Fable review and iOS parts: see section 10. Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
 
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
@@ -212,3 +212,25 @@ Phone screenshots are in the same folder.
 * the Android app on a device (all app fixes are unit-tested through the real API client);
 * screen readers on the phone card layout;
 * concurrent uploads.
+
+## 10. Complete Fable review and iOS parts (commit `6808bdd`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `6808bdd0778f556c307a767502b81954eeccf847`, 27 Nov 2026, same environment. Raw output: [`docs/evidence/fable/`](evidence/fable/).
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**, 135 warnings (all nullable annotations in the recovered `Quality.Mobile.Core`) |
+| Debug APK | SHA-256 `f1cf8281…e0d2` (`evidence/fable/apk.txt`) |
+| Unit tests | **148 passed**. Includes 12 app fixes, throttle key folding, eviction and restart tests, and 3 static iOS configuration checks. |
+| Integration, SQL Server, RCSI ON / OFF | **56 passed** each; the API runs as the least-privilege login |
+| `sqlcmd` fresh install + idempotent re-run (now with db/16) | OK (31 script runs), from a fresh copy of the scripts |
+| Upgrade path (10 steps, now including db/16) | OK |
+| db/15 via sqlcmd | OK in all three databases; refuses the `master` database (50153) |
+| Browser checks | A failed load (more than 92 days) restores the previous selection, and the message says so; no horizontal scrolling at phone width; no page errors |
+
+**Found during verification:** the first clean run (commit `518a164`) had one failure in the RCSI OFF mode: a `GET` of the machine list was a deadlock victim against a machine delete in another test (409). GET requests are now retried on a deadlock. This run, and two runs before it in that mode, passed, but none hit a deadlock, so the retry path has **not** been exercised by a test. The failed output is kept in the history of this file's commit (`evidence6`, not committed); the closure record describes it.
+
+**iOS:**
+* **Not built.** Apple allows iOS builds only on macOS, and this environment is Linux.
+* The Android build is unchanged by the iOS parts: same warnings, 0 errors.
+* The iOS settings are checked statically by the unit tests: camera reason, no App Transport Security exceptions, Keychain group equal to the application id, and the iOS target being opt-in.

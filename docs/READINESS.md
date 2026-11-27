@@ -66,4 +66,19 @@ The dashboard now works at phone width. Three more Sonnet 5.5 reviewers found **
 
 All are fixed; most have tests, some are covered only by browser checks (listed per item). See [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#third-full-application-review-sonnet-55). Deployment requirements: SQL Server 2017 or later (corrected by the Fable review: an earlier "compatibility level 130" requirement was wrong), and `sqlcmd -I` for ad-hoc SQL (runbook).
 
+### Complete Fable review and iOS (commit `6808bdd`)
+
+Fable found two high-severity defects, both fixed:
+* a wrong database compatibility-level guard that could block the upgrade of the shared GDC/CNC databases;
+* "Load more" in My entries reloading page 1 on a device.
+
+The medium findings are also fixed:
+* known logins are persisted (db/16);
+* no filtered indexes in the shared databases;
+* the entry draft can be retried;
+* the unknown-outcome id is kept across screens;
+* certificate errors are detected more precisely.
+
+Details are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#complete-review-by-claude-fable-after-the-third-sonnet-review). Deployment: run **db/16** before **db/15**; SQL Server 2017 or later. iOS project parts are added but **not built** (needs a Mac; decision #20).
+
 **Release-candidate verdict:** the server, database and app logic are complete and tested against SQL Server. The build is **not** ready for production use until the ✗ items in the "Tested on Android" and "Blocked" columns are done: the device acceptance run, the machine list, the package id, keystore and certificate, and business acceptance. See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) and the checklist in [TEST_EVIDENCE.md §3](TEST_EVIDENCE.md).

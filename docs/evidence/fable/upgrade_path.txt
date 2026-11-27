@@ -1,0 +1,29 @@
+1. 'before' state = supplied schema (01-04, no 08) with users created the old way, incl. a cross-column collision
+   simulate an entries table from before 07 (no Quantity) with one old entry
+2. run 07 (quantity), as in the runbook before 08
+   old entry quantity = 1                             
+3. run 08 with the collision present -> must stop before any login identifier is written
+   E100                                                         1 admin1                                             E100                                  1
+   E100                                                         2 e100                                               E200                                  1
+   Msg 50080, Level 16, State 1, Server 498483c7e6d3, Line 21
+   LoginIdentifiers rows after refused run: 0                             
+4. resolve the collision (rename one account) and re-run 08
+   08 ok
+   identifiers: ADMIN1:U, CLASH.USER:U, E100:E, E200:E, E300:E, INSP3:U                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+   TokenVersion for all = 0                             
+5. re-run 08 again (idempotent), then 09 (runbook order: 08 before 09)
+   ok
+6. trigger: deactivating the only admin is refused
+   At least one active administrator must remain
+7. round 2/3 upgrades on the same database: 11, 12 (backfills the old entry), 13; then all three again
+   old entry has a production day and shift
+   production counts table present
+8. backfill values: a row saved at 05:59:59.700 IST stays in shift C of the previous day
+   2026-11-26|C
+9. db/12 refuses to backfill when its shift times differ from qa.ShiftDefinitions (error 50013)
+   refused: Msg 50013
+   ok after the times match again
+10. db/15 on a database that still has the old schema-wide grants; run twice
+   schema-wide grants removed; audit log append-only
+Upgrade path complete.
+exit 0
