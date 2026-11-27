@@ -1,0 +1,32 @@
+Created QRV6_Master, QRV6_Gdc, QRV6_Cnc (READ_COMMITTED_SNAPSHOT ON)
+  ok  QRV6_Master <- 01_master_schema.sql
+  ok  QRV6_Master <- 02c_entries_schema_PRE_FINAL.sql
+  ok  QRV6_Master <- 03_seed_reference.sql
+  ok  QRV6_Master <- 04_seed_phenomena.sql
+  ok  QRV6_Master <- 08_upgrade_master_review_fixes.sql
+  ok  QRV6_Master <- 09_upgrade_entries_indexes.sql
+  ok  QRV6_Master <- 11_upgrade_master_shifts_corrections.sql
+  ok  QRV6_Master <- 12_upgrade_entries_shift_reversal.sql
+  ok  QRV6_Master <- 13_upgrade_master_production_counts.sql
+  ok  QRV6_Gdc <- 02a_entries_schema_GDC_AndonDB.sql
+  ok  QRV6_Gdc <- 09_upgrade_entries_indexes.sql
+  ok  QRV6_Gdc <- 12_upgrade_entries_shift_reversal.sql
+  ok  QRV6_Cnc <- 02b_entries_schema_MachineShopDB.sql
+  ok  QRV6_Cnc <- 09_upgrade_entries_indexes.sql
+  ok  QRV6_Cnc <- 12_upgrade_entries_shift_reversal.sql
+  ok  QRV6_Master <- 01_master_schema.sql
+  ok  QRV6_Master <- 03_seed_reference.sql
+  ok  QRV6_Master <- 04_seed_phenomena.sql
+  ok  QRV6_Master <- 08_upgrade_master_review_fixes.sql
+  ok  QRV6_Master <- 09_upgrade_entries_indexes.sql
+  ok  QRV6_Master <- 11_upgrade_master_shifts_corrections.sql
+  ok  QRV6_Master <- 12_upgrade_entries_shift_reversal.sql
+  ok  QRV6_Master <- 13_upgrade_master_production_counts.sql
+  ok  QRV6_Gdc <- 02a_entries_schema_GDC_AndonDB.sql
+  ok  QRV6_Cnc <- 02b_entries_schema_MachineShopDB.sql
+  ok  QRV6_Gdc <- 09_upgrade_entries_indexes.sql
+  ok  QRV6_Gdc <- 12_upgrade_entries_shift_reversal.sql
+  ok  QRV6_Cnc <- 09_upgrade_entries_indexes.sql
+  ok  QRV6_Cnc <- 12_upgrade_entries_shift_reversal.sql
+Fresh install + idempotent re-run complete.
+exit 0

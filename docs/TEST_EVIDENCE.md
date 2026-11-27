@@ -1,6 +1,6 @@
 # Test evidence
 
-> **Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+> **Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
 
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
@@ -167,8 +167,8 @@ Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `a9fe6f8892c
 | Debug APK | SHA-256 `256246d7…6f87` (`evidence/review2/apk.txt`) |
 | Unit tests | **97 passed** (was 84): app fixes (9), throttle on a shared plant address, accent variants, 413 mapping |
 | Integration, SQL Server, RCSI ON / OFF | **55 passed** each (was 54) |
-| `sqlcmd` fresh install + idempotent re-run (entry databases too) | OK |
-| Upgrade path, now including 11, 12 (backfill of an old entry) and 13, with failing checks | OK |
+| `sqlcmd` fresh install + idempotent re-run (entry databases too) | OK, but see the **correction** below |
+| Upgrade path, now including 11, 12 (backfill of an old entry) and 13, with failing checks | OK, but see the **correction** below |
 | `db/15` via `sqlcmd`, twice, in all three databases | OK; GDC/CNC show only the entries table with SELECT, INSERT and UPDATE of the two reversal columns |
 | Seed check | OK |
 
@@ -181,3 +181,34 @@ Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `a9fe6f8892c
 * two quick "Show" clicks on the labels page show one shop only;
 * a forced 40% coverage shows the partial-coverage warning;
 * no page errors.
+
+**Correction (found on 27 Nov 2026):** the two `sqlcmd` files in `evidence/review2/` (`fresh_install_sqlcmd.txt`, `upgrade_path.txt`) were produced from a **stale copy of `db/` and `tools/`** inside the SQL container. My verification script could not delete the previous copy (a file-permission problem), so `docker cp` nested the new copy beside it. The scripts of `a9fe6f8` were checked by hand the same day (fresh install, upgrade path including 11–13, db/15 twice: all OK, as stated in the review closure), but those two files are not evidence of it. The verification script now uses a fresh directory per run; section 9 re-runs both on the final scripts.
+
+## 9. Third full review and phone layout (commit `be27305`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `be27305fab7e496dcd6109acfee8ffe460f7887a`, 27 Nov 2026, same environment. Raw output: [`docs/evidence/review3/`](evidence/review3/).
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**, 138 warnings: all nullable annotations in the recovered `Quality.Mobile.Core`; none in the server, database or test code |
+| Debug APK | SHA-256 `6fa1ae5d…58eb` (`evidence/review3/apk.txt`) |
+| Unit tests | **127 passed**. Includes 10 app fixes, 4 throttle/readiness tests, and a per-script check that every SQL script sets `QUOTED_IDENTIFIER ON` (one test case per script). |
+| Integration, SQL Server, RCSI ON / OFF | **55 passed** each; the API runs as the least-privilege login from db/15 |
+| `sqlcmd` fresh install + idempotent re-run of the master and entry scripts | OK (29 script runs) — run from a fresh copy of the final scripts |
+| Upgrade path (`tools/test-upgrade-path.sh`, 10 steps) | OK: collision refusal (50080); 11, 12 and 13 run twice; 05:59:59.700 backfilled as shift C of the previous day; 12 refuses mismatching shift times (50013); db/15 run twice over the old schema-wide grants (grants removed, audit log append-only) |
+| Seed check | OK |
+
+**Browser checks (`visual_checks.txt`, Pixel 7 emulation and desktop):**
+* no horizontal scrolling at phone width;
+* the chart redraws when the width changes (1280 → 700 px);
+* the entries table keeps its table role in the card layout;
+* a link with an unknown machine shows `#id`, not the link's label;
+* the nav is hidden on the sign-in screen;
+* no page errors.
+
+Phone screenshots are in the same folder.
+
+**Not tested:**
+* the Android app on a device (all app fixes are unit-tested through the real API client);
+* screen readers on the phone card layout;
+* concurrent uploads.
