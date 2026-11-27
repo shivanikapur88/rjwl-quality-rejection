@@ -9,7 +9,11 @@
                 <Label Grid.Row="2" Text="Machine" Style="{StaticResource Muted}" /><Label Grid.Row="2" Grid.Column="1" Text="{Binding MachineText}" FontAttributes="Bold" FontSize="16" />
             </Grid>
         </Border>
-        <ctl:StatusBar Grid.Row="1" />
+        <VerticalStackLayout Grid.Row="1" Spacing="8">
+            <ctl:StatusBar />
+            <!-- Review fix: the phenomena list failed to load; try again without leaving the form (a kept entry is restored then). -->
+            <Button Text="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetryLoad}" Style="{StaticResource SecondaryButton}" AutomationId="retry-phenomena" />
+        </VerticalStackLayout>
         <SearchBar Grid.Row="2" Text="{Binding SearchText}" Placeholder="Search rejection phenomenon" FontSize="17" />
         <!-- Phenomena for THIS stage, loaded from the server -->
         <CollectionView Grid.Row="3" ItemsSource="{Binding Phenomena}" SelectionMode="Single" SelectedItem="{Binding SelectedPhenomenon, Mode=TwoWay}">

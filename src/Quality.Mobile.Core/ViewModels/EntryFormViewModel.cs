@@ -54,6 +54,8 @@ public sealed class EntryFormViewModel : BaseViewModel
 	/// confirmed, Clear keeps the submission id, so re-entering and saving cannot create a duplicate.</summary>
 	private bool _outcomeUnknown;
 
+	private bool _loadFailed;
+
 	public static int MaxQuantity => 9999;
 
 	public Guid SubmissionId { get; private set; } = Guid.NewGuid();
@@ -67,6 +69,22 @@ public sealed class EntryFormViewModel : BaseViewModel
 	public AsyncCommand IncreaseCommand { get; }
 
 	public AsyncCommand DecreaseCommand { get; }
+
+	/// <summary>Review fix: loads the phenomena list again after it failed to load (a kept draft is restored then).</summary>
+	public AsyncCommand RetryCommand { get; }
+
+	/// <summary>The phenomena list failed to load: the "Try again" button is shown.</summary>
+	public bool CanRetryLoad
+	{
+		get
+		{
+			return _loadFailed;
+		}
+		private set
+		{
+			Set(ref _loadFailed, value, "CanRetryLoad");
+		}
+	}
 
 	public string QuantityText
 	{
@@ -187,6 +205,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 			Adjust(-1);
 			return Task.CompletedTask;
 		});
+		RetryCommand = new AsyncCommand(LoadPhenomenaAsync);
 	}
 
 	private void Adjust(int delta)
@@ -200,7 +219,22 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_stage = BaseViewModel.Arg<StageDto>(args, "stage");
 		_machine = BaseViewModel.Arg<MachineDto>(args, "machine");
 		EntryDraft? draft = BaseViewModel.Arg<EntryDraft>(args, "draft");
-		_resume = ((object)draft != null && !Equals(draft, _restored)) ? draft : null;
+		int? userId = _session.User?.UserId;
+		if (draft is null && userId is int du && _shop is not null && _stage is not null && _machine is not null
+			&& _drafts.Peek(du) is { } kept && kept.Shop.Id == _shop.Id && kept.Stage.Id == _stage.Id && kept.Machine.Id == _machine.Id)
+		{
+			draft = kept;   // review fix: a draft not yet restored (e.g. its first phenomena load failed and the form was left) is still resumed
+		}
+		_resume = (draft is not null && !Equals(draft, _restored)) ? draft : null;
+		if (_resume is null && userId is int pu && _shop is not null && _stage is not null && _machine is not null
+			&& _drafts.PendingFor(pu, _shop.Id, _stage.Id, _machine.Id) is Guid pending && pending != SubmissionId)
+		{
+			// Review fix: an earlier save of this form (this user, shop, stage and machine) may have reached the server.
+			// The same id is sent again: the server replays it if the entry matches, or answers payload mismatch (new id).
+			SubmissionId = pending;
+			_outcomeUnknown = true;
+			OnPropertyChanged("SubmissionId");
+		}
 		OnPropertyChanged("ShopText");
 		OnPropertyChanged("StageText");
 		OnPropertyChanged("MachineText");
@@ -219,10 +253,12 @@ public sealed class EntryFormViewModel : BaseViewModel
 	{
 		_resume = null;
 		_restored = d;
+		_drafts.Remove(d);   // on screen now: no longer needed in the store
 		SelectedPhenomenon = d.PhenomenonId is int pid ? _all.FirstOrDefault(p => p.Id == pid) : null;
 		QuantityText = d.QuantityText;
 		Remarks = d.Remarks;
 		SubmissionId = d.SubmissionId;
+		_outcomeUnknown = _drafts.PendingFor(d.UserId, d.Shop.Id, d.Stage.Id, d.Machine.Id) == d.SubmissionId;   // Clear keeps a pending id
 		OnPropertyChanged("SubmissionId");
 		ErrorMessage = "Your session expired while this entry was being saved. Check the details and tap Save again - it will not create a duplicate.";
 	}
@@ -239,8 +275,13 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	public Task LoadPhenomenaAsync()
 	{
+		if (_shop is null || _stage is null)
+		{
+			return Task.CompletedTask;
+		}
 		return RunBusyAsync(async () =>
 		{
+			CanRetryLoad = true;   // stays set if the call fails or throws
 			ApiResult<List<PhenomenonDto>> r = await _api.GetPhenomenaAsync(_shop.Id, _stage.Id);
 			if (!r.IsSuccess)
 			{
@@ -248,6 +289,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 			}
 			else
 			{
+				CanRetryLoad = false;
 				_all = r.Value;
 				ApplyFilter();
 				if (_all.Count == 0)
@@ -324,14 +366,26 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_submitting = true;
 		SubmitCommand.RaiseCanExecuteChanged();
 		var userId = _session.User?.UserId;   // captured now: an expired session clears it
+		var sentId = SubmissionId;
+		var answered = false;
 		try
 		{
 			IsBusy = true;
 			ErrorMessage = null;
 			CreateEntryRequest req = new CreateEntryRequest(SubmissionId, _shop.Id, _stage.Id, _machine.Id, _selected.Id, quantity, string.IsNullOrWhiteSpace(Remarks) ? null : Remarks.Trim());
 			ApiResult<CreateEntryResult> r = await _api.SubmitEntryAsync(req);
-			// Any answer except an unknown outcome settles this submission id (saved, or refused).
-			_outcomeUnknown = !r.IsSuccess && r.Error!.OutcomeUnknown;
+			answered = true;
+			// Review fix: only the entry endpoint's own answer settles this submission id (saved, or refused as invalid / in
+			// conflict). A 401/403/429 or a certificate failure says nothing about an earlier attempt: the flag is kept.
+			if (r.IsSuccess || IsEntryAnswer(r.Error!))
+			{
+				_outcomeUnknown = false;
+			}
+			else if (r.Error!.OutcomeUnknown)
+			{
+				_outcomeUnknown = true;
+			}
+			RememberOutcome(userId, sentId);
 			if (r.IsSuccess)
 			{
 				_submittedOk = true;
@@ -379,7 +433,11 @@ public sealed class EntryFormViewModel : BaseViewModel
 		}
 		catch (Exception)
 		{
-			_outcomeUnknown = true;
+			if (!answered)
+			{
+				_outcomeUnknown = true;
+				RememberOutcome(userId, sentId);
+			}
 			ErrorMessage = "Something went wrong. Please try again. Your entry may not have been saved. Tap Save again – it will not create a duplicate.";
 		}
 		finally
@@ -388,6 +446,25 @@ public sealed class EntryFormViewModel : BaseViewModel
 			_submitting = false;
 			OnPropertyChanged("CanSubmit");
 			SubmitCommand.RaiseCanExecuteChanged();
+		}
+	}
+
+	/// <summary>A 4xx produced by the entry endpoint itself (it carries the API's problem code), not by a proxy.</summary>
+	private static bool IsEntryAnswer(ApiError e)
+	{
+		return e.Kind is ApiErrorKind.Validation or ApiErrorKind.Conflict && !e.Code.StartsWith("http_", StringComparison.Ordinal);
+	}
+
+	/// <summary>Keeps the id of a save with an unknown outcome in the app-wide store (it outlives this form); forgets it once settled.</summary>
+	private void RememberOutcome(int? userId, Guid submissionId)
+	{
+		if (!_outcomeUnknown)
+		{
+			_drafts.SettlePending(submissionId);
+		}
+		else if (userId is int uid && _shop is not null && _stage is not null && _machine is not null)
+		{
+			_drafts.SetPending(new PendingSubmission(uid, _shop.Id, _stage.Id, _machine.Id, submissionId));
 		}
 	}
 }

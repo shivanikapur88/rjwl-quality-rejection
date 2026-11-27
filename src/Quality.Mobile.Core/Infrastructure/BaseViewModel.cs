@@ -13,6 +13,8 @@ public abstract class BaseViewModel : ObservableObject, INavigationAware
 
 	private string _title = "";
 
+	private bool _isRefreshing;
+
 	public const string GenericError = "Something went wrong. Please try again.";
 
 	public bool IsBusy
@@ -31,6 +33,21 @@ public abstract class BaseViewModel : ObservableObject, INavigationAware
 	}
 
 	public bool IsNotBusy => !_isBusy;
+
+	/// <summary>Review fix: bound (TwoWay) to a RefreshView's IsRefreshing. RefreshView runs its command whenever IsRefreshing
+	/// becomes true, even when set from code, so only the pull-to-refresh path (<see cref="PullToRefreshAsync"/>) sets it;
+	/// other loads (first load, "Load more", day change) show progress through IsBusy and never start a refresh.</summary>
+	public bool IsRefreshing
+	{
+		get
+		{
+			return _isRefreshing;
+		}
+		set
+		{
+			Set(ref _isRefreshing, value, "IsRefreshing");
+		}
+	}
 
 	public string Title
 	{
@@ -86,6 +103,20 @@ public abstract class BaseViewModel : ObservableObject, INavigationAware
 		finally
 		{
 			IsBusy = false;
+		}
+	}
+
+	/// <summary>The pull-to-refresh command: runs <paramref name="load"/> and always clears IsRefreshing afterwards.</summary>
+	protected async Task PullToRefreshAsync(Func<Task> load)
+	{
+		IsRefreshing = true;
+		try
+		{
+			await load();
+		}
+		finally
+		{
+			IsRefreshing = false;
 		}
 	}
 

@@ -172,7 +172,7 @@ public sealed class CorrectionsViewModel : BaseViewModel
     {
         (_api, _session, _dialogs) = (api, session, dialogs);
         Title = "Corrections";
-        RefreshCommand = new AsyncCommand(LoadAsync);
+        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(LoadAsync));   // review fix: only a pull sets IsRefreshing
         ApproveCommand = new AsyncCommand<CorrectionItem>(ApproveAsync);
         RejectCommand = new AsyncCommand<CorrectionItem>(RejectAsync);
         WithdrawCommand = new AsyncCommand<CorrectionItem>(WithdrawAsync);
@@ -245,7 +245,7 @@ public sealed class SummaryViewModel : BaseViewModel
         _api = api; Title = "Shift summary";
         PreviousDayCommand = new AsyncCommand(() => { _day = _day.AddDays(-1); return LoadAsync(); });
         NextDayCommand = new AsyncCommand(() => { if (_day < _today) _day = _day.AddDays(1); return LoadAsync(); });
-        RefreshCommand = new AsyncCommand(LoadAsync);
+        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(LoadAsync));   // review fix: only a pull sets IsRefreshing
     }
     public ObservableCollection<Option> ShiftOptions { get; } = new();
     public ObservableCollection<SummaryLine> Shops { get; } = new();

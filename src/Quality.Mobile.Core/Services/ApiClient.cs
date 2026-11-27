@@ -40,6 +40,12 @@ public sealed class ApiClient : IApiClient
 		return SendAsync<Unit>(HttpMethod.Get, "/api/health", null, auth: false);
 	}
 
+	/// <summary>Review fix: checks a candidate server address (Settings, "Test connection") without saving it. No token is sent.</summary>
+	public Task<ApiResult<Unit>> TestConnectionAsync(string baseUrl)
+	{
+		return SendAsync<Unit>(HttpMethod.Get, "/api/health", null, auth: false, baseUrlOverride: baseUrl ?? "");
+	}
+
 	public Task<ApiResult<LoginResponse>> LoginAsync(LoginRequest r)
 	{
 		return SendAsync<LoginResponse>(HttpMethod.Post, "/api/auth/login", r, auth: false, adjust: ToDeviceClock);
@@ -265,9 +271,9 @@ public sealed class ApiClient : IApiClient
 		return ApiResult<T>.Fail(new ApiError(k, code, msg, status));
 	}
 
-	private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, object? body = null, bool auth = true, Func<T, HttpResponseMessage, T>? adjust = null)
+	private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, object? body = null, bool auth = true, Func<T, HttpResponseMessage, T>? adjust = null, string? baseUrlOverride = null)
 	{
-		string baseUrl = _settings.BaseUrl?.Trim().TrimEnd('/');
+		string baseUrl = (baseUrlOverride ?? _settings.BaseUrl)?.Trim().TrimEnd('/');
 		if (string.IsNullOrEmpty(baseUrl))
 		{
 			return Fail<T>(ApiErrorKind.NotConfigured, "not_configured", "The server address is not set. Open Settings and enter it.");
@@ -275,7 +281,7 @@ public sealed class ApiClient : IApiClient
 		// The stored address may predate the https-only rule (e.g. an old http:// value): never send the token to it.
 		if (!BaseUrlValidator.TryNormalize(baseUrl, out string validUrl, out string urlError))
 		{
-			return Fail<T>(ApiErrorKind.NotConfigured, "invalid_server_address", "The saved server address is not valid (" + urlError.TrimEnd('.') + "). Open Settings and correct it.");
+			return Fail<T>(ApiErrorKind.NotConfigured, "invalid_server_address", (baseUrlOverride == null ? "The saved server address is not valid (" : "The server address is not valid (") + urlError.TrimEnd('.') + ")." + (baseUrlOverride == null ? " Open Settings and correct it." : ""));
 		}
 		baseUrl = validUrl;
 		using HttpRequestMessage req = new HttpRequestMessage(method, baseUrl + path);
@@ -303,7 +309,7 @@ public sealed class ApiClient : IApiClient
 		{
 			return Fail<T>(ApiErrorKind.Timeout, "timeout", "The server took too long to respond. Check your connection and try again.");
 		}
-		catch (HttpRequestException ex) when (IsCertificateFailure(ex))
+		catch (Exception ex) when (IsCertificateFailure(ex))   // any type: Android also raises WebException / IOException
 		{
 			return Fail<T>(ApiErrorKind.Network, "certificate_untrusted", CertificateMessage);
 		}
@@ -339,23 +345,27 @@ public sealed class ApiClient : IApiClient
 
 	public const string CertificateMessage = "The server's security certificate is not trusted on this device. Contact IT.";
 
-	/// <summary>A TLS handshake or certificate failure (not an unreachable server): an inner AuthenticationException,
-	/// .NET's SecureConnectionError, or (Android's native handler) an SSL / trust-anchor message.</summary>
-	internal static bool IsCertificateFailure(HttpRequestException ex)
+	/// <summary>Review fix: a certificate TRUST failure only, found anywhere in the exception chain (of any exception type):
+	/// .NET's AuthenticationException, Android's CertPathValidatorException / CertificateException / SSLPeerUnverifiedException,
+	/// or an SSLHandshakeException (or wrapper) whose text names the certificate or trust anchor. A handshake that timed out
+	/// or was reset ("SSL handshake aborted", SecureConnectionError with an EOF) stays a network error: weak Wi-Fi, not IT.</summary>
+	internal static bool IsCertificateFailure(Exception ex)
 	{
-		if (ex.HttpRequestError == HttpRequestError.SecureConnectionError)
-		{
-			return true;
-		}
 		for (Exception? e = ex; e != null; e = e.InnerException)
 		{
 			if (e is System.Security.Authentication.AuthenticationException)
 			{
 				return true;
 			}
+			string type = e.GetType().Name;
+			if (type is "CertPathValidatorException" or "CertificateException" or "CertificateExpiredException"
+				or "CertificateNotYetValidException" or "SSLPeerUnverifiedException")
+			{
+				return true;
+			}
 			string m = e.Message ?? "";
-			if (m.Contains("SSL", StringComparison.OrdinalIgnoreCase) || m.Contains("certificate", StringComparison.OrdinalIgnoreCase)
-				|| m.Contains("trust anchor", StringComparison.OrdinalIgnoreCase) || m.Contains("CertPath", StringComparison.OrdinalIgnoreCase))
+			if (m.Contains("certificate", StringComparison.OrdinalIgnoreCase) || m.Contains("trust anchor", StringComparison.OrdinalIgnoreCase)
+				|| m.Contains("CertPath", StringComparison.OrdinalIgnoreCase))
 			{
 				return true;
 			}

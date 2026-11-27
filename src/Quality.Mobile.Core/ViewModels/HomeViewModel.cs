@@ -93,6 +93,13 @@ public sealed class HomeViewModel : BaseViewModel
 
 	public override async Task OnAppearingAsync()
 	{
+		if (_session.User is not null && !_session.IsAuthenticated)
+		{
+			// Review fix: the token ran out while the app was open (no request has failed yet). Without this, Home shows a
+			// name but no role and no buttons; the expiry path returns to sign-in (and keeps nothing of the old session).
+			_session.NotifyExpired();
+			return;
+		}
 		OnPropertyChanged("Welcome");
 		OnPropertyChanged("RoleText");
 		OnPropertyChanged("CanRecord");

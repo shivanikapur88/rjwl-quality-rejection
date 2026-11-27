@@ -92,8 +92,9 @@ public sealed class LoginViewModel : BaseViewModel
 				await _session.StartAsync(r.Value);
 				Password = "";
 				await _nav.GoToAsync("//home");
-				// Changed: resume an entry that was interrupted by session expiry (same user only).
-				if (_drafts.Take(r.Value.UserId) is { } d)
+				// Changed: resume an entry that was interrupted by session expiry (same user only). Review fix: the draft stays
+				// in the store until the entry form has put it back on screen (its phenomena list may fail to load first).
+				if (_drafts.Peek(r.Value.UserId) is { } d)
 					await _nav.GoToAsync("entry", new Dictionary<string, object> { ["shop"] = d.Shop, ["stage"] = d.Stage, ["machine"] = d.Machine, ["draft"] = d });
 			}
 		});

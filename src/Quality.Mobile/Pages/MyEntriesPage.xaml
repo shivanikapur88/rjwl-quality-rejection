@@ -6,7 +6,7 @@
         <Border Grid.Row="2" Style="{StaticResource Card}" Padding="12" IsVisible="{Binding IsIncomplete}">
             <Label Text="{Binding IncompleteNotice}" Style="{StaticResource Body}" FontSize="15" />
         </Border>
-        <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=OneWay}">
+        <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsRefreshing, Mode=TwoWay}">
             <Grid>
                 <CollectionView ItemsSource="{Binding Entries}" SelectionMode="Single" SelectionChanged="OnSelected">
                     <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
@@ -23,7 +23,10 @@
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                     <CollectionView.Footer>
-                        <Button Text="Load more" Command="{Binding LoadMoreCommand}" IsVisible="{Binding HasMore}" Style="{StaticResource SecondaryButton}" Margin="0,8,0,24" />
+                        <VerticalStackLayout Margin="0,8,0,24" Spacing="8">
+                            <ActivityIndicator IsRunning="{Binding IsLoadingMore}" IsVisible="{Binding IsLoadingMore}" Color="{StaticResource Primary}" HeightRequest="32" />
+                            <Button Text="Load more" Command="{Binding LoadMoreCommand}" IsVisible="{Binding HasMore}" Style="{StaticResource SecondaryButton}" />
+                        </VerticalStackLayout>
                     </CollectionView.Footer>
                 </CollectionView>
                 <Label Text="No entries yet." Style="{StaticResource Muted}" FontSize="18" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,40,0,0" IsVisible="{Binding IsEmpty}" />

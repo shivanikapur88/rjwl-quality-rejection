@@ -147,8 +147,12 @@ public sealed class PhenomenonEditorViewModel : BaseViewModel
 		});
 	}
 
+	private int _stageSeq;
+
 	private async Task LoadStagesAsync(int? preselect)
 	{
+		// Review fix: two quick shop changes: only the latest shop's stages may fill the list.
+		int seq = Interlocked.Increment(ref _stageSeq);
 		Stages.Clear();
 		SelectedStage = null;
 		int? num = _shop?.Id;
@@ -168,6 +172,10 @@ public sealed class PhenomenonEditorViewModel : BaseViewModel
 			return;
 		}
 		ApiResult<List<StageDto>> r = await _api.GetStagesAsync(sid);
+		if (seq != Volatile.Read(ref _stageSeq))
+		{
+			return;
+		}
 		if (!r.IsSuccess)
 		{
 			ErrorMessage = r.Error.Message;

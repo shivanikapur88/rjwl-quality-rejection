@@ -27,6 +27,11 @@ public sealed class MyEntriesViewModel : BaseViewModel
     public bool IsEmpty { get => _empty; private set => Set(ref _empty, value, nameof(IsEmpty)); }
     public bool HasMore => _cursor is not null;
 
+    private bool _loadingMore;
+
+    /// <summary>Review fix: "Load more" progress, shown under the list (not through the RefreshView, which would reload page 1).</summary>
+    public bool IsLoadingMore { get => _loadingMore; private set => Set(ref _loadingMore, value, nameof(IsLoadingMore)); }
+
     /// <summary>Shown above the list when one or more shops' entries could not be loaded.</summary>
     public string? IncompleteNotice
     {
@@ -42,7 +47,7 @@ public sealed class MyEntriesViewModel : BaseViewModel
         _api = api;
         _session = session;
         _nav = nav;
-        RefreshCommand = new AsyncCommand(LoadAsync);
+        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(LoadAsync));   // review fix: only a pull sets IsRefreshing
         LoadMoreCommand = new AsyncCommand(LoadMoreAsync, () => HasMore && !IsBusy);
     }
 
@@ -77,6 +82,7 @@ public sealed class MyEntriesViewModel : BaseViewModel
         var seq = Interlocked.Increment(ref _loadSeq);
         var cursor = more ? _cursor : null;
         IsBusy = true;
+        IsLoadingMore = more;
         ErrorMessage = null;
         LoadMoreCommand.RaiseCanExecuteChanged();
         try
@@ -94,7 +100,7 @@ public sealed class MyEntriesViewModel : BaseViewModel
         }
         finally
         {
-            if (seq == Volatile.Read(ref _loadSeq)) { IsBusy = false; LoadMoreCommand.RaiseCanExecuteChanged(); }
+            if (seq == Volatile.Read(ref _loadSeq)) { IsBusy = false; IsLoadingMore = false; LoadMoreCommand.RaiseCanExecuteChanged(); }
         }
     }
 

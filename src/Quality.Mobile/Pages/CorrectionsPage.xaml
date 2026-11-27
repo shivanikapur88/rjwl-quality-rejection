@@ -8,7 +8,7 @@
             <Label Grid.Column="1" Text="Also show decided requests" Style="{StaticResource Body}" FontSize="16" VerticalOptions="Center" />
         </Grid>
         <ctl:StatusBar Grid.Row="2" />
-        <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=OneWay}">
+        <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsRefreshing, Mode=TwoWay}">
             <Grid>
                 <CollectionView ItemsSource="{Binding Items}" SelectionMode="None">
                     <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>

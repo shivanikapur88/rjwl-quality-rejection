@@ -106,6 +106,7 @@ public sealed class SettingsViewModel : BaseViewModel
 		if (_session.IsAuthenticated && !SameServer(previous, normalized))
 		{
 			_drafts?.Clear();   // the draft's shop, stage and machine belong to the old server
+			_drafts?.ClearPending();
 			await _session.EndAsync();
 			OnPropertyChanged("IsSignedIn");
 			OnPropertyChanged("UserText");
@@ -142,20 +143,24 @@ public sealed class SettingsViewModel : BaseViewModel
 		}
 	}
 
+	/// <summary>Review fix: tests the address as typed WITHOUT saving it (and without signing out); only Save changes the server.</summary>
 	public async Task TestAsync()
 	{
-		var saved = await TrySaveAsync();
-		if (saved is null)
+		ErrorMessage = null;
+		InfoMessage = null;
+		if (!BaseUrlValidator.TryNormalize(ServerUrl, out string candidate, out string error))
 		{
+			ErrorMessage = error;
 			return;
 		}
+		var unsaved = !SameServer(_settings.BaseUrl, candidate);
 		IsBusy = true;
 		try
 		{
-			ApiResult<Unit> r = await _api.HealthAsync();
+			ApiResult<Unit> r = await _api.TestConnectionAsync(candidate);
 			if (r.IsSuccess)
 			{
-				InfoMessage = "Connected to the server.";
+				InfoMessage = unsaved ? "Connected to the server. Tap Save to use this address." : "Connected to the server.";
 			}
 			else
 			{
@@ -169,10 +174,6 @@ public sealed class SettingsViewModel : BaseViewModel
 		finally
 		{
 			IsBusy = false;
-		}
-		if (saved == true)
-		{
-			await SignedOutAsync(InfoMessage ?? ErrorMessage ?? "");
 		}
 	}
 
