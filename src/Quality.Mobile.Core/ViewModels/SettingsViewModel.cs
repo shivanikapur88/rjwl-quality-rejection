@@ -18,6 +18,8 @@ public sealed class SettingsViewModel : BaseViewModel
 
 	private readonly IDialogs _dialogs;
 
+	private readonly EntryDraftStore? _drafts;
+
 	private string _url;
 
 	private string? _info;
@@ -63,8 +65,9 @@ public sealed class SettingsViewModel : BaseViewModel
 
 	public AsyncCommand LogoutCommand { get; }
 
-	public SettingsViewModel(IApiClient api, IAppSettings settings, ISession session, INavigator nav, IDialogs dialogs)
+	public SettingsViewModel(IApiClient api, IAppSettings settings, ISession session, INavigator nav, IDialogs dialogs, EntryDraftStore? drafts = null)
 	{
+		_drafts = drafts;
 		_api = api;
 		_settings = settings;
 		_session = session;
@@ -100,8 +103,9 @@ public sealed class SettingsViewModel : BaseViewModel
 		ServerUrl = normalized;
 		// Full review #10: a token is only for the server that issued it. A different server ends the session,
 		// so the token is never sent to the new address.
-		if (_session.IsAuthenticated && !SameHost(previous, normalized))
+		if (_session.IsAuthenticated && !SameServer(previous, normalized))
 		{
+			_drafts?.Clear();   // the draft's shop, stage and machine belong to the old server
 			await _session.EndAsync();
 			OnPropertyChanged("IsSignedIn");
 			OnPropertyChanged("UserText");
@@ -117,9 +121,12 @@ public sealed class SettingsViewModel : BaseViewModel
 		await _nav.GoToAsync(Routes.Login);
 	}
 
-	private static bool SameHost(string? a, string? b) =>
-		Uri.TryCreate(a, UriKind.Absolute, out var x) && Uri.TryCreate(b, UriKind.Absolute, out var y)
-		&& string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase) && x.Port == y.Port && x.Scheme == y.Scheme;
+	/// <summary>Review fix: the same deployment means the same scheme, host (any case), port AND path
+	/// (https://h/prod and https://h/test are different servers); only a trailing slash is ignored.</summary>
+	private static bool SameServer(string? a, string? b) =>
+		Uri.TryCreate(a?.Trim(), UriKind.Absolute, out var x) && Uri.TryCreate(b?.Trim(), UriKind.Absolute, out var y)
+		&& string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase) && x.Port == y.Port && x.Scheme == y.Scheme
+		&& string.Equals(x.AbsolutePath.TrimEnd('/'), y.AbsolutePath.TrimEnd('/'), StringComparison.Ordinal);
 
 	public async Task SaveAsync()
 	{
@@ -173,6 +180,7 @@ public sealed class SettingsViewModel : BaseViewModel
 	{
 		if (await _dialogs.ConfirmAsync("Sign out", "Sign out of this device?", "Sign out", "Cancel"))
 		{
+			_drafts?.Clear();   // review fix: an explicit sign-out discards the entry kept for an expired session
 			await _session.EndAsync();
 			await _nav.GoToAsync("//login");
 		}

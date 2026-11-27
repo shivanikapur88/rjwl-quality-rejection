@@ -27,5 +27,7 @@ public interface ISession
 
 	Task EndAsync();
 
-	void NotifyExpired();
+	/// <summary>The server rejected the session. <paramref name="rejectedToken"/>: the token the rejected request carried;
+	/// when it is not the current token (a newer sign-in), the current session is kept.</summary>
+	void NotifyExpired(string? rejectedToken = null);
 }

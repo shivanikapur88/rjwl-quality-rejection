@@ -50,6 +50,10 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	private bool _submittedOk;
 
+	/// <summary>Review fix: the last save may have reached the server (timeout, lost response). Until an outcome is
+	/// confirmed, Clear keeps the submission id, so re-entering and saving cannot create a duplicate.</summary>
+	private bool _outcomeUnknown;
+
 	public static int MaxQuantity => 9999;
 
 	public Guid SubmissionId { get; private set; } = Guid.NewGuid();
@@ -276,6 +280,10 @@ public sealed class EntryFormViewModel : BaseViewModel
 		SearchText = "";
 		QuantityText = "1";
 		ErrorMessage = null;
+		if (_outcomeUnknown)
+		{
+			return;   // same id: if the earlier attempt was saved, the server answers "already saved" or "payload mismatch"
+		}
 		SubmissionId = Guid.NewGuid();
 		OnPropertyChanged("SubmissionId");
 	}
@@ -322,6 +330,8 @@ public sealed class EntryFormViewModel : BaseViewModel
 			ErrorMessage = null;
 			CreateEntryRequest req = new CreateEntryRequest(SubmissionId, _shop.Id, _stage.Id, _machine.Id, _selected.Id, quantity, string.IsNullOrWhiteSpace(Remarks) ? null : Remarks.Trim());
 			ApiResult<CreateEntryResult> r = await _api.SubmitEntryAsync(req);
+			// Any answer except an unknown outcome settles this submission id (saved, or refused).
+			_outcomeUnknown = !r.IsSuccess && r.Error!.OutcomeUnknown;
 			if (r.IsSuccess)
 			{
 				_submittedOk = true;
@@ -369,6 +379,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 		}
 		catch (Exception)
 		{
+			_outcomeUnknown = true;
 			ErrorMessage = "Something went wrong. Please try again. Your entry may not have been saved. Tap Save again – it will not create a duplicate.";
 		}
 		finally

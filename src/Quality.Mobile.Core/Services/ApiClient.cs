@@ -24,11 +24,14 @@ public sealed class ApiClient : IApiClient
 
 	private readonly ISession _session;
 
-	public ApiClient(HttpClient http, IAppSettings settings, ISession session)
+	private readonly TimeProvider _time;
+
+	public ApiClient(HttpClient http, IAppSettings settings, ISession session, TimeProvider? time = null)
 	{
 		_http = http;
 		_settings = settings;
 		_session = session;
+		_time = time ?? TimeProvider.System;
 		_http.Timeout = Timeout;
 	}
 
@@ -39,7 +42,19 @@ public sealed class ApiClient : IApiClient
 
 	public Task<ApiResult<LoginResponse>> LoginAsync(LoginRequest r)
 	{
-		return SendAsync<LoginResponse>(HttpMethod.Post, "/api/auth/login", r, auth: false);
+		return SendAsync<LoginResponse>(HttpMethod.Post, "/api/auth/login", r, auth: false, adjust: ToDeviceClock);
+	}
+
+	/// <summary>Review fix: the expiry is in server time. When the device clock differs (server Date header), it is moved
+	/// onto the device clock, so a tablet clock hours ahead does not make a new session look expired (or one behind, valid too long).</summary>
+	private LoginResponse ToDeviceClock(LoginResponse login, HttpResponseMessage resp)
+	{
+		if (resp.Headers.Date is not DateTimeOffset serverNow)
+		{
+			return login;   // no Date header: assume the device clock is right
+		}
+		TimeSpan skew = serverNow.UtcDateTime - _time.GetUtcNow().UtcDateTime;
+		return skew.Duration() < TimeSpan.FromSeconds(30.0) ? login : login with { ExpiresAtUtc = login.ExpiresAtUtc - skew };
 	}
 
 	public Task<ApiResult<List<ShopDto>>> GetShopsAsync()
@@ -250,7 +265,7 @@ public sealed class ApiClient : IApiClient
 		return ApiResult<T>.Fail(new ApiError(k, code, msg, status));
 	}
 
-	private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, object? body = null, bool auth = true)
+	private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, object? body = null, bool auth = true, Func<T, HttpResponseMessage, T>? adjust = null)
 	{
 		string baseUrl = _settings.BaseUrl?.Trim().TrimEnd('/');
 		if (string.IsNullOrEmpty(baseUrl))
@@ -264,9 +279,10 @@ public sealed class ApiClient : IApiClient
 		}
 		baseUrl = validUrl;
 		using HttpRequestMessage req = new HttpRequestMessage(method, baseUrl + path);
+		string? token = null;
 		if (auth)
 		{
-			string token = _session.Token;
+			token = _session.Token;
 			if (token == null)
 			{
 				_session.NotifyExpired();
@@ -310,14 +326,14 @@ public sealed class ApiClient : IApiClient
 				try
 				{
 					T v = await resp.Content.ReadFromJsonAsync<T>(Json);
-					return (v == null) ? Fail<T>(ApiErrorKind.Server, "bad_response", "The server sent an unexpected response.", (int)resp.StatusCode) : ApiResult<T>.Ok(v);
+					return (v == null) ? Fail<T>(ApiErrorKind.Server, "bad_response", "The server sent an unexpected response.", (int)resp.StatusCode) : ApiResult<T>.Ok(adjust == null ? v : adjust(v, resp));
 				}
 				catch (Exception)
 				{
 					return Fail<T>(ApiErrorKind.Server, "bad_response", "The server sent an unexpected response.", (int)resp.StatusCode);
 				}
 			}
-			return await MapFailureAsync<T>(resp, auth);
+			return await MapFailureAsync<T>(resp, auth, token);
 		}
 	}
 
@@ -347,7 +363,7 @@ public sealed class ApiClient : IApiClient
 		return false;
 	}
 
-	private async Task<ApiResult<T>> MapFailureAsync<T>(HttpResponseMessage resp, bool auth)
+	private async Task<ApiResult<T>> MapFailureAsync<T>(HttpResponseMessage resp, bool auth, string? token)
 	{
 		string code = null;
 		string title = null;
@@ -383,7 +399,7 @@ public sealed class ApiClient : IApiClient
 		case HttpStatusCode.Unauthorized:
 			if (auth)
 			{
-				_session.NotifyExpired();
+				_session.NotifyExpired(token);   // ignored when a newer session replaced the one this request used
 				return Fail<T>(ApiErrorKind.SessionExpired, code, "Your session has expired. Please sign in again.", status);
 			}
 			return Fail<T>(ApiErrorKind.Unauthorized, code, title ?? "Invalid username or password.", status);

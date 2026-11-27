@@ -29,6 +29,10 @@ public sealed class UserEditorViewModel : BaseViewModel
 
 	private RoleOption _role = UserRoles.All[0];
 
+	/// <summary>Review fix: the profile values already saved by this screen (the password step then failed),
+	/// so a retry does not send the update again.</summary>
+	private string? _savedProfile;
+
 	public bool IsEdit => (object)_editing != null;
 
 	public bool IsCreate => (object)_editing == null;
@@ -135,6 +139,7 @@ public sealed class UserEditorViewModel : BaseViewModel
 	public override async Task OnNavigatedToAsync(IDictionary<string, object> args)
 	{
 		_editing = BaseViewModel.Arg<AdminUserDto>(args, "editUser");
+		_savedProfile = null;
 		Title = (IsEdit ? "Edit user" : "Add user");
 		string[] array = new string[4] { "IsEdit", "IsCreate", "FixedIdentity", "PasswordLabel" };
 		foreach (string n in array)
@@ -219,15 +224,22 @@ public sealed class UserEditorViewModel : BaseViewModel
 			}
 			else
 			{
-				ApiResult<AdminUserDto> u = await _api.AdminUserUpdateAsync(_editing.Id, new UpdateUserRequest(display, role, shops, _editing.Version));
-				if (!u.IsSuccess)
+				string profile = display + "\n" + role + "\n" + string.Join(",", shops);
+				if (profile != _savedProfile)
 				{
-					ErrorMessage = u.Error.Message;
-					return;
+					ApiResult<AdminUserDto> u = await _api.AdminUserUpdateAsync(_editing.Id, new UpdateUserRequest(display, role, shops, _editing.Version));
+					if (!u.IsSuccess)
+					{
+						ErrorMessage = u.Error.Message;
+						return;
+					}
+					// Review fix: the record now has a new version; a later save from this screen must send it.
+					_editing = u.Value ?? _editing;
+					_savedProfile = profile;
 				}
 				if (wantsPassword)
 				{
-					ApiResult<Unit> p = await _api.AdminUserResetPasswordAsync(_editing.Id, new ResetPasswordRequest(pw));
+					ApiResult<Unit> p = await _api.AdminUserResetPasswordAsync(_editing!.Id, new ResetPasswordRequest(pw));
 					if (!p.IsSuccess)
 					{
 						ErrorMessage = "The user was updated, but the password was not changed: " + p.Error.Message;

@@ -17,6 +17,8 @@ public sealed class MyEntriesViewModel : BaseViewModel
     private bool _empty;
     private string? _cursor;
     private string? _incomplete;
+    private bool _loaded;              // a first page is on screen
+    private EntryChanges? _opened;     // filled by the detail screen of the entry opened last
 
     public ObservableCollection<EntryRow> Entries { get; } = new();
     public AsyncCommand RefreshCommand { get; }
@@ -44,10 +46,20 @@ public sealed class MyEntriesViewModel : BaseViewModel
         LoadMoreCommand = new AsyncCommand(LoadMoreAsync, () => HasMore && !IsBusy);
     }
 
+    /// <summary>Review fix: the list (with every page loaded) is kept when coming back from an entry; only that entry's
+    /// row is updated if its detail screen saw a change (e.g. a correction was requested). Pull down to reload everything.</summary>
     public override Task OnAppearingAsync()
     {
         OnPropertyChanged(nameof(Heading));
-        return LoadAsync();
+        var changed = _opened?.Updated;
+        _opened = null;
+        if (!_loaded || Entries.Count == 0) return LoadAsync();
+        if (changed is not null)
+        {
+            for (var i = 0; i < Entries.Count; i++)
+                if (Entries[i].Dto is { } d && d.Id == changed.Id && d.ShopId == changed.ShopId) { Entries[i] = Row(changed); break; }
+        }
+        return Task.CompletedTask;
     }
 
     private int _loadSeq;
@@ -74,6 +86,7 @@ public sealed class MyEntriesViewModel : BaseViewModel
             if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
             if (!more) Entries.Clear();
             Apply(r.Value!);
+            _loaded = true;
         }
         catch (Exception)
         {
@@ -103,6 +116,18 @@ public sealed class MyEntriesViewModel : BaseViewModel
         e, EntryText.Badge(e));
 
     /// <summary>Round 2: tapping an entry opens its detail (where its inspector can ask for a correction).</summary>
-    public Task OpenAsync(EntryRow row) => row.Dto is null ? Task.CompletedTask
-        : _nav.GoToAsync(Routes.EntryDetail, new Dictionary<string, object> { ["entry"] = row.Dto });
+    public Task OpenAsync(EntryRow row)
+    {
+        if (row.Dto is null) return Task.CompletedTask;
+        _opened = new EntryChanges();
+        return _nav.GoToAsync(Routes.EntryDetail, new Dictionary<string, object> { ["entry"] = row.Dto, [EntryChanges.Key] = _opened });
+    }
+}
+
+/// <summary>Review fix: passed to the entry detail screen, which puts the entry here when it changed (a fresher copy,
+/// or a correction requested), so the list can update that row without reloading its pages.</summary>
+public sealed class EntryChanges
+{
+    public const string Key = "changes";
+    public EntryDto? Updated { get; set; }
 }

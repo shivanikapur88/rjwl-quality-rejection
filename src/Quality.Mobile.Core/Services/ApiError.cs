@@ -8,6 +8,11 @@ public sealed record ApiError(ApiErrorKind Kind, string Code, string Message, in
 		get
 		{
 			ApiErrorKind kind = Kind;
+			// Review fix: a TLS/certificate failure or an unusable address fails before anything is sent.
+			if (Code is "certificate_untrusted" or "invalid_server_address" or "not_configured")
+			{
+				return false;
+			}
 			if ((uint)(kind - 1) <= 1u || kind == ApiErrorKind.Server)
 			{
 				return true;

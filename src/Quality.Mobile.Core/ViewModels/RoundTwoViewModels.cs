@@ -24,6 +24,7 @@ public sealed class EntryDetailViewModel : BaseViewModel
 {
     private readonly IApiClient _api; private readonly INavigator _nav; private readonly ISession _session; private readonly IDialogs _dialogs;
     private EntryDto? _entry;
+    private EntryDto? _original; private EntryChanges? _changes;   // review fix: tells the list when this entry changed
     private string _reason = "", _qty = "", _remarks = "";
     private bool _remove = true, _formOpen, _changeRemarks;
     private PhenomenonDto? _phen; private MachineDto? _machine;
@@ -68,7 +69,8 @@ public sealed class EntryDetailViewModel : BaseViewModel
 
     public override async Task OnNavigatedToAsync(IDictionary<string, object> args)
     {
-        _entry = Arg<EntryDto>(args, "entry");
+        _entry = _original = Arg<EntryDto>(args, "entry");
+        _changes = Arg<EntryChanges>(args, EntryChanges.Key);
         if (_entry is null) { ErrorMessage = "Entry not found."; return; }
         Refresh();
         await RunBusyAsync(async () =>   // fresh copy: status may have changed since the list was loaded
@@ -80,6 +82,7 @@ public sealed class EntryDetailViewModel : BaseViewModel
 
     private void Refresh()
     {
+        if (_changes is not null && _entry is not null && _entry != _original) _changes.Updated = _entry;
         foreach (var p in new[] { nameof(Headline), nameof(ShopLine), nameof(WhenLine), nameof(RemarksLine), nameof(EntryNumber), nameof(Badge), nameof(HasBadge), nameof(CanRequest) })
             OnPropertyChanged(p);
         OpenFormCommand.RaiseCanExecuteChanged();
@@ -323,18 +326,31 @@ public sealed class SummaryViewModel : BaseViewModel
 /// <summary>Feature #8: scan a machine label and go straight to the entry form (or the stage list when a shop has several stages).</summary>
 public sealed class ScanViewModel : BaseViewModel
 {
-    private readonly IApiClient _api; private readonly INavigator _nav;
+    /// <summary>After coming back from the screen a scan opened, the same label is ignored this long (it is usually still in front of the camera).</summary>
+    public static readonly TimeSpan RescanPause = TimeSpan.FromSeconds(3);
+    private readonly IApiClient _api; private readonly INavigator _nav; private readonly TimeProvider _time;
     private int _handling;
+    private string? _lastOpened;          // the scanned text that last opened a screen
+    private DateTimeOffset _ignoreUntil;  // ... ignored until then, unless another code is seen first
     private string _hint = "Point the camera at the QR label on the machine.";
-    public ScanViewModel(IApiClient api, INavigator nav) { (_api, _nav) = (api, nav); Title = "Scan machine"; }
+    public ScanViewModel(IApiClient api, INavigator nav, TimeProvider? time = null) { (_api, _nav) = (api, nav); _time = time ?? TimeProvider.System; Title = "Scan machine"; }
     public string Hint { get => _hint; private set => Set(ref _hint, value, nameof(Hint)); }
     public bool IsScanning => _handling == 0;
 
-    public override Task OnAppearingAsync() { Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); ErrorMessage = null; return Task.CompletedTask; }
+    public override Task OnAppearingAsync()
+    {
+        if (_lastOpened is not null) _ignoreUntil = _time.GetUtcNow() + RescanPause;   // review fix: Back must not reopen the same machine at once
+        Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); ErrorMessage = null; return Task.CompletedTask;
+    }
 
     /// <summary>Called by the camera view for every detected code; only the first one is handled until the page reappears.</summary>
     public async Task OnScannedAsync(string text)
     {
+        if (_lastOpened is not null)
+        {
+            if (text == _lastOpened && _time.GetUtcNow() < _ignoreUntil) return;
+            _lastOpened = null;   // another code, or the pause is over
+        }
         if (Interlocked.CompareExchange(ref _handling, 1, 0) != 0) return;
         OnPropertyChanged(nameof(IsScanning));
         var navigated = false;
@@ -354,6 +370,7 @@ public sealed class ScanViewModel : BaseViewModel
         }
         finally
         {
+            if (navigated) _lastOpened = text;
             // Full review #11: whatever happened (error, exception swallowed by RunBusyAsync), scanning resumes unless we left the page.
             if (!navigated) { await Task.Delay(1500); Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); }
         }
