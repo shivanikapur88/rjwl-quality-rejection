@@ -224,3 +224,20 @@ After the phone layout was added, three independent reviewers (Claude Sonnet 5.5
 | W9 | Low | Labels from a shared link shown when unconfirmed. | Shown as `#id`. | browser check |
 | W10 | Low | Print before the QR images loaded. | Print enabled when all images settled. | — |
 | W11 | Docs | API examples (login limit, missing routes), README script range and dashboard wording, RECOVERY counts, "table semantics kept", phone layout undocumented. | Corrected; phone layout in the specification and user guide. | — |
+
+### Android app
+
+| # | Severity | Finding | Fix | Evidence (unit tests) |
+|---|---|---|---|---|
+| A1 | Medium (plausible) | Scan → Back reopened the form at once while the camera still saw the label. | The same label is ignored for 3 s after returning; a different one is handled at once. | `Scan_back_does_not_reopen_the_same_label_at_once` |
+| A2 | Medium | User editor: a retry after a failed password reset sent a stale version (409). | The returned user replaces the edited one; a retry only repeats the password step. | `User_editor_retry_after_a_failed_password_reset_does_not_resend_a_stale_update` |
+| A3 | Medium | "Clear" after an unknown save outcome issued a new submission id, so re-entering could create a duplicate. | The id is kept until the outcome is confirmed. | `Clear_after_an_unknown_outcome_keeps_the_submission_id` |
+| A4 | Medium | My entries reloaded page 1 on every return, losing loaded pages. | Pages kept; only a corrected row is updated. | `My_entries_keeps_its_pages_after_Back_and_updates_the_corrected_row` |
+| A5 | Medium (plausible) | A late 401 for an earlier session ended the new one. | Ignored unless it is for the current token. | `A_late_401_for_an_earlier_session_does_not_end_the_new_one` |
+| A6 | Medium (plausible) | A tablet clock hours ahead made every new session "expired". | The expiry is shifted by the difference to the server's `Date` header. | `A_device_clock_hours_ahead_does_not_expire_a_new_session` |
+| A7 | Low | An entry draft survived an explicit sign-out. | Discarded on sign-out. | `Explicit_sign_out_discards_the_entry_draft` |
+| A8 | Low | A certificate failure said "the entry may not have been saved". | Not for certificate or address errors (nothing was sent). | `Certificate_failure_is_not_reported_as_a_possibly_saved_entry` |
+| A9 | Low | Admin phenomena: a quick second shop change could be ignored or show the first shop's stages. | Sequence guard. | `Admin_phenomena_slow_stages_of_an_earlier_shop_are_not_added_to_the_newer_shop` |
+| A10 | Low | Changing only the server path kept the session. | Scheme, host, port and path are compared. | `Changing_only_the_server_path_signs_out` |
+
+All fixes are verified by unit tests through the real API client with a scripted server; none has been tried on a device yet (no emulator in this environment).
