@@ -1,6 +1,6 @@
 # Test evidence
 
-> **Complete Fable review and iOS parts: see section 10. Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+> **UI/UX review and redesign: see section 11. Complete Fable review and iOS parts: see section 10. Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
 
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
@@ -234,3 +234,23 @@ Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `6808bdd0778
 * **Not built.** Apple allows iOS builds only on macOS, and this environment is Linux.
 * The Android build is unchanged by the iOS parts: same warnings, 0 errors.
 * The iOS settings are checked statically by the unit tests: camera reason, no App Transport Security exceptions, Keychain group equal to the application id, and the iOS target being opt-in.
+
+## 11. UI/UX review and redesign (commit `84567bc`)
+
+Fresh clone of `84567bc588c788d6f755b820fd64075fdb063bfd`, 27 Nov 2026, same environment. Raw output: [`docs/evidence/design/`](evidence/design/).
+
+| Suite | Result |
+|---|---|
+| Build incl. Android | **0 errors**, 135 warnings (all in the recovered `Quality.Mobile.Core`) |
+| Debug APK | SHA-256 `a06bfcff…1a33` |
+| Unit tests | **166 passed** (18 new for the app design: two-step entry form, summary navigation and plurals, status tones, reject prompt, confirmation details) |
+| Integration RCSI ON / OFF | **56 passed** each (includes the new phenomenon-rate assertion) |
+| sqlcmd fresh install, upgrade path, seed check | OK |
+| Browser checks (`visual_checks.txt`) | no horizontal scroll at 1440, 900, 412 (Pixel 7) and 360 px; Top machines fits on the tablet layout; Back undoes a drill-down; no page errors |
+
+The Fable UI reviewer recomputed **2,416 displayed numbers** against the API with **0 mismatches**.
+
+**Images:**
+* before/after comparisons for the dashboard: `compare-desktop.png`, `compare-phone.png`;
+* the dashboard in dark mode;
+* the redesigned app screens as mock-ups drawn from the new XAML (`app-*-mockups.png`). These are **not device screenshots**: the app has not been run on a device or emulator.
