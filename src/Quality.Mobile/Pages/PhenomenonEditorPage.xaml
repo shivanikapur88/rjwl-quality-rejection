@@ -16,7 +16,7 @@
                         <Label Text="{Binding FixedStageText}" Style="{StaticResource BodyStrong}" />
                     </VerticalStackLayout>
                     <Label Text="Phenomenon name" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-                    <Entry Text="{Binding Name}" MaxLength="200" Placeholder="Name" />
+                    <Entry SemanticProperties.Description="Phenomenon name" Text="{Binding Name}" MaxLength="200" Placeholder="Name" />
                     <Label Text="{Binding NameCounter}" Style="{StaticResource Caption}" HorizontalTextAlignment="End" />
                     <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsCreate}" MinimumHeightRequest="48">
                         <Label Text="Active" Style="{StaticResource Body}" VerticalOptions="Center" />

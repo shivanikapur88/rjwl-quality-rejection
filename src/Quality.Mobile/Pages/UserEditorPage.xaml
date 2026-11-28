@@ -8,16 +8,16 @@
                 <VerticalStackLayout Spacing="8">
                     <VerticalStackLayout IsVisible="{Binding IsCreate}" Spacing="4">
                         <Label Text="Employee code" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding EmployeeCode}" MaxLength="30" Placeholder="e.g. E1234" Keyboard="Plain" />
+                        <Entry SemanticProperties.Description="Employee code" Text="{Binding EmployeeCode}" MaxLength="30" Placeholder="e.g. E1234" Keyboard="Plain" />
                         <Label Text="Username" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-                        <Entry Text="{Binding Username}" MaxLength="50" Placeholder="login name" Keyboard="Plain" />
+                        <Entry SemanticProperties.Description="Username" Text="{Binding Username}" MaxLength="50" Placeholder="login name" Keyboard="Plain" />
                     </VerticalStackLayout>
                     <VerticalStackLayout IsVisible="{Binding IsEdit}" Spacing="4">
                         <Label Text="Employee code · username (cannot be changed)" Style="{StaticResource FieldLabel}" />
                         <Label Text="{Binding FixedIdentity}" Style="{StaticResource BodyStrong}" />
                     </VerticalStackLayout>
                     <Label Text="Name" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-                    <Entry Text="{Binding DisplayName}" MaxLength="100" Placeholder="Full name" />
+                    <Entry SemanticProperties.Description="Display name" Text="{Binding DisplayName}" MaxLength="100" Placeholder="Full name" />
                     <Label Text="Role" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
                     <Picker ItemsSource="{Binding Roles}" SelectedItem="{Binding SelectedRole, Mode=TwoWay}" Title="Role" />
                 </VerticalStackLayout>
@@ -42,8 +42,8 @@
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="{Binding PasswordLabel}" Style="{StaticResource FieldLabel}" />
-                    <Entry Text="{Binding Password}" IsPassword="True" Placeholder="Password" />
-                    <Entry Text="{Binding ConfirmPassword}" IsPassword="True" Placeholder="Repeat password" />
+                    <Entry SemanticProperties.Description="Password" Text="{Binding Password}" IsPassword="True" Placeholder="Password" />
+                    <Entry SemanticProperties.Description="Repeat password" Text="{Binding ConfirmPassword}" IsPassword="True" Placeholder="Repeat password" />
                     <Label Text="{Binding PasswordRule}" Style="{StaticResource Caption}" />
                 </VerticalStackLayout>
             </Border>

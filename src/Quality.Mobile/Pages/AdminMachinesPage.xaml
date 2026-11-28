@@ -13,7 +13,7 @@
                                 <VerticalStackLayout><Label Text="Shop" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding Shops}" SelectedItem="{Binding SelectedShop, Mode=TwoWay}" Title="Shop" /></VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1"><Label Text="Status" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}" Title="Status" /></VerticalStackLayout>
                             </Grid>
-                            <SearchBar Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by code or name" />
+                            <SearchBar SemanticProperties.Description="Search machines" Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by code or name" />
                             <Button Text="+ Add machine" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" />
                         </VerticalStackLayout>
                     </Border>

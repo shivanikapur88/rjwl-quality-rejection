@@ -8,7 +8,8 @@
   const { api, wireLogin, el, fmt, text, make, session } = QR;
   const SHIFT_SLOTS = ['--series-1', '--series-2', '--series-3', '--series-4'];   // fixed order by shift sort order, never by rank
   let shifts = [], cal = null, lastReport = null;
-  const drill = { machineId: null, machineLabel: null, phenomenonId: null, phenomenonLabel: null };
+  // *Known: the label came from a click in this window (a real name from the server), not from a link's text.
+  const drill = { machineId: null, machineLabel: null, machineKnown: false, phenomenonId: null, phenomenonLabel: null, phenomenonKnown: false };
   const COLLAPSED_PARETO = 15, COLLAPSED_ENTRIES = 20, MACHINE_ROWS = 15;
   let showAllPareto = false, showAllEntries = false, lastEntries = null;
   let rangeBeforeDay = null;   // the date range in use before a day was clicked, restored when the "Day" chip is removed
@@ -49,8 +50,8 @@
     el('shop').value = h.shop && [...el('shop').options].some(o => o.value === h.shop) ? h.shop : '';
     el('shift').value = h.shift && [...el('shift').options].some(o => o.value === h.shift) ? h.shift : '';
     // Labels from the link are only placeholders: after loading they are replaced by the names the report returns.
-    drill.machineId = /^\d+$/.test(h.m || '') ? h.m : null; drill.machineLabel = drill.machineId ? h.ml : null;
-    drill.phenomenonId = /^\d+$/.test(h.p || '') ? h.p : null; drill.phenomenonLabel = drill.phenomenonId ? h.pl : null;
+    drill.machineId = /^\d+$/.test(h.m || '') ? h.m : null; drill.machineLabel = drill.machineId ? h.ml : null; drill.machineKnown = false;
+    drill.phenomenonId = /^\d+$/.test(h.p || '') ? h.p : null; drill.phenomenonLabel = drill.phenomenonId ? h.pl : null; drill.phenomenonKnown = false;
     rangeBeforeDay = null;
   }
 
@@ -126,10 +127,11 @@
       lastReport = r; showAllPareto = false; showAllEntries = false;
       // Chip labels from a shared link are replaced by the names in the report (a link cannot relabel another machine).
       const m = drill.machineId && r.topMachines.find(x => String(x.machineId) === drill.machineId);
-      // A label that cannot be confirmed (not among the report's machines) is shown as the id, not the link's text.
-      if (m) drill.machineLabel = m.machineCode; else if (drill.machineId) drill.machineLabel = '#' + drill.machineId;
+      // A label that cannot be confirmed (not among the report's machines) is shown as the id, not the link's text;
+      // a name picked by a click in this window is kept (the machine may simply have no rows in the new selection).
+      if (m) { drill.machineLabel = m.machineCode; drill.machineKnown = true; } else if (drill.machineId && !drill.machineKnown) drill.machineLabel = '#' + drill.machineId;
       const p = drill.phenomenonId && r.topPhenomena.find(x => String(x.phenomenonId) === drill.phenomenonId);
-      if (p) drill.phenomenonLabel = p.phenomenonName; else if (drill.phenomenonId) drill.phenomenonLabel = '#' + drill.phenomenonId;
+      if (p) { drill.phenomenonLabel = p.phenomenonName; drill.phenomenonKnown = true; } else if (drill.phenomenonId && !drill.phenomenonKnown) drill.phenomenonLabel = '#' + drill.phenomenonId;
       if (drill.machineId || drill.phenomenonId) { writeHash(); renderChips(); }
       render(r);
       text(el('tPending'), pending === null ? '–' : fmt(pending));
@@ -206,7 +208,7 @@
     const ch = pctChange(now, prev);
     const cls = ch > 0 ? 'bad' : ch < 0 ? 'good' : '';
     const badge = make('span', 'badge ' + cls, ch === 0 ? '± 0%' : `${ch > 0 ? '▲' : '▼'} ${Math.abs(ch)}% ${ch > 0 ? 'more' : 'fewer'}`);
-    return [badge, document.createTextNode(`vs ${period} (${fmt(prev)})${sofar}`)];
+    return [badge, document.createTextNode(` vs ${period} (${fmt(prev)})${sofar}`)];
   }
   const shortDelta = (now, prev) => {
     if (prev === null || prev === undefined) return '';
@@ -285,7 +287,7 @@
         cells: [m.machineCode, m.machineName, m.shopCode, fmt(m.quantity), shortDelta(m.quantity, m.previousQuantity),
           m.rate ? fmt(m.rate.produced) : '–', rowRate(m.rate)],
         label: `Show only machine ${m.machineCode}`,
-        onClick: () => { drill.machineId = String(m.machineId); drill.machineLabel = m.machineCode; load(true); },
+        onClick: () => { drill.machineId = String(m.machineId); drill.machineLabel = m.machineCode; drill.machineKnown = true; load(true); },
       })), 'No rejections in this selection.', 3, 6, { phoneHide: [1, 2, 5] });
     if (r.topMachines.length > MACHINE_ROWS) el('machines').append(make('p', 'muted small', r.topMachines.length >= 50 ? `Top ${MACHINE_ROWS} of 50 or more machines shown. Drill down by shop to see the others.` : `Top ${MACHINE_ROWS} of ${r.topMachines.length} machines shown. Drill down by shop to see the others.`));
     renderTable(el('shops'), ['Shop', 'Parts', 'Entries', 'Rate'],
@@ -354,7 +356,8 @@
       hit.addEventListener('click', () => pickDay(d));
       svg.append(hit);
       // Every n-th day, and always the last one (the most recent day must be readable).
-      if (i % labelEvery === 0 && (i === days.length - 1 || days.length - 1 - i >= labelEvery / 2) || i === days.length - 1) { const t = svgEl('text', { x: padL + band * i + band / 2, y: H - 8, class: 'axis', 'text-anchor': 'middle' }); t.textContent = shortDay(d); svg.append(t); }
+      if (i === days.length - 1 || i % labelEvery === 0 && (days.length - 1 - i) * band >= 56) {   // no label crowding the last day's
+         const t = svgEl('text', { x: padL + band * i + band / 2, y: H - 8, class: 'axis', 'text-anchor': 'middle' }); t.textContent = shortDay(d); svg.append(t); }
     });
     svg.setAttribute('aria-hidden', 'true');   // the container's role="img" label describes it; the table holds the numbers
     host.append(svg);
@@ -399,16 +402,25 @@
       row.append(make('div', 'muted', String(i + 1)), name, track, make('div', 'num', fmt(p.quantity)),
         make('div', 'num', sharePct(p.quantity / total)), make('div', 'num', sharePct(cum / total)), make('div', 'num muted', shortDelta(p.quantity, p.previousQuantity)));
       hover(row, `${p.phenomenonName} (${p.shopCode}): ${fmt(p.quantity)} parts in ${fmt(p.entries)} entries, ${pct(p.quantity / total, 1)} of rejected parts; cumulative ${pct(cum / total, 1)}. Click to drill down.`, false);
-      row.addEventListener('click', () => { drill.phenomenonId = String(p.phenomenonId); drill.phenomenonLabel = p.phenomenonName; load(true); });   // the button's click bubbles here
+      row.addEventListener('click', () => { drill.phenomenonId = String(p.phenomenonId); drill.phenomenonLabel = p.phenomenonName; drill.phenomenonKnown = true; load(true); });   // the button's click bubbles here
       host.append(row);
       if (i === vital - 1 && vital < list.length) host.append(make('div', 'pcut', `— ${pct(cut, 0)} of rejected parts above this line —`));
     });
     if (visible.length < list.length) {
       const more = make('button', 'link-dark', `Show all ${list.length} phenomena`); more.type = 'button';
-      more.addEventListener('click', () => { showAllPareto = true; renderPareto(r); });
+      const firstNew = visible.length;
+      more.addEventListener('click', () => { showAllPareto = true; renderPareto(r); focusRow(host, firstNew, '.prow:not(.phead) button.barname'); });
       host.append(more);
     }
     if (r.phenomenaCount > list.length) host.append(make('p', 'muted small', `${r.phenomenaCount - list.length} more phenomena with fewer parts are not listed.`));
+  }
+
+  /** After "Show all"/"Show more" re-renders a list, put keyboard focus on the first newly shown row (not back to the page top). */
+  function focusRow(host, index, selector) {
+    const rows = host.querySelectorAll(selector);
+    const row = rows[index]; if (!row) return;
+    if (!row.matches('button') && !row.hasAttribute('tabindex')) row.setAttribute('tabindex', '-1');
+    row.focus();
   }
 
   function renderEntries(res) {
@@ -425,7 +437,8 @@
       'No entries in this selection.', 5, 5, { stack: true });   // phone: each entry becomes a small card
     if (items.length < all.length) {
       const more = make('button', 'link-dark', `Show ${all.length - items.length} more`); more.type = 'button';
-      more.addEventListener('click', () => { showAllEntries = true; renderEntries(lastEntries); });
+      const firstNew = items.length;
+      more.addEventListener('click', () => { showAllEntries = true; renderEntries(lastEntries); focusRow(host, firstNew, 'tbody tr'); });
       host.append(more);
     }
   }

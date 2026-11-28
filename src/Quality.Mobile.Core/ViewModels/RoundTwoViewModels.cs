@@ -44,6 +44,9 @@ public sealed class EntryDetailViewModel : BaseViewModel
     public ObservableCollection<PhenomenonDto> Phenomena { get; } = new();
     public ObservableCollection<MachineDto> Machines { get; } = new();
 
+    /// <summary>Fifth review: Send's CanExecute reads IsBusy, so it is re-evaluated when IsBusy changes.</summary>
+    protected override void OnBusyChanged() => SubmitCommand?.RaiseCanExecuteChanged();
+
     public string Headline => _entry is null ? "" : $"{_entry.PhenomenonName} × {_entry.Quantity}";
     public string ShopLine => _entry is null ? "" : $"{_entry.ShopCode} › {_entry.StageName} › {_entry.MachineCode} – {_entry.MachineName}";
     public string WhenLine => _entry is null ? "" : EntryText.When(_entry) + $" · {_entry.InspectorEmployeeCode}";
@@ -253,10 +256,13 @@ public sealed class SummaryViewModel : BaseViewModel
     public SummaryViewModel(IApiClient api)
     {
         _api = api; Title = "Shift summary";
-        PreviousDayCommand = new AsyncCommand(() => { SetDay(_day.AddDays(-1)); return LoadAsync(); });
+        // Fifth review: "‹" needs a day to step from (the calendar may not have loaded: offline on first open).
+        PreviousDayCommand = new AsyncCommand(() => { if (_day == default) return RefreshAllAsync(); SetDay(_day.AddDays(-1)); return LoadAsync(); }, () => _day != default);
         // App design round (A7): "›" is disabled on today (it used to reload today).
         NextDayCommand = new AsyncCommand(() => { if (_day < _today) SetDay(_day.AddDays(1)); return LoadAsync(); }, () => CanGoNext);
-        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(LoadAsync));   // review fix: only a pull sets IsRefreshing
+        // Fifth review: a pull re-reads the calendar too, so it recovers from a failed first load and "today" and the
+        // current shift move on while the screen stays open.
+        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(RefreshAllAsync));   // review fix: only a pull sets IsRefreshing
     }
     public ObservableCollection<Option> ShiftOptions { get; } = new();
     public ObservableCollection<SummaryLine> Shops { get; } = new();
@@ -274,6 +280,7 @@ public sealed class SummaryViewModel : BaseViewModel
         OnPropertyChanged(nameof(DayText));
         OnPropertyChanged(nameof(CanGoNext));
         NextDayCommand.RaiseCanExecuteChanged();
+        PreviousDayCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>Size of the top lists asked for; a list this long may be cut (its heading then says "Top 5").</summary>
@@ -296,16 +303,23 @@ public sealed class SummaryViewModel : BaseViewModel
     public bool IsIncomplete => _incomplete.Length > 0;
     public Option? SelectedShift { get => _shift; set { if (Set(ref _shift, value, nameof(SelectedShift)) && _day != default) _ = LoadAsync(); } }
 
-    public override async Task OnAppearingAsync()
+    public override Task OnAppearingAsync() => RefreshAllAsync();
+
+    /// <summary>Calendar (today, shifts, current shift), then the numbers. Used on appearing and by pull-to-refresh.</summary>
+    public async Task RefreshAllAsync()
     {
-        // The calendar is re-read every time the screen appears: "today" moves on at the start of the first shift.
+        // The calendar is re-read every time: "today" moves on at the start of the first shift.
+        var wasToday = _day != default && _day == _today;
+        var shiftWasCurrent = _shift is not null && _shift.Id is int si && si < _shiftCodes.Count && _shiftCodes[si] == _currentShift;
         await RunBusyAsync(async () =>
         {
             var c = await _api.GetCalendarAsync();
             if (!c.IsSuccess) { ErrorMessage = c.Error!.Message; return; }
             var firstTime = _day == default;
             _today = c.Value!.ProductionDate;
-            if (firstTime || _day > _today) _day = _today;
+            if (firstTime || _day > _today || wasToday) _day = _today;   // "today" stays today when the production day moves on
+            var previousCurrent = _currentShift;
+            _currentShift = c.Value.CurrentShift;
             SetDay(_day);   // "today" may have moved on: "›" may be enabled again
             _shiftCodes = c.Value.Shifts.Select(s => s.ShiftCode).ToList();
             var labels = c.Value.Shifts.Select((s, i) => $"{s.ShiftName} (from {s.StartTime})").ToList();
@@ -317,6 +331,11 @@ public sealed class SummaryViewModel : BaseViewModel
                 _shift = current >= 0 ? ShiftOptions[current + 1] : ShiftOptions[0];
                 OnPropertyChanged(nameof(SelectedShift));
             }
+            else if (shiftWasCurrent && previousCurrent != _currentShift)   // the selection followed the current shift: keep following
+            {
+                var current = _shiftCodes.IndexOf(_currentShift);
+                if (current >= 0) { _shift = ShiftOptions[current + 1]; OnPropertyChanged(nameof(SelectedShift)); }
+            }
         });
         await LoadAsync();
     }
@@ -324,6 +343,7 @@ public sealed class SummaryViewModel : BaseViewModel
     private int _loadSeq;
 
     private List<string> _shiftCodes = new();
+    private string? _currentShift;
 
     /// <summary>Day and shift the numbers on screen belong to (null: nothing shown).</summary>
     private (DateOnly Day, string? Shift)? _shown;

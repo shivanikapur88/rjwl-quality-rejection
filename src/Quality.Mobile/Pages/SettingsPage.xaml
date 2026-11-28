@@ -6,7 +6,7 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Server address" Style="{StaticResource Heading}" />
                     <Label Text="HTTPS address of the quality API, e.g. https://server:5001" Style="{StaticResource Secondary}" />
-                    <Entry Text="{Binding ServerUrl}" Keyboard="Url" Placeholder="https://" />
+                    <Entry SemanticProperties.Description="Server address" Text="{Binding ServerUrl}" Keyboard="Url" Placeholder="https://" />
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
                         <Button Text="Save" Command="{Binding SaveCommand}" Style="{StaticResource SecondaryButton}" />
                         <Button Grid.Column="1" Text="Test connection" Command="{Binding TestCommand}" Style="{StaticResource PrimaryButton}" />

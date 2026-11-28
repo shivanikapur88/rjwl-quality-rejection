@@ -27,6 +27,8 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	private EntryDraft? _resume;
 
+	private PendingSubmission? _resumePending;   // fifth review: an unknown-outcome save of this selection, shown again
+
 	/// <summary>The draft already put back: Shell can apply the same query again (e.g. coming back to this page), and it must not be restored twice.</summary>
 	private EntryDraft? _restored;
 
@@ -293,12 +295,15 @@ public sealed class EntryFormViewModel : BaseViewModel
 		}
 		_resume = (draft is not null && !Equals(draft, _restored)) ? draft : null;
 		if (_resume is null && userId is int pu && _shop is not null && _stage is not null && _machine is not null
-			&& _drafts.PendingFor(pu, _shop.Id, _stage.Id, _machine.Id) is Guid pending && pending != SubmissionId)
+			&& _drafts.PendingEntry(pu, _shop.Id, _stage.Id, _machine.Id) is { } pending && pending.SubmissionId != SubmissionId)
 		{
 			// Review fix: an earlier save of this form (this user, shop, stage and machine) may have reached the server.
 			// The same id is sent again: the server replays it if the entry matches, or answers payload mismatch (new id).
-			SubmissionId = pending;
+			// Fifth review: its details are put back on the form with a notice (once the phenomena are loaded), so the
+			// inspector sees which entry the retry is for instead of a blank form silently tied to the old id.
+			SubmissionId = pending.SubmissionId;
 			_outcomeUnknown = true;
+			_resumePending = pending;
 			OnPropertyChanged("SubmissionId");
 		}
 		OnPropertyChanged("ShopText");
@@ -367,6 +372,15 @@ public sealed class EntryFormViewModel : BaseViewModel
 				{
 					// Only now: if loading failed, the error stays on screen and the draft is kept for the next attempt.
 					Restore(_resume);
+				}
+				else if (_resumePending is { } pend)
+				{
+					_resumePending = null;
+					SelectedPhenomenon = pend.PhenomenonId is int pid ? _all.FirstOrDefault(p => p.Id == pid) : null;
+					QuantityText = pend.QuantityText;
+					Remarks = pend.Remarks;
+					SetRemarksOpen(!string.IsNullOrEmpty(pend.Remarks));
+					ErrorMessage = $"Your save at {pend.SentAt.ToLocalTime():HH:mm} got no answer, so it may or may not be recorded. Its details are shown again: tap Save to finish it (no duplicate is created). If this is a NEW rejection, check My entries first.";
 				}
 			}
 		});
@@ -533,7 +547,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 		}
 		else if (userId is int uid && _shop is not null && _stage is not null && _machine is not null)
 		{
-			_drafts.SetPending(new PendingSubmission(uid, _shop.Id, _stage.Id, _machine.Id, submissionId));
+			_drafts.SetPending(new PendingSubmission(uid, _shop.Id, _stage.Id, _machine.Id, submissionId, _selected?.Id, QuantityText, Remarks ?? ""));
 		}
 	}
 }

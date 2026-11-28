@@ -21,7 +21,7 @@
 
         <!-- Step 1: choose the phenomenon (phenomena for THIS stage, loaded from the server) -->
         <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="8" IsVisible="{Binding IsChoosingPhenomenon}">
-            <SearchBar x:Name="Search" Text="{Binding SearchText}" Placeholder="Search rejection phenomenon" />
+            <SearchBar SemanticProperties.Description="Search rejection phenomenon" x:Name="Search" Text="{Binding SearchText}" Placeholder="Search rejection phenomenon" />
             <Border Grid.Row="1" Style="{StaticResource CardList}">
                 <CollectionView ItemsSource="{Binding Phenomena}" SelectionMode="Single" SelectedItem="{Binding SelectedPhenomenon, Mode=TwoWay}" SelectionChanged="OnPhenomenonSelected">
                     <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="0" /></CollectionView.ItemsLayout>
@@ -52,7 +52,7 @@
                         <Label Text="Rejected quantity (parts)" Style="{StaticResource FieldLabel}" />
                         <Grid ColumnDefinitions="64,*,64" ColumnSpacing="12">
                             <Button Text="−" Command="{Binding DecreaseCommand}" Style="{StaticResource StepperButton}" SemanticProperties.Description="One part less" AutomationId="qty-minus" />
-                            <Entry Grid.Column="1" Text="{Binding QuantityText}" Style="{StaticResource QuantityEntry}" Keyboard="Numeric" MaxLength="4" AutomationId="quantity" />
+                            <Entry SemanticProperties.Description="Quantity of rejected parts" Grid.Column="1" Text="{Binding QuantityText}" Style="{StaticResource QuantityEntry}" Keyboard="Numeric" MaxLength="4" AutomationId="quantity" />
                             <Button Grid.Column="2" Text="+" Command="{Binding IncreaseCommand}" Style="{StaticResource StepperButton}" SemanticProperties.Description="One part more" AutomationId="qty-plus" />
                         </Grid>
                         <Label Text="{Binding QuantityHint}" Style="{StaticResource ErrorText}" IsVisible="{Binding HasQuantityError}" />
@@ -62,7 +62,7 @@
                 <Border Style="{StaticResource Card}" Padding="16,12" IsVisible="{Binding IsRemarksOpen}">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="Remarks (optional)" Style="{StaticResource FieldLabel}" />
-                        <Editor x:Name="RemarksEditor" Text="{Binding Remarks}" Placeholder="What did you see?" MaxLength="500" HeightRequest="96" AutoSize="Disabled" AutomationId="remarks" />
+                        <Editor SemanticProperties.Description="Remarks" x:Name="RemarksEditor" Text="{Binding Remarks}" Placeholder="What did you see?" MaxLength="500" HeightRequest="96" AutoSize="Disabled" AutomationId="remarks" />
                         <Label Text="{Binding RemarksCounter}" Style="{StaticResource Caption}" HorizontalTextAlignment="End" />
                     </VerticalStackLayout>
                 </Border>

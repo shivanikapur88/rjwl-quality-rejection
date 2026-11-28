@@ -18,7 +18,7 @@
                                 <VerticalStackLayout><Label Text="Status" Style="{StaticResource FieldLabel}" /><Picker ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus, Mode=TwoWay}" Title="Status" /></VerticalStackLayout>
                                 <Button Grid.Column="1" Text="+ Add" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" VerticalOptions="End" />
                             </Grid>
-                            <SearchBar Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by name" />
+                            <SearchBar SemanticProperties.Description="Search phenomena" Text="{Binding SearchText}" SearchCommand="{Binding SearchCommand}" Placeholder="Search by name" />
                         </VerticalStackLayout>
                     </Border>
                     <Label Text="{Binding CountText}" Style="{StaticResource Secondary}" Margin="4,0" />

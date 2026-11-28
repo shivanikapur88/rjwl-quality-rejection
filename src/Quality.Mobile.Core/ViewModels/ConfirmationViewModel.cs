@@ -57,7 +57,7 @@ public sealed class ConfirmationViewModel : BaseViewModel
 		_entry = BaseViewModel.Arg<EntryDto>(args, "entry");
 		_shopName = BaseViewModel.Arg<string>(args, "shopName");
 		bool flag = args.TryGetValue("already", out object value) && value is bool && (bool)value;
-		Headline = (flag ? "Already saved earlier – no duplicate created" : "Rejection entry saved");
+		Headline = (flag ? "Already saved earlier – no duplicate created. If you were recording a new rejection, tap Record another." : "Rejection entry saved");
 		string[] array = new string[]
 		{
 			"Headline", "EntryNumber", "Shop", "Stage", "Machine", "Phenomenon", "Quantity", "Inspector", "SavedAt", "Remarks", "ShiftText",

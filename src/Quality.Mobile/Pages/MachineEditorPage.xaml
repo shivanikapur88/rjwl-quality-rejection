@@ -14,9 +14,9 @@
                         <Label Text="{Binding FixedShopText}" Style="{StaticResource BodyStrong}" />
                     </VerticalStackLayout>
                     <Label Text="Machine code" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-                    <Entry Text="{Binding Code}" MaxLength="30" Placeholder="e.g. GDC-05" />
+                    <Entry SemanticProperties.Description="Machine code" Text="{Binding Code}" MaxLength="30" Placeholder="e.g. GDC-05" />
                     <Label Text="Machine name" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-                    <Entry Text="{Binding MachineName}" MaxLength="100" Placeholder="Name or description" />
+                    <Entry SemanticProperties.Description="Machine name" Text="{Binding MachineName}" MaxLength="100" Placeholder="Name or description" />
                     <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsCreate}" MinimumHeightRequest="48" Margin="0,8,0,0">
                         <Label Text="Active" Style="{StaticResource Body}" VerticalOptions="Center" />
                         <Switch Grid.Column="1" IsToggled="{Binding IsActive}" SemanticProperties.Description="Machine is active" VerticalOptions="Center" />

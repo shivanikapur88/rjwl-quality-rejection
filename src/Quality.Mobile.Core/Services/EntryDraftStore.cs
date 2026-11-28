@@ -39,22 +39,40 @@ public sealed class EntryDraftStore
     // Review fix: the submission id of a save whose outcome is unknown (timeout, lost response) outlives the entry form
     // (a transient view-model): Back, re-enter and Save for the same user, shop, stage and machine reuses it, so the server
     // replays the saved entry (or answers submission_payload_mismatch) instead of creating a duplicate.
-    private PendingSubmission? _pending;
+    // Fifth review: one slot per user/shop/stage/machine (a second unknown outcome on another machine no longer drops the
+    // first), the entry's details are kept so the form shows them again (never a blank form silently tied to an old id),
+    // and a pending id expires after PendingLifetime, so a genuinely new identical rejection later is not taken for it.
+    public static readonly TimeSpan PendingLifetime = TimeSpan.FromMinutes(30);
 
-    public void SetPending(PendingSubmission pending) => _pending = pending;
+    /// <summary>The clock (tests replace it).</summary>
+    public Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.UtcNow;
+
+    private readonly Dictionary<(int User, int Shop, int Stage, int Machine), PendingSubmission> _pending = new();
+
+    public void SetPending(PendingSubmission pending) =>
+        _pending[(pending.UserId, pending.ShopId, pending.StageId, pending.MachineId)] = pending with { SentAt = Now() };
 
     /// <summary>The outcome of <paramref name="submissionId"/> is known (saved or refused): forget it.</summary>
     public void SettlePending(Guid submissionId)
     {
-        if (_pending is not null && _pending.SubmissionId == submissionId) _pending = null;
+        foreach (var k in _pending.Where(kv => kv.Value.SubmissionId == submissionId).Select(kv => kv.Key).ToList()) _pending.Remove(k);
     }
 
-    public void ClearPending() => _pending = null;
+    public void ClearPending() => _pending.Clear();
+
+    /// <summary>The unexpired pending save of this user, shop, stage and machine, with its details; null if none.</summary>
+    public PendingSubmission? PendingEntry(int userId, int shopId, int stageId, int machineId)
+    {
+        var key = (userId, shopId, stageId, machineId);
+        if (!_pending.TryGetValue(key, out var p)) return null;
+        if (Now() - p.SentAt > PendingLifetime) { _pending.Remove(key); return null; }
+        return p;
+    }
 
     public Guid? PendingFor(int userId, int shopId, int stageId, int machineId) =>
-        _pending is { } p && p.UserId == userId && p.ShopId == shopId && p.StageId == stageId && p.MachineId == machineId
-            ? p.SubmissionId : null;
+        PendingEntry(userId, shopId, stageId, machineId)?.SubmissionId;
 }
 
-/// <summary>A save that may have reached the server, and the identity of its payload.</summary>
-public sealed record PendingSubmission(int UserId, int ShopId, int StageId, int MachineId, Guid SubmissionId);
+/// <summary>A save that may have reached the server: its identity, the details sent and when.</summary>
+public sealed record PendingSubmission(int UserId, int ShopId, int StageId, int MachineId, Guid SubmissionId,
+    int? PhenomenonId = null, string QuantityText = "1", string Remarks = "", DateTimeOffset SentAt = default);
