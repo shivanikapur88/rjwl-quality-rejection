@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" x:Class="Quality.Mobile.Controls.StatusBar" xmlns:infra="clr-namespace:Quality.Mobile.Core.Infrastructure;assembly=Quality.Mobile.Core" x:DataType="infra:BaseViewModel">
+    <!-- Busy indicator and the page's error as a compact banner (shared by every page) -->
     <VerticalStackLayout Spacing="8">
-        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Primary}" HeightRequest="36" />
-        <Border Style="{StaticResource Card}" BackgroundColor="{StaticResource DangerSoft}" Stroke="{StaticResource Danger}" IsVisible="{Binding HasError}">
-            <Label Text="{Binding ErrorMessage}" TextColor="{StaticResource Danger}" FontSize="16" FontAttributes="Bold" />
+        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="32" />
+        <Border Style="{StaticResource ErrorBanner}" IsVisible="{Binding HasError}">
+            <Label Text="{Binding ErrorMessage}" Style="{StaticResource ErrorText}" />
         </Border>
     </VerticalStackLayout>
 </ContentView>

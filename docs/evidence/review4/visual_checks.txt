@@ -1,0 +1,11 @@
+desktop-light: overflow 0px; machines table fits: true
+Back after drill: chips=""
+desktop-dark: overflow 0px; machines table fits: true
+tablet: overflow 0px; machines table fits: true
+phone admin overflow 0px
+360 admin overflow 0px
+touch targets < 44px: []
+page errors: []
+failed load (>92 days): error="Choose at most 92 days. The previous selection is still shown."; from restored=true; hash=#from=2026-11-22&to=2026-11-28
+phone overflow px: 0
+page errors: []

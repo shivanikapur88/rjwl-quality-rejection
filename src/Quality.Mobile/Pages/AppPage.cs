@@ -8,7 +8,14 @@ public abstract class AppPage : ContentPage, IQueryAttributable
 {
     protected BaseViewModel Vm => (BaseViewModel)BindingContext;
 
-    public void ApplyQueryAttributes(IDictionary<string, object> query) => _ = Vm.OnNavigatedToAsync(new Dictionary<string, object>(query));
+    public void ApplyQueryAttributes(IDictionary<string, object> query) => _ = NavigatedToAsync(new Dictionary<string, object>(query));
+
+    private async Task NavigatedToAsync(IDictionary<string, object> args)
+    {
+        // The task used to be discarded, so an exception was lost unobserved; it is now caught and logged.
+        try { await Vm.OnNavigatedToAsync(args); }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("OnNavigatedToAsync failed: " + ex); }
+    }
 
     protected override async void OnAppearing()
     {

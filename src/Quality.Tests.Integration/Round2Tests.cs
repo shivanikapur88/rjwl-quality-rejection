@@ -60,16 +60,19 @@ public sealed class Round2Tests(SqlFixture f) : SqlTest(f)
     public async Task Script_12_backfills_old_rows_with_the_night_shift_on_the_previous_production_day()
     {
         // 2026-11-26 20:30 UTC = 27 Nov 02:00 IST -> shift C of production day 26 Nov.  2026-11-27 01:00 UTC = 06:30 IST -> A, 27 Nov.
-        var id1 = Guid.NewGuid(); var id2 = Guid.NewGuid();
-        foreach (var (id, t) in new[] { (id1, new DateTime(2026, 11, 26, 20, 30, 0, DateTimeKind.Utc)), (id2, new DateTime(2026, 11, 27, 1, 0, 0, DateTimeKind.Utc)) })
+        // 2026-11-27 00:29:59.700 UTC = 05:59:59.700 IST -> still shift C of 26 Nov (a cast to time(0) used to round it up to 06:00 = A).
+        var id1 = Guid.NewGuid(); var id2 = Guid.NewGuid(); var id3 = Guid.NewGuid();
+        foreach (var (id, t) in new[] { (id1, new DateTime(2026, 11, 26, 20, 30, 0, DateTimeKind.Utc)), (id2, new DateTime(2026, 11, 27, 1, 0, 0, DateTimeKind.Utc)),
+                                        (id3, new DateTime(2026, 11, 27, 0, 29, 59, 700, DateTimeKind.Utc)) })
             await SqlFixture.Scalar<int>(F.GdcCs, """
                 INSERT INTO qa.QualityRejectionEntries (SubmissionId, ShopId, ShopCode, InspectionStageId, StageCode, StageName, MachineId, MachineCode, MachineName,
                   RejectionPhenomenonId, PhenomenonNameSnapshot, Quantity, InspectorId, InspectorEmployeeCode, ServerCreatedAt)
                 VALUES (@s, 1, 'GDC', 1, 'GDC_SHOP', 'GDC Shop', 1, 'M', 'M', 1, 'P', 1, 1, 'E', @t); SELECT 1
                 """, ("@s", id), ("@t", t));
         await SqlFixture.RunScripts(F.GdcCs, "12_upgrade_entries_shift_reversal");
-        var rows = await SqlFixture.Rows(F.GdcCs, $"SELECT CONVERT(varchar(10), ProductionDate, 23) + '|' + ShiftCode FROM qa.QualityRejectionEntries WHERE SubmissionId IN ('{id1}','{id2}') ORDER BY ServerCreatedAt");
-        Assert.Equal(new[] { "2026-11-26|C", "2026-11-27|A" }, rows.Select(r => (string)r[0]));
+        var rows = await SqlFixture.Rows(F.GdcCs, $"SELECT CONVERT(varchar(10), ProductionDate, 23) + '|' + ShiftCode FROM qa.QualityRejectionEntries WHERE SubmissionId IN ('{id1}','{id2}','{id3}') ORDER BY ServerCreatedAt");
+        Assert.Equal(new[] { "2026-11-26|C", "2026-11-26|C", "2026-11-27|A" }, rows.Select(r => (string)r[0]));
+        Assert.Equal((new DateOnly(2026, 11, 26), "C"), ShiftCalendar.Default(Ist).Resolve(new DateTime(2026, 11, 27, 0, 29, 59, 700, DateTimeKind.Utc)));
         // The SQL backfill and the API's calendar agree.
         Assert.Equal((new DateOnly(2026, 11, 26), "C"), ShiftCalendar.Default(Ist).Resolve(new DateTime(2026, 11, 26, 20, 30, 0, DateTimeKind.Utc)));
     }
@@ -331,5 +334,36 @@ public sealed class Round2Tests(SqlFixture f) : SqlTest(f)
         }
         var html = await F.Client().GetStringAsync("/dashboard/");
         Assert.DoesNotContain("<script>", html);   // no inline script (CSP would block it anyway)
+    }
+
+    // ---------------- desktop app (installable dashboard) ----------------
+    [Fact]
+    public async Task Desktop_app_manifest_icons_and_service_worker_are_served()
+    {
+        var m = await F.Client().GetAsync("/dashboard/manifest.webmanifest");
+        Assert.Equal(HttpStatusCode.OK, m.StatusCode);
+        Assert.Equal("application/manifest+json", m.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("frame-ancestors 'none'", string.Join(";", m.Headers.GetValues("Content-Security-Policy")));
+        using var doc = JsonDocument.Parse(await m.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+        Assert.Equal("/dashboard/", root.GetProperty("start_url").GetString());
+        Assert.Equal("/dashboard/", root.GetProperty("scope").GetString());
+        Assert.Equal("standalone", root.GetProperty("display").GetString());
+        foreach (var icon in root.GetProperty("icons").EnumerateArray())
+        {
+            var r = await F.Client().GetAsync("/dashboard/" + icon.GetProperty("src").GetString());
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        }
+        Assert.Contains(root.GetProperty("icons").EnumerateArray(), i => i.GetProperty("purpose").GetString() == "maskable");
+
+        var sw = await F.Client().GetAsync("/dashboard/sw.js");
+        Assert.Equal(HttpStatusCode.OK, sw.StatusCode);
+        Assert.Equal("text/javascript", sw.Content.Headers.ContentType?.MediaType);
+        var swText = await sw.Content.ReadAsStringAsync();
+        Assert.Contains("url.pathname.startsWith('/api/')", swText);   // report data is never cached
+
+        var html = await F.Client().GetStringAsync("/dashboard/");
+        Assert.Contains("rel=\"manifest\"", html);
+        Assert.Contains("id=\"install\"", html);
     }
 }

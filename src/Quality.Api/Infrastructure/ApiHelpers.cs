@@ -49,6 +49,9 @@ public static class ErrorHandling
         await ctx.Response.WriteAsJsonAsync(new ProblemDetails { Status = status, Title = msg, Extensions = { ["code"] = code } });
     });
 
+    /// <summary>True if the exception (or an inner one) is SQL Server error 1205, "chosen as the deadlock victim".</summary>
+    public static bool IsDeadlock(Exception? ex) => Quality.Core.Abstractions.DbErrors.IsDeadlock(ex);
+
     public static (int Status, string Code, string Message) Classify(Exception? ex)
     {
         var sql = ex as SqlException ?? ex?.InnerException as SqlException ?? ex?.InnerException?.InnerException as SqlException;
@@ -56,8 +59,12 @@ public static class ErrorHandling
         {
             ConcurrencyConflictException or DbUpdateConcurrencyException => (409, "concurrent_edit", "This record was changed by someone else. Refresh and try again."),
             UniqueViolationException => (409, "duplicate", "A record with the same unique value already exists."),
-            BadHttpRequestException => (400, "bad_request", "The request was not valid."),
+            BadHttpRequestException { StatusCode: 413 } => (413, "request_too_large", "The request is too large (for uploads: at most 5,000 rows)."),
+            BadHttpRequestException bre => (bre.StatusCode is >= 400 and < 500 ? bre.StatusCode : 400, "bad_request", "The request was not valid."),
             OperationCanceledException when ex is not TimeoutException => (499, "cancelled", "The request was cancelled."),
+            // Connection pool exhausted (all connections busy): SqlClient raises InvalidOperationException, not SqlException.
+            InvalidOperationException { Message: var pm } when pm.Contains("obtaining a connection from the pool", StringComparison.OrdinalIgnoreCase)
+                => (503, "database_unavailable", "The server is busy. Please try again shortly."),
             InvalidOperationException { Message: var m } when m.StartsWith("No connection string configured", StringComparison.Ordinal)
                 => (503, "store_not_configured", "The server is not fully configured. Contact your administrator."),
             _ when sql is not null => ClassifySql(sql),
@@ -71,10 +78,11 @@ public static class ErrorHandling
         2601 or 2627 => (409, "duplicate", "A record with the same unique value already exists."),
         547 => (409, "constraint_violation", "This change conflicts with related data. Refresh and try again."),
         2628 or 8152 => (400, "value_too_long", "One of the values is too long."),
+        1222 => (409, "concurrent_change", "This record is in use by entries being saved right now. Please try again in a moment."),
         1205 => (409, "concurrent_change", "Someone else was changing the same data at the same moment. Please try again."),
         50090 => (409, "last_admin", "At least one active administrator must remain."),
         // Connectivity, login, timeouts and server-unavailable errors.
-        -2 or -1 or 2 or 53 or 40 or 64 or 121 or 233 or 4060 or 4064 or 10053 or 10054 or 10060 or 10061 or 11001 or 18456 or 40613 or 1222
+        -2 or -1 or 2 or 53 or 40 or 64 or 121 or 233 or 4060 or 4064 or 10053 or 10054 or 10060 or 10061 or 11001 or 18456 or 40613
             => (503, "database_unavailable", "The database is temporarily unavailable. Please try again shortly."),
         _ when sql.Class >= 20 => (503, "database_unavailable", "The database is temporarily unavailable. Please try again shortly."),
         _ => (500, "server_error", "Something went wrong. Please try again."),

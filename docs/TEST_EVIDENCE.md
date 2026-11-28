@@ -1,12 +1,12 @@
 # Test evidence
 
-> **Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+> **Fourth full review (Sonnet 5.5): see section 12. UI/UX review and redesign: see section 11. Complete Fable review and iOS parts: see section 10. Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
 
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
 | | |
 |---|---|
-| Source commit | `3313612a00a13179f572afd3e8b3d4cd590d522c` (later commits change only documentation and evidence files) |
+| Source commit | `3313612a00a13179f572afd3e8b3d4cd590d522c` (round-1 evidence; later rounds have their own sections below) |
 | Date | 2026-11-26 (UTC) |
 | Environment | Linux container (cloud session), .NET SDK 10.0.404, MAUI Android workload 10.0.110, Android SDK platform 36 / build-tools 36.0.0, JDK 21 |
 | Database | **Real SQL Server**: Microsoft SQL Server 2022 (RTM-CU28) 16.0.4325.4, Linux container image `mcr.microsoft.com/mssql/server:2022-latest` |
@@ -121,3 +121,195 @@ Fresh clone of branch `claude/corrections-shifts-dashboard-qr` at `13d6d8c30afcb
 **Independent review:** a separate reviewer (Claude Fable) read the round-2 diff without seeing my conclusions. Its findings and their fixes are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#round-2-independent-review).
 
 **Still not tested in round 2:** camera scanning on a real device (no emulator here); the scan screen's logic is unit-tested and the APK builds with the ZXing camera view. Not yet run either: printing labels on real label stock, and the dashboard against RJWL's server, certificate and data.
+
+## 7. Round 3 evidence (commit `d4acbe0`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `d4acbe0c328b250e7e77d65cb06f76146537bd71`, 26 Nov 2026, same environment as above. The later commit `36a5f25` changes only two dashboard styling/tooltip lines, checked in the browser. Raw output: [`docs/evidence/round3/`](evidence/round3/).
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**, 135 warnings (all in the decompiled `Quality.Mobile.Core`; new code has none) |
+| Debug APK | SHA-256 `2ada84f2…0a7c` (`evidence/round3/apk.txt`) |
+| Unit tests | **84 passed** |
+| Integration, SQL Server, RCSI ON / OFF | **54 passed** each (was 49 in round 2) |
+| `sqlcmd` fresh install incl. 13 + idempotent re-run | OK (`fresh_install_sqlcmd.txt`) |
+| Upgrade path | OK (`upgrade_path.txt`) |
+| Seed check | OK |
+
+**New integration tests:**
+* comparison with the previous period, and drill-down by machine and phenomenon, with exact numbers and scope;
+* production-count upload: all-or-nothing validation listed by row, dry run, upsert, audit, and exact rate and coverage (including the shift filter and partial coverage);
+* a shop readable in only one period is left out of both. This test fails without the fix;
+* limits: report dates before 2000, more than 5,000 rows, dates more than 400 days ago, and 403 for another shop's entries.
+
+**Browser checks (Playwright, demo database, `visual_checks.txt`):**
+* clicking a bar filters to that day, and removing the chip restores the earlier range;
+* keyboard drill-down with Enter, with focus moving to the chips and the result announced;
+* a pasted link with a wrong label is corrected from the report;
+* CSV errors are reported by file line, with a blank line skipped;
+* no page errors. Screenshots are in the same folder.
+
+**Independent review:** Claude Fable reviewed round 3 without seeing my conclusions; findings and fixes are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#round-3-independent-review-claude-fable).
+
+**Not tested in round 3:**
+* automated JavaScript unit tests;
+* concurrent uploads, or an upload racing a feed (the lock design is described in the code);
+* a real production-count feed (db/14 is a template);
+* the dashboard on RJWL's server and browsers.
+
+## 8. Second full review evidence (commit `a9fe6f8`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `a9fe6f8892c133f71c96e4b426f5bcc8cab8243c`, 26 Nov 2026, same environment. Raw output: [`docs/evidence/review2/`](evidence/review2/). The next commit only passes the test cancellation token in two new unit tests (removing two analyzer warnings); unit tests re-run: 97 passed.
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**. 141 warnings in the evidence run, 139 after that commit. All are nullable-annotation warnings in the recovered `Quality.Mobile.Core`; 4 more than before, from review fixes made in that recovered code. None are in the server, database or test code. |
+| Debug APK | SHA-256 `256246d7…6f87` (`evidence/review2/apk.txt`) |
+| Unit tests | **97 passed** (was 84): app fixes (9), throttle on a shared plant address, accent variants, 413 mapping |
+| Integration, SQL Server, RCSI ON / OFF | **55 passed** each (was 54) |
+| `sqlcmd` fresh install + idempotent re-run (entry databases too) | OK, but see the **correction** below |
+| Upgrade path, now including 11, 12 (backfill of an old entry) and 13, with failing checks | OK, but see the **correction** below |
+| `db/15` via `sqlcmd`, twice, in all three databases | OK; GDC/CNC show only the entries table with SELECT, INSERT and UPDATE of the two reversal columns |
+| Seed check | OK |
+
+**The API now runs as a least-privilege login in every integration test.** The fixture creates a temporary login, applies `db/15_api_permissions.sql` in the three databases, and the API connects with that login (the tests' own SQL checks use the administrator login). With the runbook's old GDC/CNC grants, 6 correction tests fail; with 15, all pass.
+
+**New or extended integration tests:** the seed re-run after an administrator renamed a seeded phenomenon; a machine with production counts cannot be deleted (409); a shift with 0 produced stays outside the rate; the db/12 backfill at 05:59:59.700 stays in shift C; the readiness warning (fresh instance; no counts or file names).
+
+**Browser checks (`visual_checks.txt`):**
+* the Pareto shows the shop when several shops are in view;
+* two quick "Show" clicks on the labels page show one shop only;
+* a forced 40% coverage shows the partial-coverage warning;
+* no page errors.
+
+**Correction (found on 27 Nov 2026):** the two `sqlcmd` files in `evidence/review2/` (`fresh_install_sqlcmd.txt`, `upgrade_path.txt`) were produced from a **stale copy of `db/` and `tools/`** inside the SQL container. My verification script could not delete the previous copy (a file-permission problem), so `docker cp` nested the new copy beside it. The scripts of `a9fe6f8` were checked by hand the same day (fresh install, upgrade path including 11–13, db/15 twice: all OK, as stated in the review closure), but those two files are not evidence of it. The verification script now uses a fresh directory per run; section 9 re-runs both on the final scripts.
+
+## 9. Third full review and phone layout (commit `be27305`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `be27305fab7e496dcd6109acfee8ffe460f7887a`, 27 Nov 2026, same environment. Raw output: [`docs/evidence/review3/`](evidence/review3/).
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**, 138 warnings: all nullable annotations in the recovered `Quality.Mobile.Core`; none in the server, database or test code |
+| Debug APK | SHA-256 `6fa1ae5d…58eb` (`evidence/review3/apk.txt`) |
+| Unit tests | **127 passed**. Includes 10 app fixes, 4 throttle/readiness tests, and a per-script check that every SQL script sets `QUOTED_IDENTIFIER ON` (one test case per script). |
+| Integration, SQL Server, RCSI ON / OFF | **55 passed** each; the API runs as the least-privilege login from db/15 |
+| `sqlcmd` fresh install + idempotent re-run of the master and entry scripts | OK (29 script runs) — run from a fresh copy of the final scripts |
+| Upgrade path (`tools/test-upgrade-path.sh`, 10 steps) | OK: collision refusal (50080); 11, 12 and 13 run twice; 05:59:59.700 backfilled as shift C of the previous day; 12 refuses mismatching shift times (50013); db/15 run twice over the old schema-wide grants (grants removed, audit log append-only) |
+| Seed check | OK |
+
+**Browser checks (`visual_checks.txt`, Pixel 7 emulation and desktop):**
+* no horizontal scrolling at phone width;
+* the chart redraws when the width changes (1280 → 700 px);
+* the entries table keeps its table role in the card layout;
+* a link with an unknown machine shows `#id`, not the link's label;
+* the nav is hidden on the sign-in screen;
+* no page errors.
+
+Phone screenshots are in the same folder.
+
+**Not tested:**
+* the Android app on a device (all app fixes are unit-tested through the real API client);
+* screen readers on the phone card layout;
+* concurrent uploads.
+
+## 10. Complete Fable review and iOS parts (commit `6808bdd`)
+
+Fresh clone of branch `claude/dashboard-insights-rejection-rate` at `6808bdd0778f556c307a767502b81954eeccf847`, 27 Nov 2026, same environment. Raw output: [`docs/evidence/fable/`](evidence/fable/).
+
+| Suite | Result |
+|---|---|
+| Build, all projects incl. Android | **0 errors**, 135 warnings (all nullable annotations in the recovered `Quality.Mobile.Core`) |
+| Debug APK | SHA-256 `f1cf8281…e0d2` (`evidence/fable/apk.txt`) |
+| Unit tests | **148 passed**. Includes 12 app fixes, throttle key folding, eviction and restart tests, and 3 static iOS configuration checks. |
+| Integration, SQL Server, RCSI ON / OFF | **56 passed** each; the API runs as the least-privilege login |
+| `sqlcmd` fresh install + idempotent re-run (now with db/16) | OK (31 script runs), from a fresh copy of the scripts |
+| Upgrade path (10 steps, now including db/16) | OK |
+| db/15 via sqlcmd | OK in all three databases; refuses the `master` database (50153) |
+| Browser checks | A failed load (more than 92 days) restores the previous selection, and the message says so; no horizontal scrolling at phone width; no page errors |
+
+**Found during verification:** the first clean run (commit `518a164`) had one failure in the RCSI OFF mode: a `GET` of the machine list was a deadlock victim against a machine delete in another test (409). GET requests are now retried on a deadlock. This run, and two runs before it in that mode, passed, but none hit a deadlock, so the retry path has **not** been exercised by a test. The failed run's output is in `evidence/fable/first_run_518a164_integration_OFF_FAILED.txt`; the closure record describes it.
+
+**iOS:**
+* **Not built.** Apple allows iOS builds only on macOS, and this environment is Linux.
+* The Android build is unchanged by the iOS parts: same warnings, 0 errors.
+* The iOS settings are checked statically by the unit tests: camera reason, no App Transport Security exceptions, Keychain group equal to the application id, and the iOS target being opt-in.
+
+## 11. UI/UX review and redesign (commit `84567bc`)
+
+Fresh clone of `84567bc588c788d6f755b820fd64075fdb063bfd`, 27 Nov 2026, same environment. Raw output: [`docs/evidence/design/`](evidence/design/).
+
+| Suite | Result |
+|---|---|
+| Build incl. Android | **0 errors**, 135 warnings (all in the recovered `Quality.Mobile.Core`) |
+| Debug APK | SHA-256 `a06bfcff…1a33` |
+| Unit tests | **166 passed** (18 new for the app design: two-step entry form, summary navigation and plurals, status tones, reject prompt, confirmation details) |
+| Integration RCSI ON / OFF | **56 passed** each (includes the new phenomenon-rate assertion) |
+| sqlcmd fresh install, upgrade path, seed check | OK |
+| Browser checks (`visual_checks.txt`) | no horizontal scroll at 1440, 900, 412 (Pixel 7) and 360 px; Top machines fits on the tablet layout; Back undoes a drill-down; no page errors |
+
+The Fable UI reviewer recomputed **2,416 displayed numbers** against the API with **0 mismatches**.
+
+**Images:**
+* before/after comparisons for the dashboard: `compare-desktop.png`, `compare-phone.png`;
+* the dashboard in dark mode;
+* the redesigned app screens as mock-ups drawn from the new XAML (`app-*-mockups.png`). These are **not device screenshots**: the app has not been run on a device or emulator.
+
+## 12. Fourth full review (commit `49ef2d2`)
+
+Fresh clone of `49ef2d2e806931b8438c92fea82f8dae43816813`, 28 Nov 2026, same environment. Raw output: [`docs/evidence/review4/`](evidence/review4/).
+
+| Suite | Result |
+|---|---|
+| Build incl. Android | **0 errors**, 135 warnings (all in the recovered `Quality.Mobile.Core`) |
+| Debug APK | SHA-256 `14bdb04f…d363` |
+| Unit tests | **166 passed**. The draft-restore test now checks what the Save button reads on each change notification; it fails without the fix. |
+| Integration RCSI ON / OFF | **56 passed** each. The phenomenon-rate test uses a real GDC phenomenon: GDC production only, 0% with no rejections. |
+| sqlcmd fresh install, upgrade path (stricter assertions), seed check | OK |
+| Browser checks (`visual_checks.txt`) | no horizontal scroll at any tested width; no touch target under 44 px; Back undoes a drill-down; a failed load keeps the previous selection; no page errors |
+
+**First run of this round:** the integration suite failed once, in both modes, because the test still used a made-up phenomenon id. With the stage-mapping fix, a made-up id has no shops. The test was corrected; the code was right.
+
+## 13. Dashboard desktop app (commit `31e6ef8`)
+
+Clean clone of `31e6ef8`, fresh databases, script `verify3.sh` (output in `docs/evidence/desktop/verify/`):
+
+| Check | Result |
+|---|---|
+| Build (.NET 10, all projects) | 0 errors, 135 warnings (all in the recovered Mobile.Core, unchanged) |
+| Unit tests | 166 / 166 passed |
+| Integration tests, RCSI ON | 57 / 57 passed (new: `Desktop_app_manifest_icons_and_service_worker_are_served`) |
+| Integration tests, RCSI OFF | 57 / 57 passed |
+| Fresh install, upgrade path, import check | exit 0 |
+| Debug APK | built, SHA-256 `9725fe0c…5787` |
+
+Browser check in Chromium (`docs/evidence/desktop/pwa.js`, result `installability.json`):
+* `Page.getInstallabilityErrors`: **none**; manifest parsed with no errors.
+* Service worker active with scope `/dashboard/` and controlling the page after reload.
+* Saved files: the 13 dashboard files (pages, CSS, JS, manifest, icons). **`/api` responses saved: 0.**
+* "Install app" shown when the browser offers installation (simulated, since headless Chromium does not fire the prompt); phone width 390 px still has no sideways scroll.
+
+Not tested: installing on a real Windows PC in Edge over the plant HTTPS certificate, and the `WebAppInstallForceList` policy.
+
+## 14. Fifth full review (commit `f6055c3`)
+
+Clean clone of `f6055c3`, fresh databases, script `verify3.sh` (output in `docs/evidence/review5/verify/`):
+
+| Check | Result |
+|---|---|
+| Build (.NET 10, all projects) | 0 errors, 137 warnings: 133 in the recovered Mobile.Core and 4 nullable warnings in the new test file, removed in the next commit (test-only annotation; those 3 tests re-run and pass) |
+| Unit tests | 171 / 171 passed (5 new) |
+| Integration tests, RCSI ON / OFF | 60 / 60 passed each (3 new) |
+| Fresh install, upgrade path, import check | exit 0 |
+| Debug APK | built, SHA-256 `555de1ee…9741` |
+
+**Mutation check:** the new tests fail on the code before the fixes. That is 3 of the 5 unit tests (the summary and reopened-form tests; the other two test the new per-machine, expiring save memory) and all 3 integration tests.
+
+**Browser checks** (`docs/evidence/review5/fix5.js`, result `browser_checks.json`):
+* the badge reads "… fewer vs …";
+* on an 89-day range the last two axis labels are at least 48 px apart;
+* focus moves to the first new row after "Show all"/"Show more";
+* a clicked machine keeps its code in the chip on an empty range;
+* a 503 for `labels.html?x=1` is answered from the saved copy;
+* saved keys have no query strings, and 0 `/api` responses are saved;
+* no console errors.

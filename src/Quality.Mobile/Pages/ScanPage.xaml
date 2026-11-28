@@ -3,7 +3,7 @@
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls" x:Class="Quality.Mobile.Pages.ScanPage" x:DataType="vm:ScanViewModel" Title="Scan machine">
     <Grid RowDefinitions="*,Auto">
         <zxing:CameraBarcodeReaderView x:Name="Camera" BarcodesDetected="OnDetected" IsDetecting="{Binding IsScanning}" />
-        <VerticalStackLayout Grid.Row="1" Padding="16" Spacing="10" BackgroundColor="{StaticResource Surface}">
+        <VerticalStackLayout Grid.Row="1" Padding="{StaticResource PagePadding}" Spacing="8" BackgroundColor="{StaticResource Surface}">
             <ctl:StatusBar />
             <Label Text="{Binding Hint}" Style="{StaticResource Body}" HorizontalTextAlignment="Center" />
         </VerticalStackLayout>

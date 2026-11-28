@@ -10,4 +10,10 @@ public partial class UserEditorPage : AppPage
         InitializeComponent();
         BindingContext = vm;
     }
+
+    // App design round: a shop's name toggles its checkbox too.
+    private void OnShopTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is ShopChoice choice) choice.IsSelected = !choice.IsSelected;
+    }
 }

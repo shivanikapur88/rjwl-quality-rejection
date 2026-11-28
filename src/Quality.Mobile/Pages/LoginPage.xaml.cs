@@ -10,4 +10,7 @@ public partial class LoginPage : AppPage
         InitializeComponent();
         BindingContext = vm;
     }
+
+    // "Next" on the keyboard moves to the password field.
+    private void OnUserCompleted(object? sender, EventArgs e) => PasswordEntry.Focus();
 }

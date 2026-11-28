@@ -76,6 +76,37 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_EntryCorrections_Requ
     CREATE INDEX IX_EntryCorrections_RequestedBy ON qa.EntryCorrections (RequestedBy, RequestedAt DESC);
 GO
 
+/* ---------- proposed machine / phenomenon must exist (a delete is refused while a request refers to them) ---------- */
+-- Added after the first release of this script: rows that already point to a deleted machine or phenomenon are kept
+-- (constraint added WITH NOCHECK and reported) instead of making the upgrade fail.
+IF OBJECT_ID(N'qa.FK_EntryCorrections_ProposedMachine', N'F') IS NULL
+BEGIN
+    IF EXISTS (SELECT 1 FROM qa.EntryCorrections c WHERE c.ProposedMachineId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qa.Machines m WHERE m.Id = c.ProposedMachineId))
+    BEGIN
+        PRINT N'WARNING: some correction requests refer to a deleted machine; the foreign key is added without checking them.';
+        ALTER TABLE qa.EntryCorrections WITH NOCHECK ADD CONSTRAINT FK_EntryCorrections_ProposedMachine FOREIGN KEY (ProposedMachineId) REFERENCES qa.Machines(Id);
+    END
+    ELSE
+        ALTER TABLE qa.EntryCorrections WITH CHECK ADD CONSTRAINT FK_EntryCorrections_ProposedMachine FOREIGN KEY (ProposedMachineId) REFERENCES qa.Machines(Id);
+END;
+IF OBJECT_ID(N'qa.FK_EntryCorrections_ProposedPhenomenon', N'F') IS NULL
+BEGIN
+    IF EXISTS (SELECT 1 FROM qa.EntryCorrections c WHERE c.ProposedPhenomenonId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qa.RejectionPhenomena p WHERE p.Id = c.ProposedPhenomenonId))
+    BEGIN
+        PRINT N'WARNING: some correction requests refer to a deleted phenomenon; the foreign key is added without checking them.';
+        ALTER TABLE qa.EntryCorrections WITH NOCHECK ADD CONSTRAINT FK_EntryCorrections_ProposedPhenomenon FOREIGN KEY (ProposedPhenomenonId) REFERENCES qa.RejectionPhenomena(Id);
+    END
+    ELSE
+        ALTER TABLE qa.EntryCorrections WITH CHECK ADD CONSTRAINT FK_EntryCorrections_ProposedPhenomenon FOREIGN KEY (ProposedPhenomenonId) REFERENCES qa.RejectionPhenomena(Id);
+END;
+GO
+-- Indexes for the two foreign keys: a machine or phenomenon delete checks them without scanning all requests.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_EntryCorrections_ProposedMachine' AND object_id = OBJECT_ID(N'qa.EntryCorrections'))
+    CREATE INDEX IX_EntryCorrections_ProposedMachine ON qa.EntryCorrections (ProposedMachineId) WHERE ProposedMachineId IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_EntryCorrections_ProposedPhenomenon' AND object_id = OBJECT_ID(N'qa.EntryCorrections'))
+    CREATE INDEX IX_EntryCorrections_ProposedPhenomenon ON qa.EntryCorrections (ProposedPhenomenonId) WHERE ProposedPhenomenonId IS NOT NULL;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM qa.SchemaVersions WHERE Script = N'11_upgrade_master_shifts_corrections')
     INSERT INTO qa.SchemaVersions (Script) VALUES (N'11_upgrade_master_shifts_corrections');
 GO

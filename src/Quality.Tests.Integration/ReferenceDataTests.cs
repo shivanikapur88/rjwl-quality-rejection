@@ -74,4 +74,35 @@ public sealed class ReferenceDataTests(SqlFixture f) : SqlTest(f)
         Assert.Equal(145, before);
         Assert.Equal(before, await SqlFixture.Scalar<int>(F.MasterCs, seeded));
     }
+
+    [Fact]
+    public async Task Rerunning_the_seed_after_a_seeded_phenomenon_was_renamed_gives_the_old_name_a_new_code()
+    {
+        // An administrator renamed FINAL-034. A re-run sees the original name as missing; its workbook code is taken,
+        // so it must get the next free FINAL code instead of failing on the unique code (and rolling back everything).
+        var original = await SqlFixture.Scalar<string>(F.MasterCs, "SELECT PhenomenonName FROM qa.RejectionPhenomena WHERE PhenomenonCode = 'FINAL-034'");
+        var norm = await SqlFixture.Scalar<string>(F.MasterCs, "SELECT NormalizedName FROM qa.RejectionPhenomena WHERE PhenomenonCode = 'FINAL-034'");
+        await SqlFixture.Scalar<int>(F.MasterCs, "UPDATE qa.RejectionPhenomena SET PhenomenonName = 'Renamed by admin', NormalizedName = 'RENAMED BY ADMIN' WHERE PhenomenonCode = 'FINAL-034'; SELECT 1");
+        try
+        {
+            await SqlFixture.RunScripts(F.MasterCs, "04_seed_phenomena");
+            var code = await SqlFixture.Scalar<string>(F.MasterCs, "SELECT p.PhenomenonCode FROM qa.RejectionPhenomena p JOIN qa.InspectionStages s ON s.Id = p.InspectionStageId WHERE s.StageCode = 'FINAL' AND p.NormalizedName = @n", ("@n", norm));
+            var highest = await SqlFixture.Scalar<string>(F.MasterCs, "SELECT MAX(PhenomenonCode) FROM qa.RejectionPhenomena WHERE PhenomenonCode LIKE 'FINAL-[0-9][0-9][0-9]'");
+            Assert.Equal(highest, code);
+            Assert.NotEqual("FINAL-034", code);
+            // A second re-run changes nothing.
+            var count = await SqlFixture.Scalar<int>(F.MasterCs, "SELECT COUNT(*) FROM qa.RejectionPhenomena");
+            await SqlFixture.RunScripts(F.MasterCs, "04_seed_phenomena");
+            Assert.Equal(count, await SqlFixture.Scalar<int>(F.MasterCs, "SELECT COUNT(*) FROM qa.RejectionPhenomena"));
+        }
+        finally
+        {
+            // Restore the seed state for the other reference-data tests.
+            await SqlFixture.Scalar<int>(F.MasterCs, """
+                DELETE p FROM qa.RejectionPhenomena p JOIN qa.InspectionStages s ON s.Id = p.InspectionStageId
+                WHERE s.StageCode = 'FINAL' AND p.NormalizedName = @n AND p.PhenomenonCode <> 'FINAL-034';
+                UPDATE qa.RejectionPhenomena SET PhenomenonName = @o, NormalizedName = @n WHERE PhenomenonCode = 'FINAL-034'; SELECT 1
+                """, ("@n", norm), ("@o", original));
+        }
+    }
 }

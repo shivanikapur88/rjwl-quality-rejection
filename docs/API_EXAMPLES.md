@@ -23,7 +23,8 @@ Errors use RFC 7807 problem JSON with an extra `code` field, for example:
 | Method and path | Role | Notes |
 |---|---|---|
 | GET `/api/health` | anonymous | `{ "status": "ok" }` |
-| POST `/api/auth/login` | anonymous | rate limited (10/min) |
+| GET `/api/health/ready` | anonymous | 200 / 503 per database; each entries table is also read (a missing column or grant gives 503, details in the server log); rate-limited (60/min per address), cached 10 s |
+| POST `/api/auth/login` | anonymous | failed attempts throttled (5 per 5 min per address + login, 10 per 15 min per login, 30 per 15 min per address; see SPECIFICATION §10) → 429 with `Retry-After`; raw cap 300 requests/min per address; body ≤ 8 KB |
 | GET `/api/shops` | any signed-in | inspectors/supervisors: assigned shops only |
 | GET `/api/shops/{shopId}/stages` | any signed-in | stages mapped to the shop |
 | GET `/api/shops/{shopId}/stages/{stageId}/machines` | any signed-in | active machines of that shop |
@@ -46,6 +47,20 @@ Errors use RFC 7807 problem JSON with an extra `code` field, for example:
 | PUT `/api/admin/users/{id}` | Administrator | name, role, shops |
 | PATCH `/api/admin/users/{id}/status` | Administrator | activate / deactivate (no hard delete) |
 | POST `/api/admin/users/{id}/reset-password` | Administrator | 204 |
+| GET `/api/rejection-entries/page?shopId&fromUtc&toUtc&cursor&limit` | any signed-in | paged history (newest first) with `nextCursor`, `isComplete`, `unavailableShops` |
+| **Round 2/3** | | |
+| POST `/api/rejection-entries/{shopId}/{id}/corrections` | QualityInspector | request a correction of an own entry (reason; reverse only or proposed new details) |
+| GET `/api/corrections?status&shopId` | signed in | inspector: own; supervisor: assigned shops; admin: all (max 200) |
+| GET `/api/corrections/count?status&shopId` | signed in | count in scope |
+| POST `/api/corrections/{id}/approve` · `/reject` · `/withdraw` | Supervisor/Admin · Supervisor/Admin · requesting inspector | approve reverses the entry and inserts the replacement; reject needs a note |
+| GET `/api/reports/calendar` | signed in | today's production date, current shift, shift list |
+| GET `/api/reports/totals?fromDate&toDate&shopId&shiftCode&machineId&phenomenonId&top&compare` | Supervisor/Admin | totals by day/shift, shop, phenomenon, machine; previous period; rate with coverage (≤ 92 days) |
+| GET `/api/reports/entries?…same filters…&limit` | Supervisor/Admin | entries behind a selection (≤ 200), newest first |
+| GET `/api/machines/lookup?code=RJWLQR:M:<id>` | QualityInspector | machine, shop and stages for a scanned label |
+| GET `/api/admin/machines/{id}/qr.svg` | Administrator | QR label image |
+| POST `/api/admin/production-counts` | Administrator | `{ rows, dryRun, source }`; all-or-nothing, ≤ 5,000 rows, body ≤ 2 MB |
+
+Errors are problem documents with a stable `code`, including model-binding errors (`validation`). Request bodies are limited to 64 KB except where stated.
 
 (The shop id is part of the stage/machine/phenomena routes because the server must verify the stage belongs to the shop; this refines the paths in the original brief.)
 

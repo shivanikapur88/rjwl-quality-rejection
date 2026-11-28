@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.MachinePage" x:DataType="vm:MachineViewModel" Title="Machine">
-    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="12">
-        <Label Text="{Binding ContextText}" Style="{StaticResource H2}" />
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16,12,16,0" RowSpacing="12">
+        <Label Text="{Binding ContextText}" Style="{StaticResource ContextLine}" LineBreakMode="TailTruncation" MaxLines="1" />
         <ctl:StatusBar Grid.Row="1" />
         <CollectionView Grid.Row="2" ItemsSource="{Binding Machines}" SelectionMode="Single" SelectionChanged="OnSelected">
-            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="10" /></CollectionView.ItemsLayout>
+            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
+            <CollectionView.Header><Label Text="Choose the machine" Style="{StaticResource Heading}" Margin="0,0,0,8" /></CollectionView.Header>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="dto:MachineDto">
-                    <Border Style="{StaticResource Card}" Padding="0">
-                        <Grid Style="{StaticResource ListItem}" ColumnDefinitions="*,Auto" MinimumHeightRequest="72">
-                            <VerticalStackLayout VerticalOptions="Center">
-                                <Label Text="{Binding MachineCode}" Style="{StaticResource H2}" />
-                                <Label Text="{Binding MachineName}" Style="{StaticResource Muted}" />
+                    <Border Style="{StaticResource CardList}">
+                        <Grid Style="{StaticResource ListItem}" ColumnDefinitions="*,Auto" MinimumHeightRequest="64">
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="{Binding MachineCode}" Style="{StaticResource Subheading}" />
+                                <Label Text="{Binding MachineName}" Style="{StaticResource Secondary}" />
                             </VerticalStackLayout>
-                            <Label Grid.Column="1" Text="›" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
                         </Grid>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
+            <CollectionView.Footer><BoxView HeightRequest="16" Color="Transparent" /></CollectionView.Footer>
         </CollectionView>
     </Grid>
 </pages:AppPage>

@@ -48,6 +48,8 @@ No secrets are in source. The API refuses to start without these settings (user-
 | `ConnectionStrings:Master` | QualityMasterDB |
 | `ConnectionStrings:GdcEntries` / `CncEntries` | GDC_AndonDB / MachineShopDB |
 | `ConnectionStrings:PreEntries` / `FinalEntries` | **same as Master** (PRE/FINAL entries live there) |
+
+Connection pool: a PRE/FINAL save holds one master connection and opens a second one from the same pool for the entry insert. With many simultaneous saves the default pool (100) can run out; add `Max Pool Size=200` to the Master/PRE/FINAL connection strings if more than about 50 inspectors save at once. Admin deletes of a machine or phenomenon that is being used by saves at that moment give up after 3 seconds with "in use … try again" instead of waiting.
 | `Jwt:Key` | random, at least 32 bytes. Changing it signs everybody out. |
 | `Jwt:Issuer` / `Audience` / `ExpiryMinutes` | defaults in `appsettings.json` (480 min) |
 | `Bootstrap:AdminEmployeeCode` / `AdminUsername` / `AdminPassword` / `AdminDisplayName` | only for the very first start (empty Users table); password at least 12 characters; **remove after the first start** |
@@ -77,6 +79,21 @@ Host behind HTTPS (IIS with the ASP.NET Core Hosting Bundle **10.0**, or Kestrel
 
 **Rollback:** stop the new API, restore the database backups taken in step 1 and redeploy the previous build. To run the old API on the upgraded database without a restore, see the trigger warning in [DATABASE_RUNBOOK.md §4](DATABASE_RUNBOOK.md).
 
+## 4a. Dashboard desktop app (Windows, supervisors and administrators)
+
+The dashboard is an installable web app (PWA): `wwwroot/dashboard/manifest.webmanifest`, `sw.js` and `icons/`. Nothing is built or packaged separately: deploying the API deploys the desktop app, and every installed copy picks up the new version from the server.
+
+* **HTTPS is required.** Edge and Chrome install a web app only from a secure origin. Use a certificate the PCs trust (the company CA is fine). Plain `http://` works only on the server itself (`localhost`).
+* **Installing per user:** see [USER_GUIDE.md](USER_GUIDE.md) (Supervisor → Desktop app).
+* **Installing for many PCs (IT):** use the Edge or Chrome policy `WebAppInstallForceList`, for example through Group Policy or Intune:
+  ```json
+  [{"url": "https://<server>/dashboard/", "default_launch_container": "window", "create_desktop_shortcut": true}]
+  ```
+  The browser installs the app for the targeted users at their next sign-in and keeps it until the policy is removed.
+* **Icons:** `icons/icon.svg` is placeholder artwork (a bar chart with a tick). Replace it and the PNGs (192, 512, maskable 512, 180 apple-touch, 32 favicon) with RJWL's artwork, keeping the file names.
+* **Cache version:** after changing the dashboard files, raise `VERSION` in `sw.js` so installed copies drop their old saved files at once. The offline helper fetches from the network first anyway, so the old files are used only when the server cannot be reached.
+* **Data on the PC:** the offline helper saves only the dashboard's own files (pages, styles, scripts, icons). It never saves `/api` responses, so no rejection data stays on the PC. The sign-in token is in the window's session storage and is gone when the window closes.
+
 ## 5. Android app
 
 ### Debug APK (testing)
@@ -103,3 +120,36 @@ The app has no built-in server address. On first launch: **Server settings** →
 
 ### Emulator and phone (development)
 Emulator: API address `https://10.0.2.2:<port>`. Phone over USB: `adb reverse tcp:<port> tcp:<port>`, then `https://localhost:<port>`.
+
+## 6. iOS app (iPhone and iPad)
+
+The app is .NET MAUI, so the same screens and logic run on iOS. **Apple allows iOS apps to be built and signed only on a Mac with Xcode**, so the iOS build has **not** been compiled or run in this project's environment (Linux). What is in the repository: the iOS target (added automatically on macOS), `Platforms/iOS` (start-up, `Info.plist` with the camera reason and no plain-HTTP exceptions, Keychain entitlement for the sign-in token), a launch screen, and signing settings read from environment variables. Unit tests check those iOS settings statically.
+
+### What RJWL needs
+* A **Mac** with the current Xcode required by .NET 10 MAUI (`dotnet workload install maui-ios` tells you if Xcode is too old), the .NET 10 SDK, and the `maui-ios` workload. Visual Studio on Windows can also build iOS when paired with that Mac (set `QR_ENABLE_IOS=true`).
+* An **Apple Developer account** in RJWL's name, an **App ID** equal to the app's `ApplicationId` (decide the final id first: decision #10), and a way to put the app on company devices: **TestFlight** (simple, test builds expire after 90 days), **Apple Business Manager custom app** (private App Store distribution), or the **Apple Developer Enterprise Program** (in-house distribution; Apple restricts eligibility). See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) #20.
+* iPhones or iPads with **iOS 15 or later**.
+
+### Build on the Mac
+```bash
+dotnet workload install maui-ios
+```
+```bash
+dotnet build src/Quality.Mobile -f net10.0-ios -c Debug
+```
+Run on the simulator from Visual Studio Code (C# Dev Kit + .NET MAUI extension) or with `dotnet build -t:Run -f net10.0-ios`. The simulator reaches an API running on the same Mac as `https://localhost:<port>` (debug builds accept the development certificate for localhost only).
+
+Release, signed (values come from the Apple Developer account; never commit them):
+```bash
+QR_IOS_CODESIGN_KEY="Apple Distribution: <team>" QR_IOS_PROVISION="<profile name>" dotnet publish src/Quality.Mobile -f net10.0-ios -c Release
+```
+The `.ipa` is uploaded to App Store Connect (Transporter app) for TestFlight or Business Manager distribution.
+
+### First-device checklist (iOS)
+1. The app starts and shows **Server settings**; enter `https://<server>:<port>` and **Test connection**. The server's certificate must be trusted by iOS (public CA, or an internal CA installed and **enabled for full trust** by MDM).
+2. Sign in as an inspector; close and reopen the app: still signed in (Keychain).
+3. Record an entry; double-tap Save → one entry; airplane mode → Save → message; reconnect → Save → "already saved".
+4. **Scan machine**: iOS asks for the camera with the reason text; scanning a printed label opens the entry form for that machine; Back does not reopen it at once.
+5. Rotate the device; iPad split view; dark mode.
+6. Sign out; sign in as a supervisor: shift summary and corrections.
+7. Repeat steps 3-4 on the oldest supported device.

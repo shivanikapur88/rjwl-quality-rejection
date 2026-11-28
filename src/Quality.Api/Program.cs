@@ -49,12 +49,14 @@ builder.Services.AddScoped<UserAdminService>();
 builder.Services.AddScoped<EntryCorrectionService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<MachineLookupService>();
+builder.Services.AddScoped<ProductionCountService>();   // round 3
 builder.Services.AddSingleton(new CorrectionOptions(cfg.GetValue("Corrections:MaxAgeDays", 30)));
 builder.Services.AddSingleton<IShiftCalendarProvider, ShiftCalendarProvider>();
 builder.Services.AddSingleton<IdentityPasswordVerifier>();
 builder.Services.AddSingleton<IPasswordVerifier>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
 builder.Services.AddSingleton<IPasswordHashService>(sp => sp.GetRequiredService<IdentityPasswordVerifier>());
 builder.Services.AddSingleton<ITokenIssuer, JwtTokenIssuer>();
+builder.Services.AddSingleton<IKnownLoginStore, EfKnownLoginStore>();
 builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddHostedService<BootstrapAdmin>();   // retries in the background; the API starts even if SQL Server is down
 
@@ -79,6 +81,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
             ctx.Response.StatusCode = 401; ctx.Response.ContentType = "application/problem+json";
             await ctx.Response.WriteAsJsonAsync(new ProblemDetails { Status = 401, Title = expired ? "Your session has expired. Please sign in again." : "Authentication required.", Extensions = { ["code"] = expired ? "token_expired" : "unauthenticated" } });
         },
+        // Role checks ([Authorize(Roles=...)]) answer with the same problem shape and a stable code (Fable review).
+        OnForbidden = async ctx =>
+        {
+            ctx.Response.StatusCode = 403; ctx.Response.ContentType = "application/problem+json";
+            await ctx.Response.WriteAsJsonAsync(new ProblemDetails { Status = 403, Title = "You do not have access to this function.", Extensions = { ["code"] = "forbidden" } });
+        },
     };
 });
 builder.Services.AddAuthorization();
@@ -89,10 +97,22 @@ var loginRequestsPerMinute = cfg.GetValue("LoginThrottle:RequestsPerMinutePerCli
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
+    // Same problem shape as the throttle's own 429, with Retry-After (Fable review).
+    o.OnRejected = async (ctx, ct) =>
+    {
+        ctx.HttpContext.Response.Headers.RetryAfter = "60";
+        ctx.HttpContext.Response.ContentType = "application/problem+json";
+        await ctx.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails { Status = 429, Title = "Too many requests. Wait a minute and try again.", Extensions = { ["code"] = "too_many_attempts" } }, ct);
+    };
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        LoginThrottle.ClientKey(ctx.Connection.RemoteIpAddress),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = loginRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Anonymous readiness probe: monitoring needs a few calls a minute, not thousands.
+    o.AddPolicy("health", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        LoginThrottle.ClientKey(ctx.Connection.RemoteIpAddress),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = cfg.GetValue("Health:RequestsPerMinutePerClient", 60), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
+builder.Services.AddSingleton<Quality.Api.Controllers.ReadinessCache>();
 // Behind a reverse proxy the client address must come from X-Forwarded-For, or every device would share one throttle bucket.
 var knownProxies = cfg.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? Array.Empty<string>();
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
@@ -100,7 +120,20 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     foreach (var ip in knownProxies) o.KnownProxies.Add(IPAddress.Parse(ip));
 });
-builder.Services.AddControllers();
+builder.Services.AddControllers().ConfigureApiBehaviorOptions(o =>
+    // Model-binding errors (missing body, wrong type) get the same problem shape with a stable "code" as every other error.
+    o.InvalidModelStateResponseFactory = ctx =>
+    {
+        var problem = new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(ctx.ModelState)
+        { Status = 400, Title = "The request was not valid.", Detail = "Check the fields and try again." };
+        problem.Extensions["code"] = "validation";
+        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
+    });
+// Request bodies: 64 KB by default (entries, corrections, admin edits are small); the production-count upload raises its
+// own limit with [RequestSizeLimit]. Applies to Kestrel and to IIS in-process hosting (third full review).
+const long DefaultMaxBody = 64 * 1024;
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = DefaultMaxBody);
+builder.Services.Configure<Microsoft.AspNetCore.Builder.IISServerOptions>(o => o.MaxRequestBodySize = DefaultMaxBody);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -119,7 +152,9 @@ else
     var warned = 0;
     app.Use(async (ctx, next) =>
     {
-        if (warned == 0 && ctx.Request.Headers.ContainsKey("X-Forwarded-For") && ctx.Connection.RemoteIpAddress is { } ip && !IPAddress.IsLoopback(ip)
+        // Also for a loopback peer (a proxy on the same server, e.g. IIS ARR or nginx), except in Development (Fable review).
+        if (warned == 0 && ctx.Request.Headers.ContainsKey("X-Forwarded-For") && ctx.Connection.RemoteIpAddress is { } ip
+            && (!IPAddress.IsLoopback(ip) || !app.Environment.IsDevelopment())
             && Interlocked.Exchange(ref warned, 1) == 0)
             app.Logger.LogWarning("Requests arrive through a proxy ({Proxy}) but ReverseProxy:KnownProxies is not set: all clients share one address for login throttling. See docs/BUILD_AND_DEPLOY.md.", ip);
         await next();
@@ -127,7 +162,7 @@ else
 }
 app.UseExceptionHandler(ErrorHandling.Configure);
 app.UseHttpsRedirection();
-// Feature #6: read-only web dashboard (static files under wwwroot/dashboard) with a strict content-security policy:
+// Feature #6: web dashboard (read-only, plus the administrators' production-count upload from round 3) (static files under wwwroot/dashboard) with a strict content-security policy:
 // only this site's own scripts/styles, no inline script, no framing. The pages call the same API with the same roles.
 app.Use(async (ctx, next) =>
 {
@@ -147,6 +182,23 @@ if (app.Environment.IsDevelopment() || cfg.GetValue<bool>("Swagger:Enabled")) { 
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// A read can be chosen as a deadlock victim when the database runs without READ_COMMITTED_SNAPSHOT (reader/writer
+// deadlock with, e.g., a machine delete). Reads change nothing, so GET requests are retried (up to twice) before the
+// caller sees an error (Fable review verification run).
+app.Use(async (ctx, next) =>
+{
+    if (!HttpMethods.IsGet(ctx.Request.Method)) { await next(); return; }
+    for (var attempt = 1; ; attempt++)
+    {
+        try { await next(); return; }
+        catch (Exception ex) when (attempt < 3 && !ctx.Response.HasStarted && ErrorHandling.IsDeadlock(ex))
+        {
+            ctx.RequestServices.GetRequiredService<ILogger<Program>>().LogInformation("Read chosen as deadlock victim; retrying ({Attempt}).", attempt);
+            ctx.RequestServices.GetService<MasterDbContext>()?.ChangeTracker.Clear();
+            await Task.Delay(Random.Shared.Next(20, 120), ctx.RequestAborted);
+        }
+    }
+});
 app.MapControllers();
 
 app.Run();

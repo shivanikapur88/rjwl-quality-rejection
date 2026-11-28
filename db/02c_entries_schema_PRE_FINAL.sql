@@ -8,8 +8,10 @@
    apart by ShopId/ShopCode. To use a different database later, run this script there and change the two connection strings.
    REVIEW BEFORE RUNNING. Creates only schema [qa] (if missing) and ONE table.
    A CHECK constraint accepts only ShopCode 'PRE' or 'FINAL'.
-   NOT YET EXECUTED against SQL Server.
+  Executed against SQL Server 2022 by the automated tests (docs/TEST_EVIDENCE.md).
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 GO

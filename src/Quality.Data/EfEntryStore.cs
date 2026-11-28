@@ -41,7 +41,9 @@ public sealed class EfEntryStore : IEntryStore
         return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(f.Limit).ToListAsync();
     }
 
-    public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => _db.Entries.CountAsync(e => e.ProductionDate == null, ct);
+    // Uses the plain index IX_QRE_ProductionDate (db/12; NOT a filtered index - the entry databases are shared, see db/12).
+    // Also reads ReversedAt (fifth review: readiness then notices a missing column or grant). Reversed entries are not in reports either way.
+    public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => _db.Entries.CountAsync(e => e.ProductionDate == null && e.ReversedAt == null, ct);
 
     public async Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode)
     {
@@ -58,6 +60,16 @@ public sealed class EfEntryStore : IEntryStore
         // Snapshot columns are NOT NULL; the ?? only satisfies the compiler's view of MAX() over strings.
         return rows.Select(r => new EntryAggregateRow(r.ProductionDate!.Value, r.ShiftCode ?? "?", r.MachineId, r.MachineCode ?? "", r.MachineName ?? "",
             r.RejectionPhenomenonId, r.Phenomenon ?? "", r.Quantity, r.Entries)).ToList();
+    }
+
+    public async Task<IReadOnlyList<QualityRejectionEntry>> ListForReportAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId, int? phenomenonId, int limit)
+    {
+        var q = _db.Entries.AsNoTracking().Where(e => e.ShopId == shopId && e.ReversedAt == null
+            && e.ProductionDate != null && e.ProductionDate >= fromDate && e.ProductionDate <= toDate);
+        if (shiftCode is not null) q = q.Where(e => e.ShiftCode == shiftCode);
+        if (machineId is int m) q = q.Where(e => e.MachineId == m);
+        if (phenomenonId is int p) q = q.Where(e => e.RejectionPhenomenonId == p);
+        return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(limit).ToListAsync();
     }
 
     public async Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? replacement)
@@ -90,6 +102,12 @@ public sealed class EfEntryStore : IEntryStore
         return saved;
     }
 
+    public async Task<IReadOnlyList<QualityRejectionEntry>> GetByIdsAsync(IReadOnlyCollection<long> ids)
+    {
+        if (ids.Count == 0) return Array.Empty<QualityRejectionEntry>();
+        var list = ids.Distinct().ToList();
+        return await _db.Entries.AsNoTracking().Where(e => list.Contains(e.Id)).ToListAsync();
+    }
     public Task<bool> IsPhenomenonUsedAsync(int phenomenonId) => _db.Entries.AnyAsync(e => e.RejectionPhenomenonId == phenomenonId);
     public Task<bool> IsMachineUsedAsync(int machineId) => _db.Entries.AnyAsync(e => e.MachineId == machineId);
 }

@@ -1,0 +1,28 @@
+{
+  "sw": {
+    "scope": "http://127.0.0.1:5080/dashboard/",
+    "active": true
+  },
+  "controlled": true,
+  "manifestUrl": "http://127.0.0.1:5080/dashboard/manifest.webmanifest",
+  "manifestErrors": [],
+  "installabilityErrors": [],
+  "cachedPaths": [
+    "/dashboard/index.html",
+    "/dashboard/labels.html",
+    "/dashboard/labels.js",
+    "/dashboard/icons/icon-192.png",
+    "/dashboard/icons/icon-512.png",
+    "/dashboard/icons/maskable-512.png",
+    "/dashboard/icons/icon.svg",
+    "/dashboard/icons/favicon-32.png",
+    "/dashboard/",
+    "/dashboard/dashboard.css",
+    "/dashboard/common.js",
+    "/dashboard/dashboard.js",
+    "/dashboard/manifest.webmanifest"
+  ],
+  "apiCached": [],
+  "installVisible": true,
+  "consoleErrors": []
+}

@@ -10,4 +10,13 @@ public partial class EntryFormPage : AppPage
         InitializeComponent();
         BindingContext = vm;
     }
+
+    // App design round (A1): a phenomenon was chosen - close the keyboard so the quantity and Save are in view.
+    private void OnPhenomenonSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.Count > 0) Search.Unfocus();
+    }
+
+    // "+ Add remarks" (its command opens the box): put the cursor in it.
+    private void OnAddRemarks(object? sender, EventArgs e) => Dispatcher.Dispatch(() => RemarksEditor.Focus());
 }

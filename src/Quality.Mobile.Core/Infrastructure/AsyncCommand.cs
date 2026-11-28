@@ -11,14 +11,18 @@ public sealed class AsyncCommand : ICommand
 
 	private readonly Func<bool>? _canExecute;
 
+	private readonly Action<Exception>? _onError;
+
 	private bool _running;
 
 	public event EventHandler? CanExecuteChanged;
 
-	public AsyncCommand(Func<Task> execute, Func<bool>? canExecute = null)
+	/// <param name="onError">Optional: told about an exception that escaped the command (Execute never lets one crash the app).</param>
+	public AsyncCommand(Func<Task> execute, Func<bool>? canExecute = null, Action<Exception>? onError = null)
 	{
 		_execute = execute;
 		_canExecute = canExecute;
+		_onError = onError;
 	}
 
 	public bool CanExecute(object? parameter)
@@ -28,7 +32,33 @@ public sealed class AsyncCommand : ICommand
 
 	public async void Execute(object? parameter)
 	{
-		await ExecuteAsync();
+		// async void: an exception here would crash the app, so it is caught, logged and reported (if anyone listens).
+		try
+		{
+			await ExecuteAsync();
+		}
+		catch (Exception ex)
+		{
+			Report(ex, _onError);
+		}
+	}
+
+	internal static void Report(Exception ex, Action<Exception>? onError)
+	{
+		if (ex is OperationCanceledException)
+		{
+			System.Diagnostics.Debug.WriteLine("AsyncCommand cancelled: " + ex);
+			return;
+		}
+		System.Diagnostics.Debug.WriteLine("AsyncCommand failed: " + ex);
+		try
+		{
+			onError?.Invoke(ex);
+		}
+		catch (Exception inner)
+		{
+			System.Diagnostics.Debug.WriteLine("AsyncCommand error callback failed: " + inner);
+		}
 	}
 
 	public async Task ExecuteAsync()
@@ -59,13 +89,16 @@ public sealed class AsyncCommand<T> : ICommand
 {
 	private readonly Func<T, Task> _execute;
 
+	private readonly Action<Exception>? _onError;
+
 	private bool _running;
 
 	public event EventHandler? CanExecuteChanged;
 
-	public AsyncCommand(Func<T, Task> execute)
+	public AsyncCommand(Func<T, Task> execute, Action<Exception>? onError = null)
 	{
 		_execute = execute;
+		_onError = onError;
 	}
 
 	public bool CanExecute(object? parameter)
@@ -88,7 +121,14 @@ public sealed class AsyncCommand<T> : ICommand
 		}
 		if (num != 0)
 		{
-			await ExecuteAsync(t);
+			try
+			{
+				await ExecuteAsync(t);
+			}
+			catch (Exception ex)
+			{
+				AsyncCommand.Report(ex, _onError);
+			}
 		}
 	}
 

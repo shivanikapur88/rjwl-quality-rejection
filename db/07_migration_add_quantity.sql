@@ -4,8 +4,10 @@
 
    Run once in EACH entry database that already has the table (GDC_AndonDB, MachineShopDB, and the Pre-treatment/FINAL database).
    Existing rows get Quantity = 1 (the earlier version did not record a quantity; 1 is an ASSUMPTION - correct it if you know better).
-   Review before running. NOT YET EXECUTED against SQL Server.
+   Review before running.Executed against SQL Server 2022 by the automated tests (docs/TEST_EVIDENCE.md).
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID(N'qa.QualityRejectionEntries', N'U') IS NULL

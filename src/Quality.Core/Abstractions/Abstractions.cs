@@ -51,12 +51,22 @@ public interface IMasterData
     Task<IReadOnlyList<EntryCorrection>> GetCorrectionsForEntriesAsync(int shopId, IReadOnlyCollection<long> entryIds);
     Task<IReadOnlyDictionary<int, string>> GetUserCodesAsync(IReadOnlyCollection<int> userIds);
 
+    // ---- production counts (round 3, #8) ----
+    Task<IReadOnlyList<ProductionCount>> GetProductionCountsAsync(IReadOnlyCollection<int> shopIds, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId);
+    /// <summary>Tracked rows for the given machines and day range (for an upsert inside <see cref="InTransactionAsync"/>, with update locks).</summary>
+    Task<IReadOnlyList<ProductionCount>> GetProductionCountsForUpdateAsync(IReadOnlyCollection<int> machineIds, DateOnly fromDate, DateOnly toDate);
+    void AddProductionCount(ProductionCount c);
+
     // ---- machine administration ----
     Task<IReadOnlyList<Machine>> GetMachinesAsync(int? shopId, bool? isActive, string? search);   // ordered by shop, code
     Task<Machine?> GetMachineForEditAsync(int machineId);                                        // tracked
     Task<bool> MachineCodeExistsAsync(int shopId, string machineCode, int? excludeMachineId);     // case-insensitive, per shop
     void AddMachine(Machine m);
     void RemoveMachine(Machine m);
+    /// <summary>True if production counts or correction requests (proposed machine) refer to the machine (delete check).</summary>
+    Task<bool> IsMachineReferencedInMasterAsync(int machineId);
+    /// <summary>True if correction requests (proposed phenomenon) refer to the phenomenon (delete check).</summary>
+    Task<bool> IsPhenomenonReferencedInMasterAsync(int phenomenonId);
 
     // ---- user administration ----
     Task<IReadOnlyList<User>> GetUsersAsync(string? search, bool? isActive);                      // includes Role
@@ -85,6 +95,34 @@ public interface IMasterData
 }
 
 /// <summary>A unique constraint or unique index was violated. <see cref="Name"/> is the constraint/index name when known.</summary>
+/// <summary>Database error checks the services need without referencing a database driver.</summary>
+public static class DbErrors
+{
+    /// <summary>True if the exception or an inner one is SQL Server error 1205 ("chosen as the deadlock victim"). Such an
+    /// error is transient: it must reach the caller's retry logic, never be reported as "database unavailable".</summary>
+    public static bool IsDeadlock(Exception? ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e.GetType().Name == "SqlException" && e.GetType().GetProperty("Number")?.GetValue(e) is int n && n == 1205) return true;
+        return false;
+    }
+
+    /// <summary>The SQL Server error number of the exception or an inner one (null if it is not a SqlException).</summary>
+    public static int? SqlNumber(Exception? ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e.GetType().Name == "SqlException" && e.GetType().GetProperty("Number")?.GetValue(e) is int n) return n;
+        return null;
+    }
+
+    /// <summary>Fifth review: a shop whose entry database could not be read is reported as "unavailable" to the caller;
+    /// the reason (unreachable, missing column, missing permission, ...) goes to the server log so it can be found.</summary>
+    public static void LogShopUnavailable(Microsoft.Extensions.Logging.ILogger? log, string shopCode, string operation, Exception ex) =>
+        Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(log ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, ex,
+            "Entry database of shop {Shop} could not be read during {Operation} (SQL error {SqlError}); the shop is reported as unavailable.",
+            shopCode, operation, SqlNumber(ex));
+}
+
 public sealed class UniqueViolationException : Exception
 {
     public UniqueViolationException(string? name, Exception? inner = null) : base("Unique constraint violated: " + name, inner) => Name = name;
@@ -119,6 +157,8 @@ public interface IEntryStore
     /// <exception cref="DuplicateSubmissionException">unique SubmissionId violated (concurrent retry)</exception>
     Task<QualityRejectionEntry> InsertAsync(QualityRejectionEntry entry);
     Task<QualityRejectionEntry?> GetByIdAsync(long id);
+    /// <summary>Several entries in one query (correction lists).</summary>
+    Task<IReadOnlyList<QualityRejectionEntry>> GetByIdsAsync(IReadOnlyCollection<long> ids);
     Task<IReadOnlyList<QualityRejectionEntry>> ListAsync(EntryFilter filter); // newest first
     Task<bool> IsPhenomenonUsedAsync(int phenomenonId);
     Task<bool> IsMachineUsedAsync(int machineId);
@@ -136,6 +176,9 @@ public interface IEntryStore
     /// </summary>
     /// <exception cref="CorrectionConflictException">entry missing, or already reversed by another correction</exception>
     Task<QualityRejectionEntry?> ApplyCorrectionAsync(int shopId, long entryId, long correctionId, DateTime nowUtc, QualityRejectionEntry? replacement);
+
+    /// <summary>NON-reversed entries of one shop for production days fromDate..toDate (drill-down list), newest first, at most <paramref name="limit"/>.</summary>
+    Task<IReadOnlyList<QualityRejectionEntry>> ListForReportAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId, int? phenomenonId, int limit);
 }
 
 public sealed record EntryAggregateRow(DateOnly ProductionDate, string ShiftCode, int MachineId, string MachineCode, string MachineName,

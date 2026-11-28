@@ -11,10 +11,10 @@ public partial class HomePage : AppPage
         BindingContext = vm;
     }
 
-    private void OnShopSelected(object? sender, SelectionChangedEventArgs e)
+    // App design round (A3): the shops are a BindableLayout inside the page's ScrollView; a tap opens the shop.
+    private void OnShopTapped(object? sender, TappedEventArgs e)
     {
-        if (e.CurrentSelection.FirstOrDefault() is Quality.Core.Dtos.ShopDto item)
+        if ((sender as BindableObject)?.BindingContext is Quality.Core.Dtos.ShopDto item)
             ((HomeViewModel)BindingContext).SelectShopCommand.Execute(item);
-        if (sender is CollectionView list) list.SelectedItem = null;   // allow choosing the same row again
     }
 }

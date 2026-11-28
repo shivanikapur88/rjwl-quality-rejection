@@ -9,6 +9,8 @@
    IX_QRE_Machine: the "is this machine used?" check before a machine is deleted
    previously scanned the whole table.
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID(N'qa.QualityRejectionEntries', N'U') IS NULL
@@ -22,3 +24,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_Shop_Time_Id' AND
     CREATE INDEX IX_QRE_Shop_Time_Id ON qa.QualityRejectionEntries (ShopId, ServerCreatedAt DESC, Id DESC);
 GO
 PRINT N'09_upgrade_entries_indexes.sql complete.';
+GO
+-- IX_QRE_Shop_Time (02c, master only) is a strict prefix of IX_QRE_Shop_Time_Id: it only costs writes. Removed.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_Shop_Time_Id' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
+   AND EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_QRE_Shop_Time' AND object_id = OBJECT_ID(N'qa.QualityRejectionEntries'))
+    DROP INDEX IX_QRE_Shop_Time ON qa.QualityRejectionEntries;
+GO

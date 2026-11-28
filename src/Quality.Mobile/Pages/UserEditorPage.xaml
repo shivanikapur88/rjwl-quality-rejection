@@ -1,35 +1,38 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- App design round: shared type scale; a shop's name toggles its checkbox. -->
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.UserEditorPage" x:DataType="vm:UserEditorViewModel" Title="{Binding Title}">
     <ScrollView>
-        <VerticalStackLayout Padding="16" Spacing="14">
+        <VerticalStackLayout Padding="{StaticResource PagePadding}" Spacing="16">
             <ctl:StatusBar />
             <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="10">
-                    <VerticalStackLayout IsVisible="{Binding IsCreate}" Spacing="6">
-                        <Label Text="Employee code" Style="{StaticResource Muted}" />
-                        <Entry Text="{Binding EmployeeCode}" MaxLength="30" Placeholder="e.g. E1234" Keyboard="Plain" />
-                        <Label Text="Username" Style="{StaticResource Muted}" />
-                        <Entry Text="{Binding Username}" MaxLength="50" Placeholder="login name" Keyboard="Plain" />
+                <VerticalStackLayout Spacing="8">
+                    <VerticalStackLayout IsVisible="{Binding IsCreate}" Spacing="4">
+                        <Label Text="Employee code" Style="{StaticResource FieldLabel}" />
+                        <Entry SemanticProperties.Description="Employee code" Text="{Binding EmployeeCode}" MaxLength="30" Placeholder="e.g. E1234" Keyboard="Plain" />
+                        <Label Text="Username" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+                        <Entry SemanticProperties.Description="Username" Text="{Binding Username}" MaxLength="50" Placeholder="login name" Keyboard="Plain" />
                     </VerticalStackLayout>
                     <VerticalStackLayout IsVisible="{Binding IsEdit}" Spacing="4">
-                        <Label Text="Employee code · username (cannot be changed)" Style="{StaticResource Muted}" />
-                        <Label Text="{Binding FixedIdentity}" Style="{StaticResource Body}" FontAttributes="Bold" />
+                        <Label Text="Employee code · username (cannot be changed)" Style="{StaticResource FieldLabel}" />
+                        <Label Text="{Binding FixedIdentity}" Style="{StaticResource BodyStrong}" />
                     </VerticalStackLayout>
-                    <Label Text="Name" Style="{StaticResource Muted}" />
-                    <Entry Text="{Binding DisplayName}" MaxLength="100" Placeholder="Full name" />
-                    <Label Text="Role" Style="{StaticResource Muted}" />
-                    <Picker ItemsSource="{Binding Roles}" SelectedItem="{Binding SelectedRole, Mode=TwoWay}" />
+                    <Label Text="Name" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+                    <Entry SemanticProperties.Description="Display name" Text="{Binding DisplayName}" MaxLength="100" Placeholder="Full name" />
+                    <Label Text="Role" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+                    <Picker ItemsSource="{Binding Roles}" SelectedItem="{Binding SelectedRole, Mode=TwoWay}" Title="Role" />
                 </VerticalStackLayout>
             </Border>
             <Border Style="{StaticResource Card}" IsVisible="{Binding ShowShops}">
-                <VerticalStackLayout Spacing="6">
-                    <Label Text="Shops this user may work in" Style="{StaticResource H2}" />
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ShopChoices}" Spacing="2">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Shops this user may work in" Style="{StaticResource Heading}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ShopChoices}" Spacing="0">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="vm:ShopChoice">
-                                <Grid ColumnDefinitions="Auto,*" MinimumHeightRequest="48" ColumnSpacing="8">
-                                    <CheckBox IsChecked="{Binding IsSelected}" VerticalOptions="Center" />
-                                    <Label Grid.Column="1" Text="{Binding Name}" Style="{StaticResource Body}" VerticalOptions="Center" />
+                                <Grid ColumnDefinitions="Auto,*" MinimumHeightRequest="48" ColumnSpacing="4">
+                                    <CheckBox IsChecked="{Binding IsSelected}" SemanticProperties.Description="{Binding Name}" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="{Binding Name}" Style="{StaticResource CheckLabel}">
+                                        <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnShopTapped" /></Label.GestureRecognizers>
+                                    </Label>
                                 </Grid>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
@@ -38,13 +41,13 @@
             </Border>
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="8">
-                    <Label Text="{Binding PasswordLabel}" Style="{StaticResource Muted}" />
-                    <Entry Text="{Binding Password}" IsPassword="True" Placeholder="Password" />
-                    <Entry Text="{Binding ConfirmPassword}" IsPassword="True" Placeholder="Repeat password" />
-                    <Label Text="{Binding PasswordRule}" Style="{StaticResource Muted}" FontSize="13" />
+                    <Label Text="{Binding PasswordLabel}" Style="{StaticResource FieldLabel}" />
+                    <Entry SemanticProperties.Description="Password" Text="{Binding Password}" IsPassword="True" Placeholder="Password" />
+                    <Entry SemanticProperties.Description="Repeat password" Text="{Binding ConfirmPassword}" IsPassword="True" Placeholder="Repeat password" />
+                    <Label Text="{Binding PasswordRule}" Style="{StaticResource Caption}" />
                 </VerticalStackLayout>
             </Border>
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                 <Button Text="Cancel" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" />
                 <Button Grid.Column="1" Text="Save" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}" />
             </Grid>

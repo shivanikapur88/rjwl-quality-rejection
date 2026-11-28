@@ -1,0 +1,6 @@
+nav hidden on sign-in screen: true
+chart viewBox at 1280: 0 0 1174 240; after resize to 700: 0 0 634 240
+entries table role: table
+chips for unknown machine link: Machine: #999999 ×
+phone horizontal overflow px: 0
+page errors: []

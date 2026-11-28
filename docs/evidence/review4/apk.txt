@@ -1,0 +1,3 @@
+src/Quality.Mobile/bin/Debug/net10.0-android/com.yourcompany.qualityrejection-Signed.apk
+14bdb04fc2256ea905ade134f6fd219e0b88489ab93bf9d7c15a88df69b5d363  src/Quality.Mobile/bin/Debug/net10.0-android/com.yourcompany.qualityrejection-Signed.apk
+-rw-r--r-- 1 root root 16403832 Nov 28 08:34 src/Quality.Mobile/bin/Debug/net10.0-android/com.yourcompany.qualityrejection-Signed.apk

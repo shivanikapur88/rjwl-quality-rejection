@@ -19,18 +19,32 @@ public sealed class HealthController : ControllerBase
     /// <summary>
     /// Readiness: can the API reach the master database and every entry database? 200 when all are reachable, otherwise 503.
     /// Reports only "ok"/"unavailable" per component (no server names, no error text).
+    /// Anonymous, so it is rate-limited per address and the result is cached for 10 seconds: a client looping on it cannot
+    /// open five database connections per request (second full review).
     /// </summary>
-    [HttpGet("ready"), AllowAnonymous]
+    [HttpGet("ready"), AllowAnonymous, EnableRateLimiting("health")]
     [ProducesResponseType(typeof(ReadinessDto), 200), ProducesResponseType(typeof(ReadinessDto), 503)]
     public async Task<IActionResult> Ready([FromServices] Quality.Data.MasterDbContext master, [FromServices] Quality.Core.Abstractions.IEntryStoreRouter router,
-        CancellationToken ct)
+        [FromServices] ReadinessCache cache, CancellationToken ct)
+    {
+        var (status, dto) = await cache.GetAsync(() => Probe(master, router), ct);
+        return StatusCode(status, dto);
+    }
+
+    /// <summary>Each check gets its own time limit and is NOT tied to the calling request: a caller that disconnects must not
+    /// turn a healthy database into a cached "unavailable" for everybody (third full review).</summary>
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
+
+    private async Task<(int, ReadinessDto)> Probe(Quality.Data.MasterDbContext master, Quality.Core.Abstractions.IEntryStoreRouter router)
     {
         var components = new Dictionary<string, string>();
-        components["master"] = await CanConnect(() => master.Database.CanConnectAsync(ct));
-        foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(() => router.CanConnectAsync(key, ct));
+        components["master"] = await CanConnect(t => master.Database.CanConnectAsync(t));
+        foreach (var key in router.Keys) components["entries:" + key] = await CanConnect(t => router.CanConnectAsync(key, t));
         // Round 2: entries are stamped with shifts from qa.ShiftDefinitions; a fallback calendar means those are not being used.
-        var calendar = await HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>().GetAsync();
-        components["shifts"] = calendar.IsFallback ? "unavailable" : "ok";
+        var calendarProvider = HttpContext.RequestServices.GetRequiredService<Quality.Core.Services.IShiftCalendarProvider>();
+        var calendar = await calendarProvider.GetAsync();
+        // "unavailable" also when an older calendar is still in use because the latest read of the shift table failed.
+        components["shifts"] = calendar.IsFallback || calendarProvider.LastLoadFailed ? "unavailable" : "ok";
         // Full review #5: entries without a production day are left out of reports; say so instead of silently under-counting.
         var warnings = new List<string>();
         foreach (var key in router.Keys)
@@ -38,19 +52,59 @@ public sealed class HealthController : ControllerBase
             if (components["entries:" + key] != "ok") continue;
             try
             {
-                var n = await router.For(key).CountWithoutProductionDateAsync(ct);
-                if (n > 0) warnings.Add($"entries:{key}: {n} entries have no production day and are not in reports. Run db/12_upgrade_entries_shift_reversal.sql in that database.");
+                using var cts = new CancellationTokenSource(ProbeTimeout);
+                var n = await router.For(key).CountWithoutProductionDateAsync(cts.Token);
+                if (n > 0) warnings.Add($"entries:{key}: some entries have no production day and are not in reports (see the database runbook, script 12).");
             }
-            catch (Exception) { /* reachability is already reported above */ }
+            catch (Exception ex) when (ex is OperationCanceledException || Quality.Core.Abstractions.DbErrors.SqlNumber(ex) == -2)
+            {
+                // A slow count on a large shared table is not a failure of the API: say it could not be checked.
+                warnings.Add($"entries:{key}: the check for entries without a production day took too long and was skipped.");
+            }
+            catch (Exception ex)
+            {
+                // Fifth review: CanConnectAsync only opens a connection. This query reads qa.QualityRejectionEntries, so a
+                // missing column (script 12 not run) or a missing SELECT grant (db/15) shows here instead of every report
+                // silently listing the shop as unavailable. Details go to the log; the anonymous answer stays generic.
+                components["entries:" + key] = "unavailable";
+                warnings.Add($"entries:{key}: connected, but reading the entries table failed (SQL error {Quality.Core.Abstractions.DbErrors.SqlNumber(ex)?.ToString() ?? "–"}); check scripts 08-16 and the API permissions (db/15). Details are in the server log.");
+                HttpContext.RequestServices.GetRequiredService<ILogger<HealthController>>().LogError(ex, "Readiness: reading the entries table of {Store} failed.", key);
+            }
         }
         var ok = components.Values.All(v => v == "ok");
-        return StatusCode(ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));
+        return (ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));
 
-        static async Task<string> CanConnect(Func<Task<bool>> probe)
+        static async Task<string> CanConnect(Func<CancellationToken, Task<bool>> probe)
         {
-            try { return await probe() ? "ok" : "unavailable"; } catch (Exception) { return "unavailable"; }
+            using var cts = new CancellationTokenSource(ProbeTimeout);
+            try { return await probe(cts.Token) ? "ok" : "unavailable"; } catch (Exception) { return "unavailable"; }
         }
     }
+}
+
+/// <summary>Holds the last readiness result for 10 seconds; concurrent callers share one probe.</summary>
+public sealed class ReadinessCache(TimeProvider time)
+{
+    public static readonly TimeSpan For = TimeSpan.FromSeconds(10);
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private sealed record Entry(DateTime At, int Status, ReadinessDto Dto);   // immutable: read without the lock, never torn
+    private volatile Entry? _last;
+
+    public async Task<(int Status, ReadinessDto Dto)> GetAsync(Func<Task<(int, ReadinessDto)>> probe, CancellationToken ct = default)
+    {
+        if (Fresh() is { } hit) return (hit.Status, hit.Dto);
+        await _gate.WaitAsync(ct);   // a caller that gives up leaves the queue
+        try
+        {
+            if (Fresh() is { } hit2) return (hit2.Status, hit2.Dto);
+            var (status, dto) = await probe();
+            _last = new Entry(time.GetUtcNow().UtcDateTime, status, dto);   // stamped when the probe FINISHED
+            return (status, dto);
+        }
+        finally { _gate.Release(); }
+    }
+
+    private Entry? Fresh() => _last is { } l && time.GetUtcNow().UtcDateTime - l.At < For ? l : null;
 }
 
 [ApiController, Route("api/auth")]
@@ -61,20 +115,28 @@ public sealed class AuthController : ApiControllerBase
     public AuthController(AuthService auth, LoginThrottle throttle) => (_auth, _throttle) = (auth, throttle);
 
     /// <summary>429 "too_many_attempts" (with Retry-After) after repeated FAILED attempts from this client/for this login (review Q4).</summary>
-    [HttpPost("login"), AllowAnonymous, EnableRateLimiting("login")]
+    [HttpPost("login"), AllowAnonymous, EnableRateLimiting("login"), RequestSizeLimit(8 * 1024)]   // no 30 MB anonymous bodies
     [ProducesResponseType(typeof(LoginResponse), 200), ProducesResponseType(429)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var client = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var client = LoginThrottle.ClientKey(HttpContext.Connection.RemoteIpAddress);
         var login = request?.Username ?? "";
-        if (_throttle.TryBegin(client, login) is { } wait)   // checks AND reserves the attempt atomically (full review #2)
+        await _throttle.PrepareAsync(client, login, HttpContext.RequestAborted);   // known logins survive restarts (db/16)
+        if (_throttle.TryBegin(client, login, out var known) is { } wait)   // checks AND reserves the attempt atomically (full review #2)
         {
             Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return ProblemFor(429, "too_many_attempts", "Too many failed sign-in attempts. Wait a few minutes and try again.");
         }
-        var result = await _auth.LoginAsync(request!);
-        if (result.IsSuccess) _throttle.RecordSuccess(client, login);
-        else if (result.Error!.Kind != ErrorKind.Unauthorized) _throttle.Refund(client, login);   // never reached the password check
+        ServiceResult<LoginResponse> result;
+        try { result = await _auth.LoginAsync(request!); }
+        catch
+        {
+            // Database down, timeout, client gone: not a wrong password, so it must not count (third full review).
+            _throttle.Refund(client, login, known);
+            throw;
+        }
+        if (result.IsSuccess) { _throttle.RecordSuccess(client, login, known); await _throttle.RememberAsync(client, login, CancellationToken.None); }
+        else if (result.Error!.Kind != ErrorKind.Unauthorized) _throttle.Refund(client, login, known);   // never reached the password check
         return Map(result);
     }
 }
@@ -250,8 +312,27 @@ public sealed class ReportsController : ApiControllerBase
     /// <summary>Totals for production days fromDate..toDate (inclusive; default today), optional shop and shift. Supervisor/administrator.</summary>
     [HttpGet("totals")]
     [ProducesResponseType(typeof(ReportDto), 200)]
-    public async Task<IActionResult> Totals([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode, [FromQuery] int? top) =>
-        Map(await _reports.RangeAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, top)));
+    public async Task<IActionResult> Totals([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode, [FromQuery] int? top,
+        [FromQuery] int? machineId, [FromQuery] int? phenomenonId, [FromQuery] bool compare = false) =>
+        Map(await _reports.RangeAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, top, machineId, phenomenonId, compare)));
+
+    /// <summary>Round 3 drill-down: the entries behind a selection (same filters as totals; reversed excluded), newest first.</summary>
+    [HttpGet("entries")]
+    [ProducesResponseType(typeof(ReportEntriesDto), 200)]
+    public async Task<IActionResult> Entries([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate, [FromQuery] int? shopId, [FromQuery] string? shiftCode,
+        [FromQuery] int? machineId, [FromQuery] int? phenomenonId, [FromQuery] int? limit) =>
+        Map(await _reports.EntriesAsync(Me, new ReportQuery(fromDate, toDate, shopId, shiftCode, null, machineId, phenomenonId), limit));
+}
+
+/// <summary>Round 3, #8: production counts for the rejection rate (administrators).</summary>
+[ApiController, Route("api/admin/production-counts"), Authorize(Roles = RoleNames.Administrator)]
+public sealed class ProductionCountsController : ApiControllerBase
+{
+    /// <summary>Validate (dryRun = true, the default) or apply an upload. All-or-nothing; problems are listed by row.</summary>
+    [HttpPost, RequestSizeLimit(2_000_000)]
+    [ProducesResponseType(typeof(ProductionCountResult), 200)]
+    public async Task<IActionResult> Upload([FromBody] ProductionCountUpload request, [FromServices] ProductionCountService svc) =>
+        Map(await svc.UploadAsync(Me, request));
 }
 
 /// <summary>Feature #8: machine QR codes.</summary>

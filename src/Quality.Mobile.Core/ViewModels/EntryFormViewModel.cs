@@ -27,6 +27,11 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	private EntryDraft? _resume;
 
+	private PendingSubmission? _resumePending;   // fifth review: an unknown-outcome save of this selection, shown again
+
+	/// <summary>The draft already put back: Shell can apply the same query again (e.g. coming back to this page), and it must not be restored twice.</summary>
+	private EntryDraft? _restored;
+
 	private ShopDto? _shop;
 
 	private StageDto? _stage;
@@ -47,6 +52,15 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	private bool _submittedOk;
 
+	/// <summary>Review fix: the last save may have reached the server (timeout, lost response). Until an outcome is
+	/// confirmed, Clear keeps the submission id, so re-entering and saving cannot create a duplicate.</summary>
+	private bool _outcomeUnknown;
+
+	private bool _loadFailed;
+
+	/// <summary>App design round: the remarks box is shown (tapped "Add remarks", or remarks were already entered).</summary>
+	private bool _remarksOpen;
+
 	public static int MaxQuantity => 9999;
 
 	public Guid SubmissionId { get; private set; } = Guid.NewGuid();
@@ -60,6 +74,22 @@ public sealed class EntryFormViewModel : BaseViewModel
 	public AsyncCommand IncreaseCommand { get; }
 
 	public AsyncCommand DecreaseCommand { get; }
+
+	/// <summary>Review fix: loads the phenomena list again after it failed to load (a kept draft is restored then).</summary>
+	public AsyncCommand RetryCommand { get; }
+
+	/// <summary>The phenomena list failed to load: the "Try again" button is shown.</summary>
+	public bool CanRetryLoad
+	{
+		get
+		{
+			return _loadFailed;
+		}
+		private set
+		{
+			Set(ref _loadFailed, value, "CanRetryLoad");
+		}
+	}
 
 	public string QuantityText
 	{
@@ -98,6 +128,34 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	public string MachineText => ((object)_machine == null) ? "" : (_machine.MachineCode + " – " + _machine.MachineName);
 
+	/// <summary>App design round (A1): the one-line context header, e.g. "GDC Shop › GDC-02 – Die casting press 2".
+	/// The stage is left out when it is named like the shop (every shop has one stage today).</summary>
+	public string ContextText
+	{
+		get
+		{
+			var parts = new List<string>();
+			if (_shop is not null) parts.Add(_shop.ShopName);
+			if (_stage is not null && !string.Equals(_stage.StageName, _shop?.ShopName, StringComparison.OrdinalIgnoreCase)) parts.Add(_stage.StageName);
+			if (_machine is not null) parts.Add(MachineText);
+			return string.Join(" › ", parts);
+		}
+	}
+
+	/// <summary>App design round (A1): goes back to the phenomenon list (quantity and remarks are kept).</summary>
+	public AsyncCommand ChangePhenomenonCommand { get; }
+
+	/// <summary>App design round (A1): opens the remarks box.</summary>
+	public AsyncCommand AddRemarksCommand { get; }
+
+	/// <summary>The remarks box is visible: opened with "Add remarks", or there are remarks (e.g. a restored entry).</summary>
+	public bool IsRemarksOpen => _remarksOpen || Remarks.Length > 0;
+
+	public bool CanAddRemarks => !IsRemarksOpen;
+
+	/// <summary>Something was entered that "Clear" would throw away (it asks first).</summary>
+	public bool HasFormData => _selected is not null || Remarks.Length > 0 || _qty.Trim() != "1";
+
 	public string SearchText
 	{
 		get
@@ -124,6 +182,8 @@ public sealed class EntryFormViewModel : BaseViewModel
 			if (Set(ref _remarks, value ?? "", "Remarks"))
 			{
 				OnPropertyChanged("RemarksCounter");
+				OnPropertyChanged(nameof(IsRemarksOpen));
+				OnPropertyChanged(nameof(CanAddRemarks));
 				OnPropertyChanged("CanSubmit");
 				SubmitCommand.RaiseCanExecuteChanged();
 			}
@@ -144,6 +204,7 @@ public sealed class EntryFormViewModel : BaseViewModel
 			{
 				OnPropertyChanged("SummaryText");
 				OnPropertyChanged("HasSelection");
+				OnPropertyChanged(nameof(IsChoosingPhenomenon));
 				OnPropertyChanged("CanSubmit");
 				SubmitCommand.RaiseCanExecuteChanged();
 			}
@@ -152,7 +213,16 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	public bool HasSelection => (object)_selected != null;
 
+	/// <summary>App design round (A1): no phenomenon chosen yet, so the search and the list fill the screen.</summary>
+	public bool IsChoosingPhenomenon => _selected is null;
+
 	public string SummaryText => ((object)_selected == null) ? "Select a rejection phenomenon above" : (_selected.PhenomenonName + "  ×  " + (ParsedQuantity?.ToString() ?? "?"));
+
+	protected override void OnBusyChanged()
+	{
+		OnPropertyChanged("CanSubmit");
+		SubmitCommand?.RaiseCanExecuteChanged();
+	}
 
 	public bool CanSubmit => !_submitting && !IsBusy && (object)_selected != null && ParsedQuantity.HasValue && Remarks.Length <= 500;
 
@@ -165,9 +235,15 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_drafts = drafts;
 		Title = "Rejection entry";
 		SubmitCommand = new AsyncCommand(SubmitAsync, () => CanSubmit);
-		ResetCommand = new AsyncCommand(() =>
+		ResetCommand = new AsyncCommand(ClearAsync);   // app design round: asks first when something was entered
+		ChangePhenomenonCommand = new AsyncCommand(() =>
 		{
-			Reset();
+			SelectedPhenomenon = null;
+			return Task.CompletedTask;
+		});
+		AddRemarksCommand = new AsyncCommand(() =>
+		{
+			SetRemarksOpen(true);
 			return Task.CompletedTask;
 		});
 		IncreaseCommand = new AsyncCommand(() =>
@@ -180,6 +256,24 @@ public sealed class EntryFormViewModel : BaseViewModel
 			Adjust(-1);
 			return Task.CompletedTask;
 		});
+		RetryCommand = new AsyncCommand(LoadPhenomenaAsync);
+	}
+
+	private void SetRemarksOpen(bool open)
+	{
+		_remarksOpen = open;
+		OnPropertyChanged(nameof(IsRemarksOpen));
+		OnPropertyChanged(nameof(CanAddRemarks));
+	}
+
+	/// <summary>"Clear": empties the form, after a confirmation when it holds anything worth keeping.</summary>
+	public async Task ClearAsync()
+	{
+		if (HasFormData && !await _dialogs.ConfirmAsync("Clear this entry?", "The selected phenomenon, quantity and remarks will be removed.", "Clear", "Keep"))
+		{
+			return;
+		}
+		Reset();
 	}
 
 	private void Adjust(int delta)
@@ -192,18 +286,37 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_shop = BaseViewModel.Arg<ShopDto>(args, "shop");
 		_stage = BaseViewModel.Arg<StageDto>(args, "stage");
 		_machine = BaseViewModel.Arg<MachineDto>(args, "machine");
-		_resume = BaseViewModel.Arg<EntryDraft>(args, "draft");
+		EntryDraft? draft = BaseViewModel.Arg<EntryDraft>(args, "draft");
+		int? userId = _session.User?.UserId;
+		if (draft is null && userId is int du && _shop is not null && _stage is not null && _machine is not null
+			&& _drafts.Peek(du) is { } kept && kept.Shop.Id == _shop.Id && kept.Stage.Id == _stage.Id && kept.Machine.Id == _machine.Id)
+		{
+			draft = kept;   // review fix: a draft not yet restored (e.g. its first phenomena load failed and the form was left) is still resumed
+		}
+		_resume = (draft is not null && !Equals(draft, _restored)) ? draft : null;
+		if (_resume is null && userId is int pu && _shop is not null && _stage is not null && _machine is not null
+			&& _drafts.PendingEntry(pu, _shop.Id, _stage.Id, _machine.Id) is { } pending && pending.SubmissionId != SubmissionId)
+		{
+			// Review fix: an earlier save of this form (this user, shop, stage and machine) may have reached the server.
+			// The same id is sent again: the server replays it if the entry matches, or answers payload mismatch (new id).
+			// Fifth review: its details are put back on the form with a notice (once the phenomena are loaded), so the
+			// inspector sees which entry the retry is for instead of a blank form silently tied to the old id.
+			SubmissionId = pending.SubmissionId;
+			_outcomeUnknown = true;
+			_resumePending = pending;
+			OnPropertyChanged("SubmissionId");
+		}
 		OnPropertyChanged("ShopText");
 		OnPropertyChanged("StageText");
 		OnPropertyChanged("MachineText");
+		OnPropertyChanged(nameof(ContextText));
 		if ((object)_shop == null || (object)_stage == null || (object)_machine == null)
 		{
 			ErrorMessage = "Selection incomplete. Go back and choose shop, stage and machine.";
 		}
 		else
 		{
-			await LoadPhenomenaAsync();
-			if (_resume is not null) Restore(_resume);
+			await LoadPhenomenaAsync();   // restores the draft once the phenomena are loaded
 		}
 	}
 
@@ -211,10 +324,13 @@ public sealed class EntryFormViewModel : BaseViewModel
 	private void Restore(EntryDraft d)
 	{
 		_resume = null;
+		_restored = d;
+		_drafts.Remove(d);   // on screen now: no longer needed in the store
 		SelectedPhenomenon = d.PhenomenonId is int pid ? _all.FirstOrDefault(p => p.Id == pid) : null;
 		QuantityText = d.QuantityText;
 		Remarks = d.Remarks;
 		SubmissionId = d.SubmissionId;
+		_outcomeUnknown = _drafts.PendingFor(d.UserId, d.Shop.Id, d.Stage.Id, d.Machine.Id) == d.SubmissionId;   // Clear keeps a pending id
 		OnPropertyChanged("SubmissionId");
 		ErrorMessage = "Your session expired while this entry was being saved. Check the details and tap Save again - it will not create a duplicate.";
 	}
@@ -231,8 +347,13 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	public Task LoadPhenomenaAsync()
 	{
+		if (_shop is null || _stage is null)
+		{
+			return Task.CompletedTask;
+		}
 		return RunBusyAsync(async () =>
 		{
+			CanRetryLoad = true;   // stays set if the call fails or throws
 			ApiResult<List<PhenomenonDto>> r = await _api.GetPhenomenaAsync(_shop.Id, _stage.Id);
 			if (!r.IsSuccess)
 			{
@@ -240,11 +361,26 @@ public sealed class EntryFormViewModel : BaseViewModel
 			}
 			else
 			{
+				CanRetryLoad = false;
 				_all = r.Value;
 				ApplyFilter();
 				if (_all.Count == 0)
 				{
 					ErrorMessage = "No active rejection phenomena are configured for this stage. Contact your administrator.";
+				}
+				else if ((object)_resume != null)
+				{
+					// Only now: if loading failed, the error stays on screen and the draft is kept for the next attempt.
+					Restore(_resume);
+				}
+				else if (_resumePending is { } pend)
+				{
+					_resumePending = null;
+					SelectedPhenomenon = pend.PhenomenonId is int pid ? _all.FirstOrDefault(p => p.Id == pid) : null;
+					QuantityText = pend.QuantityText;
+					Remarks = pend.Remarks;
+					SetRemarksOpen(!string.IsNullOrEmpty(pend.Remarks));
+					ErrorMessage = $"Your save at {pend.SentAt.ToLocalTime():HH:mm} got no answer, so it may or may not be recorded. Its details are shown again: tap Save to finish it (no duplicate is created). If this is a NEW rejection, check My entries first.";
 				}
 			}
 		});
@@ -266,7 +402,12 @@ public sealed class EntryFormViewModel : BaseViewModel
 		Remarks = "";
 		SearchText = "";
 		QuantityText = "1";
+		SetRemarksOpen(false);
 		ErrorMessage = null;
+		if (_outcomeUnknown)
+		{
+			return;   // same id: if the earlier attempt was saved, the server answers "already saved" or "payload mismatch"
+		}
 		SubmissionId = Guid.NewGuid();
 		OnPropertyChanged("SubmissionId");
 	}
@@ -307,19 +448,34 @@ public sealed class EntryFormViewModel : BaseViewModel
 		_submitting = true;
 		SubmitCommand.RaiseCanExecuteChanged();
 		var userId = _session.User?.UserId;   // captured now: an expired session clears it
+		var sentId = SubmissionId;
+		var answered = false;
 		try
 		{
 			IsBusy = true;
 			ErrorMessage = null;
 			CreateEntryRequest req = new CreateEntryRequest(SubmissionId, _shop.Id, _stage.Id, _machine.Id, _selected.Id, quantity, string.IsNullOrWhiteSpace(Remarks) ? null : Remarks.Trim());
 			ApiResult<CreateEntryResult> r = await _api.SubmitEntryAsync(req);
+			answered = true;
+			// Review fix: only the entry endpoint's own answer settles this submission id (saved, or refused as invalid / in
+			// conflict). A 401/403/429 or a certificate failure says nothing about an earlier attempt: the flag is kept.
+			if (r.IsSuccess || IsEntryAnswer(r.Error!))
+			{
+				_outcomeUnknown = false;
+			}
+			else if (r.Error!.OutcomeUnknown)
+			{
+				_outcomeUnknown = true;
+			}
+			RememberOutcome(userId, sentId);
 			if (r.IsSuccess)
 			{
 				_submittedOk = true;
 				await _nav.GoToAsync("confirmation", new Dictionary<string, object>
 				{
 					["entry"] = r.Value.Entry,
-					["already"] = r.Value.AlreadySubmitted
+					["already"] = r.Value.AlreadySubmitted,
+					["shopName"] = ShopText   // app design round: the confirmation shows the shop name, not its code
 				});
 				return;
 			}
@@ -360,6 +516,11 @@ public sealed class EntryFormViewModel : BaseViewModel
 		}
 		catch (Exception)
 		{
+			if (!answered)
+			{
+				_outcomeUnknown = true;
+				RememberOutcome(userId, sentId);
+			}
 			ErrorMessage = "Something went wrong. Please try again. Your entry may not have been saved. Tap Save again – it will not create a duplicate.";
 		}
 		finally
@@ -368,6 +529,25 @@ public sealed class EntryFormViewModel : BaseViewModel
 			_submitting = false;
 			OnPropertyChanged("CanSubmit");
 			SubmitCommand.RaiseCanExecuteChanged();
+		}
+	}
+
+	/// <summary>A 4xx produced by the entry endpoint itself (it carries the API's problem code), not by a proxy.</summary>
+	private static bool IsEntryAnswer(ApiError e)
+	{
+		return e.Kind is ApiErrorKind.Validation or ApiErrorKind.Conflict && !e.Code.StartsWith("http_", StringComparison.Ordinal);
+	}
+
+	/// <summary>Keeps the id of a save with an unknown outcome in the app-wide store (it outlives this form); forgets it once settled.</summary>
+	private void RememberOutcome(int? userId, Guid submissionId)
+	{
+		if (!_outcomeUnknown)
+		{
+			_drafts.SettlePending(submissionId);
+		}
+		else if (userId is int uid && _shop is not null && _stage is not null && _machine is not null)
+		{
+			_drafts.SetPending(new PendingSubmission(uid, _shop.Id, _stage.Id, _machine.Id, submissionId, _selected?.Id, QuantityText, Remarks ?? ""));
 		}
 	}
 }

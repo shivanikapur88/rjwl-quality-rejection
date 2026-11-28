@@ -5,7 +5,8 @@ const QR = (() => {
   const session = () => { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch { return null; } };
   const save = s => { try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch { /* private mode: session lasts this page only */ } };
   const clear = () => { try { sessionStorage.removeItem(KEY); } catch { } };
-  const valid = s => s && s.token && new Date(s.expiresAtUtc) > new Date();
+  // No expiry check against this PC's clock (it may be wrong by hours): the server decides; a 401 clears the session.
+  const valid = s => !!(s && s.token);
 
   async function api(path, opts = {}) {
     const s = session();
@@ -47,9 +48,25 @@ const QR = (() => {
       ev.preventDefault();
       el('loginError').hidden = true;
       try { await login(el('user').value.trim(), el('pass').value); location.reload(); }
-      catch (e) { text(el('loginError'), e.message); el('loginError').hidden = false; }
+      catch (e) { text(el('loginError'), e.message); el('loginError').hidden = false; el('pass').focus(); el('pass').select(); }
     });
   }
 
-  return { api, session, wireLogin, el, fmt, text, make };
+  // ---- desktop app (installable web app) ----
+  // The service worker keeps only the dashboard's own files (see sw.js); report data always comes from the server.
+  if ('serviceWorker' in navigator && window.isSecureContext)
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* still works as a web page */ }); });
+  // Edge and Chrome offer installation; show an "Install app" button where they do (hidden once installed).
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', ev => {
+    ev.preventDefault(); installPrompt = ev;
+    const b = document.getElementById('install'); if (b) b.hidden = false;
+  });
+  window.addEventListener('appinstalled', () => { const b = document.getElementById('install'); if (b) b.hidden = true; installPrompt = null; });
+  document.addEventListener('DOMContentLoaded', () => {
+    const b = document.getElementById('install');
+    if (b) b.addEventListener('click', async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; b.hidden = true; });
+  });
+
+  return { api, session, clear, wireLogin, el, fmt, text, make };
 })();

@@ -24,11 +24,14 @@ public sealed class ApiClient : IApiClient
 
 	private readonly ISession _session;
 
-	public ApiClient(HttpClient http, IAppSettings settings, ISession session)
+	private readonly TimeProvider _time;
+
+	public ApiClient(HttpClient http, IAppSettings settings, ISession session, TimeProvider? time = null)
 	{
 		_http = http;
 		_settings = settings;
 		_session = session;
+		_time = time ?? TimeProvider.System;
 		_http.Timeout = Timeout;
 	}
 
@@ -37,9 +40,27 @@ public sealed class ApiClient : IApiClient
 		return SendAsync<Unit>(HttpMethod.Get, "/api/health", null, auth: false);
 	}
 
+	/// <summary>Review fix: checks a candidate server address (Settings, "Test connection") without saving it. No token is sent.</summary>
+	public Task<ApiResult<Unit>> TestConnectionAsync(string baseUrl)
+	{
+		return SendAsync<Unit>(HttpMethod.Get, "/api/health", null, auth: false, baseUrlOverride: baseUrl ?? "");
+	}
+
 	public Task<ApiResult<LoginResponse>> LoginAsync(LoginRequest r)
 	{
-		return SendAsync<LoginResponse>(HttpMethod.Post, "/api/auth/login", r, auth: false);
+		return SendAsync<LoginResponse>(HttpMethod.Post, "/api/auth/login", r, auth: false, adjust: ToDeviceClock);
+	}
+
+	/// <summary>Review fix: the expiry is in server time. When the device clock differs (server Date header), it is moved
+	/// onto the device clock, so a tablet clock hours ahead does not make a new session look expired (or one behind, valid too long).</summary>
+	private LoginResponse ToDeviceClock(LoginResponse login, HttpResponseMessage resp)
+	{
+		if (resp.Headers.Date is not DateTimeOffset serverNow)
+		{
+			return login;   // no Date header: assume the device clock is right
+		}
+		TimeSpan skew = serverNow.UtcDateTime - _time.GetUtcNow().UtcDateTime;
+		return skew.Duration() < TimeSpan.FromSeconds(30.0) ? login : login with { ExpiresAtUtc = login.ExpiresAtUtc - skew };
 	}
 
 	public Task<ApiResult<List<ShopDto>>> GetShopsAsync()
@@ -250,17 +271,24 @@ public sealed class ApiClient : IApiClient
 		return ApiResult<T>.Fail(new ApiError(k, code, msg, status));
 	}
 
-	private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, object? body = null, bool auth = true)
+	private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string path, object? body = null, bool auth = true, Func<T, HttpResponseMessage, T>? adjust = null, string? baseUrlOverride = null)
 	{
-		string baseUrl = _settings.BaseUrl?.Trim().TrimEnd('/');
+		string baseUrl = (baseUrlOverride ?? _settings.BaseUrl)?.Trim().TrimEnd('/');
 		if (string.IsNullOrEmpty(baseUrl))
 		{
 			return Fail<T>(ApiErrorKind.NotConfigured, "not_configured", "The server address is not set. Open Settings and enter it.");
 		}
+		// The stored address may predate the https-only rule (e.g. an old http:// value): never send the token to it.
+		if (!BaseUrlValidator.TryNormalize(baseUrl, out string validUrl, out string urlError))
+		{
+			return Fail<T>(ApiErrorKind.NotConfigured, "invalid_server_address", (baseUrlOverride == null ? "The saved server address is not valid (" : "The server address is not valid (") + urlError.TrimEnd('.') + ")." + (baseUrlOverride == null ? " Open Settings and correct it." : ""));
+		}
+		baseUrl = validUrl;
 		using HttpRequestMessage req = new HttpRequestMessage(method, baseUrl + path);
+		string? token = null;
 		if (auth)
 		{
-			string token = _session.Token;
+			token = _session.Token;
 			if (token == null)
 			{
 				_session.NotifyExpired();
@@ -281,6 +309,10 @@ public sealed class ApiClient : IApiClient
 		{
 			return Fail<T>(ApiErrorKind.Timeout, "timeout", "The server took too long to respond. Check your connection and try again.");
 		}
+		catch (Exception ex) when (IsCertificateFailure(ex))   // any type: Android also raises WebException / IOException
+		{
+			return Fail<T>(ApiErrorKind.Network, "certificate_untrusted", CertificateMessage);
+		}
 		catch (HttpRequestException)
 		{
 			return Fail<T>(ApiErrorKind.Network, "network", "Cannot reach the server. Check your Wi-Fi or mobile data and the server address, then try again.");
@@ -300,18 +332,48 @@ public sealed class ApiClient : IApiClient
 				try
 				{
 					T v = await resp.Content.ReadFromJsonAsync<T>(Json);
-					return (v == null) ? Fail<T>(ApiErrorKind.Server, "bad_response", "The server sent an unexpected response.", (int)resp.StatusCode) : ApiResult<T>.Ok(v);
+					return (v == null) ? Fail<T>(ApiErrorKind.Server, "bad_response", "The server sent an unexpected response.", (int)resp.StatusCode) : ApiResult<T>.Ok(adjust == null ? v : adjust(v, resp));
 				}
 				catch (Exception)
 				{
 					return Fail<T>(ApiErrorKind.Server, "bad_response", "The server sent an unexpected response.", (int)resp.StatusCode);
 				}
 			}
-			return await MapFailureAsync<T>(resp, auth);
+			return await MapFailureAsync<T>(resp, auth, token);
 		}
 	}
 
-	private async Task<ApiResult<T>> MapFailureAsync<T>(HttpResponseMessage resp, bool auth)
+	public const string CertificateMessage = "The server's security certificate is not trusted on this device. Contact IT.";
+
+	/// <summary>Review fix: a certificate TRUST failure only, found anywhere in the exception chain (of any exception type):
+	/// .NET's AuthenticationException, Android's CertPathValidatorException / CertificateException / SSLPeerUnverifiedException,
+	/// or an SSLHandshakeException (or wrapper) whose text names the certificate or trust anchor. A handshake that timed out
+	/// or was reset ("SSL handshake aborted", SecureConnectionError with an EOF) stays a network error: weak Wi-Fi, not IT.</summary>
+	internal static bool IsCertificateFailure(Exception ex)
+	{
+		for (Exception? e = ex; e != null; e = e.InnerException)
+		{
+			if (e is System.Security.Authentication.AuthenticationException)
+			{
+				return true;
+			}
+			string type = e.GetType().Name;
+			if (type is "CertPathValidatorException" or "CertificateException" or "CertificateExpiredException"
+				or "CertificateNotYetValidException" or "SSLPeerUnverifiedException")
+			{
+				return true;
+			}
+			string m = e.Message ?? "";
+			if (m.Contains("certificate", StringComparison.OrdinalIgnoreCase) || m.Contains("trust anchor", StringComparison.OrdinalIgnoreCase)
+				|| m.Contains("CertPath", StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private async Task<ApiResult<T>> MapFailureAsync<T>(HttpResponseMessage resp, bool auth, string? token)
 	{
 		string code = null;
 		string title = null;
@@ -347,7 +409,7 @@ public sealed class ApiClient : IApiClient
 		case HttpStatusCode.Unauthorized:
 			if (auth)
 			{
-				_session.NotifyExpired();
+				_session.NotifyExpired(token);   // ignored when a newer session replaced the one this request used
 				return Fail<T>(ApiErrorKind.SessionExpired, code, "Your session has expired. Please sign in again.", status);
 			}
 			return Fail<T>(ApiErrorKind.Unauthorized, code, title ?? "Invalid username or password.", status);

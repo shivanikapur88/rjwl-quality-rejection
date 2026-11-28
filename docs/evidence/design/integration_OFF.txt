@@ -1,0 +1,10 @@
+Running tests from /tmp/claude-0/-home-user-mirahbelle/6a0dccf8-a11e-5c3c-9107-aa8f36d4cac3/scratchpad/verify8/src/Quality.Tests.Integration/bin/Debug/net10.0/Quality.Tests.Integration.dll (net10.0|x64)
+/tmp/claude-0/-home-user-mirahbelle/6a0dccf8-a11e-5c3c-9107-aa8f36d4cac3/scratchpad/verify8/src/Quality.Tests.Integration/bin/Debug/net10.0/Quality.Tests.Integration.dll (net10.0|x64) passed (23s 240ms)
+
+Test run summary: Passed!
+  total: 56
+  failed: 0
+  succeeded: 56
+  skipped: 0
+  duration: 23s 448ms
+exit 0

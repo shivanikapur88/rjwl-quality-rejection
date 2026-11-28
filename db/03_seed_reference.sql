@@ -1,15 +1,17 @@
 /* ============================================================================
    03_seed_reference.sql - roles, the FOUR independent shops, their stages and mapping.
    Run in the master database after 01_master_schema.sql. Idempotent.
-   NOT YET EXECUTED against SQL Server.
+  Executed against SQL Server 2022 by the automated tests (docs/TEST_EVIDENCE.md).
 
    Four independent shops, each with exactly one inspection stage of the same name:
      GDC   -> GDC Shop                 (entries: GDC_AndonDB)
      CNC   -> CNC Shop                 (entries: MachineShopDB)
-     PRE   -> Pre-treatment Inspection (entries: database of your choice - see 02c)
-     FINAL -> FINAL Inspection         (entries: database of your choice - see 02c)
+     PRE   -> Pre-treatment Inspection (entries: QualityMasterDB, see 02c)
+     FINAL -> FINAL Inspection         (entries: QualityMasterDB, see 02c)
    No users are seeded here: password hashes must come from the backend (see Quality.UserSqlGen).
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON; SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
@@ -43,12 +45,19 @@ JOIN qa.Shops sh ON sh.ShopCode = m.ShopCode
 JOIN qa.InspectionStages st ON st.StageCode = m.StageCode
 WHERE NOT EXISTS (SELECT 1 FROM qa.ShopStages x WHERE x.ShopId = sh.Id AND x.InspectionStageId = st.Id);
 
+-- The four required rows must exist; more (a shop or stage added later) is allowed, so a re-run stays harmless.
 DECLARE @stageCount int, @shopCount int, @mapCount int;
-SELECT @stageCount = COUNT(*) FROM qa.InspectionStages;
-SELECT @shopCount  = COUNT(*) FROM qa.Shops;
-SELECT @mapCount   = COUNT(*) FROM qa.ShopStages;
-IF @stageCount <> 4 THROW 50002, N'Expected exactly 4 inspection stages.', 1;
-IF @shopCount  <> 4 THROW 50003, N'Expected exactly 4 shops. If you ran an older version of this script, run 06_migration_four_shops.sql first.', 1;
-IF @mapCount   <> 4 THROW 50004, N'Expected exactly 4 shop-stage mappings (one per shop). Run 06_migration_four_shops.sql.', 1;
+SELECT @stageCount = COUNT(*) FROM qa.InspectionStages WHERE StageCode IN (N'GDC_SHOP', N'CNC_SHOP', N'PRE_TREATMENT', N'FINAL');
+SELECT @shopCount  = COUNT(*) FROM qa.Shops WHERE ShopCode IN (N'GDC', N'CNC', N'PRE', N'FINAL');
+SELECT @mapCount   = COUNT(*) FROM qa.ShopStages x JOIN qa.Shops sh ON sh.Id = x.ShopId JOIN qa.InspectionStages st ON st.Id = x.InspectionStageId
+WHERE (sh.ShopCode = N'GDC' AND st.StageCode = N'GDC_SHOP') OR (sh.ShopCode = N'CNC' AND st.StageCode = N'CNC_SHOP')
+   OR (sh.ShopCode = N'PRE' AND st.StageCode = N'PRE_TREATMENT') OR (sh.ShopCode = N'FINAL' AND st.StageCode = N'FINAL');
+IF @stageCount <> 4 THROW 50002, N'The 4 inspection stages are not all present.', 1;
+IF @shopCount  <> 4 THROW 50003, N'The 4 shops are not all present. If you ran an older version of this script, run 06_migration_four_shops.sql first.', 1;
+IF @mapCount   <> 4 THROW 50004, N'The 4 shop-stage mappings (one per shop) are not all present. Run 06_migration_four_shops.sql.', 1;
+-- The old two-shop layout mapped PRE/FINAL stages to GDC/CNC: it must have been migrated by 06.
+IF EXISTS (SELECT 1 FROM qa.ShopStages x JOIN qa.Shops sh ON sh.Id = x.ShopId JOIN qa.InspectionStages st ON st.Id = x.InspectionStageId
+           WHERE sh.ShopCode IN (N'GDC', N'CNC') AND st.StageCode IN (N'PRE_TREATMENT', N'FINAL'))
+    THROW 50004, N'GDC/CNC still have PRE/FINAL stage mappings from the old layout. Run 06_migration_four_shops.sql.', 1;
 COMMIT TRANSACTION;
 PRINT N'03_seed_reference.sql complete.';

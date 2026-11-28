@@ -27,6 +27,11 @@ public sealed class AuthService
         if (request is null || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrEmpty(request.Password))
             return ServiceResult<LoginResponse>.Fail(ErrorKind.Validation, "credentials_required", "Enter your username or employee ID and password.");
 
+        // No identifier is longer than 50 characters and no password longer than 128 (the admin rules): refuse without a
+        // database lookup or hashing a huge string. Same generic answer as a wrong password (counted by the throttle).
+        if (request.Username.Trim().Length > LoginRules.MaxUsernameLength || request.Password.Length > UserAdminService.MaxPasswordLength)
+            return ServiceResult<LoginResponse>.Fail(ErrorKind.Unauthorized, "invalid_credentials", "Invalid username or password.");
+
         var user = await _master.FindUserByLoginAsync(request.Username.Trim());
         // One generic message for unknown user, wrong password and inactive account: no account enumeration.
         if (user is null || !user.IsActive || user.Role is null)

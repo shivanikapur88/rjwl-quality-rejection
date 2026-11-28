@@ -143,12 +143,13 @@ public sealed class MachineAdminService
         await _master.InTransactionAsync(async () =>
         {
             await _master.LockMachineExclusiveAsync(m.Id);                    // Q9: lock first ...
-            if (await _router.For(shop.EntryStoreKey).IsMachineUsedAsync(m.Id)) { inUse = true; return; }   // ... then check
+            if (await _router.For(shop.EntryStoreKey).IsMachineUsedAsync(m.Id)                                // ... then check entries,
+                || await _master.IsMachineReferencedInMasterAsync(m.Id)) { inUse = true; return; }              // production counts, corrections
             _master.RemoveMachine(m);
             _master.AddAudit(new AuditLogEntry { UserId = user.Id, Action = AuditActions.MachineDeleted, EntityType = Entity, EntityId = m.Id.ToString(), OldValue = old, Timestamp = _time.GetUtcNow().UtcDateTime });
             await _master.SaveChangesAsync();
         });
-        if (inUse) return ServiceResult<bool>.Fail(ErrorKind.Conflict, "machine_in_use", "This machine is used in saved rejection entries and cannot be deleted. Deactivate it instead.");
+        if (inUse) return ServiceResult<bool>.Fail(ErrorKind.Conflict, "machine_in_use", "This machine is used in saved rejection entries, correction requests or production counts and cannot be deleted. Deactivate it instead.");
         return ServiceResult<bool>.Ok(true);
     }
 

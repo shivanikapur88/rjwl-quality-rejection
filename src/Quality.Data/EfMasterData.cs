@@ -74,14 +74,16 @@ public sealed class EfMasterData : IMasterData
     public async Task LockMachineExclusiveAsync(int machineId)
     {
         RequireTransaction();
-        await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE qa.Machines SET IsActive = IsActive WHERE Id = {machineId}");
+        // LOCK_TIMEOUT: if entry saves hold the machine (e.g. a slow insert into a shared entry database), the delete gives up
+        // after 3 s with 409 instead of queueing - a waiting exclusive lock would also stall every new save (third full review).
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SET LOCK_TIMEOUT 3000; UPDATE qa.Machines SET IsActive = IsActive WHERE Id = {machineId}; SET LOCK_TIMEOUT -1;");
         if (_db.ChangeTracker.Entries<Machine>().FirstOrDefault(e => e.Entity.Id == machineId) is { } tracked) await tracked.ReloadAsync();
     }
 
     public async Task LockPhenomenonExclusiveAsync(int phenomenonId)
     {
         RequireTransaction();
-        await _db.Database.ExecuteSqlInterpolatedAsync($"UPDATE qa.RejectionPhenomena SET IsActive = IsActive WHERE Id = {phenomenonId}");
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SET LOCK_TIMEOUT 3000; UPDATE qa.RejectionPhenomena SET IsActive = IsActive WHERE Id = {phenomenonId}; SET LOCK_TIMEOUT -1;");
         if (_db.ChangeTracker.Entries<RejectionPhenomenon>().FirstOrDefault(e => e.Entity.Id == phenomenonId) is { } tracked) await tracked.ReloadAsync();
     }
 
@@ -108,6 +110,31 @@ public sealed class EfMasterData : IMasterData
         if (status is not null) q = q.Where(c => c.Status == status);
         return await q.OrderByDescending(c => c.RequestedAt).ThenByDescending(c => c.Id).Take(limit).ToListAsync();
     }
+
+    public async Task<IReadOnlyList<ProductionCount>> GetProductionCountsAsync(IReadOnlyCollection<int> shopIds, DateOnly fromDate, DateOnly toDate, string? shiftCode, int? machineId)
+    {
+        var q = _db.ProductionCounts.AsNoTracking().Where(p => shopIds.Contains(p.ShopId) && p.ProductionDate >= fromDate && p.ProductionDate <= toDate);
+        if (shiftCode is not null) q = q.Where(p => p.ShiftCode == shiftCode);
+        if (machineId is int m) q = q.Where(p => p.MachineId == m);
+        return await q.ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<ProductionCount>> GetProductionCountsForUpdateAsync(IReadOnlyCollection<int> machineIds, DateOnly fromDate, DateOnly toDate)
+    {
+        RequireTransaction();
+        // UPDLOCK+HOLDLOCK on each machine's (MachineId, ProductionDate) key range through the unique index that leads on
+        // MachineId: two uploads (or an upload and the feed) touching the same machine and days are serialised instead of
+        // colliding on the unique key; other machines are not blocked. The predicate sits INSIDE the hinted query, so the
+        // optimizer cannot turn it into a table-wide range lock. One parameterised query per distinct machine.
+        var rows = new List<ProductionCount>();
+        foreach (var id in machineIds.Distinct().OrderBy(x => x))   // fixed order: no deadlock between two uploads
+            rows.AddRange(await _db.ProductionCounts
+                .FromSqlInterpolated($"SELECT * FROM qa.ProductionCounts WITH (UPDLOCK, HOLDLOCK, INDEX(UQ_ProductionCounts_Machine_Day_Shift)) WHERE MachineId = {id} AND ProductionDate BETWEEN {fromDate} AND {toDate}")
+                .ToListAsync());
+        return rows;
+    }
+
+    public void AddProductionCount(ProductionCount c) => _db.ProductionCounts.Add(c);
 
     public Task<int> CountCorrectionsAsync(IReadOnlyCollection<int>? shopIds, int? requestedBy, string? status)
     {
@@ -158,6 +185,9 @@ public sealed class EfMasterData : IMasterData
         _db.Machines.AnyAsync(m => m.ShopId == shopId && m.MachineCode == machineCode && m.Id != excludeMachineId);
     public void AddMachine(Machine m) => _db.Machines.Add(m);
     public void RemoveMachine(Machine m) => _db.Machines.Remove(m);
+    public async Task<bool> IsMachineReferencedInMasterAsync(int machineId) =>
+        await _db.ProductionCounts.AnyAsync(c => c.MachineId == machineId) || await _db.EntryCorrections.AnyAsync(c => c.ProposedMachineId == machineId);
+    public Task<bool> IsPhenomenonReferencedInMasterAsync(int phenomenonId) => _db.EntryCorrections.AnyAsync(c => c.ProposedPhenomenonId == phenomenonId);
 
     // ---- user administration ----
     public async Task<IReadOnlyList<User>> GetUsersAsync(string? search, bool? isActive)

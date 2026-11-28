@@ -15,13 +15,23 @@ public partial class ScanPage : AppPage
         Camera.Options = new BarcodeReaderOptions { Formats = BarcodeFormat.QrCode, AutoRotate = true, Multiple = false };
     }
 
+    private bool _explained;
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
-        if (status != PermissionStatus.Granted) status = await Permissions.RequestAsync<Permissions.Camera>();
-        if (status != PermissionStatus.Granted)
-            await DisplayAlertAsync("Camera needed", "Allow camera access to scan machine labels, or choose the machine from the list.", "OK");
+        try   // async void: a permission or alert failure must not crash the app
+        {
+            var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
+            if (status != PermissionStatus.Granted) status = await Permissions.RequestAsync<Permissions.Camera>();
+            // Explain once per page: not again on every return from the entry form.
+            if (status != PermissionStatus.Granted && !_explained)
+            {
+                _explained = true;
+                await DisplayAlertAsync("Camera needed", "Allow camera access to scan machine labels, or choose the machine from the list.", "OK");
+            }
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Camera permission check failed: " + ex); }
     }
 
     private void OnDetected(object? sender, BarcodeDetectionEventArgs e)

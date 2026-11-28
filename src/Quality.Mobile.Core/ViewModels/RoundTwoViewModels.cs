@@ -24,6 +24,7 @@ public sealed class EntryDetailViewModel : BaseViewModel
 {
     private readonly IApiClient _api; private readonly INavigator _nav; private readonly ISession _session; private readonly IDialogs _dialogs;
     private EntryDto? _entry;
+    private EntryDto? _original; private EntryChanges? _changes;   // review fix: tells the list when this entry changed
     private string _reason = "", _qty = "", _remarks = "";
     private bool _remove = true, _formOpen, _changeRemarks;
     private PhenomenonDto? _phen; private MachineDto? _machine;
@@ -42,6 +43,9 @@ public sealed class EntryDetailViewModel : BaseViewModel
     public AsyncCommand CancelCommand { get; }
     public ObservableCollection<PhenomenonDto> Phenomena { get; } = new();
     public ObservableCollection<MachineDto> Machines { get; } = new();
+
+    /// <summary>Fifth review: Send's CanExecute reads IsBusy, so it is re-evaluated when IsBusy changes.</summary>
+    protected override void OnBusyChanged() => SubmitCommand?.RaiseCanExecuteChanged();
 
     public string Headline => _entry is null ? "" : $"{_entry.PhenomenonName} × {_entry.Quantity}";
     public string ShopLine => _entry is null ? "" : $"{_entry.ShopCode} › {_entry.StageName} › {_entry.MachineCode} – {_entry.MachineName}";
@@ -68,7 +72,8 @@ public sealed class EntryDetailViewModel : BaseViewModel
 
     public override async Task OnNavigatedToAsync(IDictionary<string, object> args)
     {
-        _entry = Arg<EntryDto>(args, "entry");
+        _entry = _original = Arg<EntryDto>(args, "entry");
+        _changes = Arg<EntryChanges>(args, EntryChanges.Key);
         if (_entry is null) { ErrorMessage = "Entry not found."; return; }
         Refresh();
         await RunBusyAsync(async () =>   // fresh copy: status may have changed since the list was loaded
@@ -80,6 +85,7 @@ public sealed class EntryDetailViewModel : BaseViewModel
 
     private void Refresh()
     {
+        if (_changes is not null && _entry is not null && _entry != _original) _changes.Updated = _entry;
         foreach (var p in new[] { nameof(Headline), nameof(ShopLine), nameof(WhenLine), nameof(RemarksLine), nameof(EntryNumber), nameof(Badge), nameof(HasBadge), nameof(CanRequest) })
             OnPropertyChanged(p);
         OpenFormCommand.RaiseCanExecuteChanged();
@@ -125,6 +131,17 @@ public sealed class EntryDetailViewModel : BaseViewModel
         await RunBusyAsync(async () =>
         {
             var r = await _api.RequestCorrectionAsync(_entry!.ShopId, _entry.Id, req);
+            if (!r.IsSuccess && r.Error!.Code == "correction_pending")
+            {
+                // A request is already waiting (e.g. an earlier attempt that timed out did reach the server):
+                // close the form and show the entry as it is now, with its pending request.
+                FormOpen = false;
+                var fresh = await _api.GetEntryAsync(_entry.ShopId, _entry.Id);
+                _entry = fresh.IsSuccess ? fresh.Value! : _entry with { CorrectionStatus = "Pending" };
+                Refresh();
+                ErrorMessage = r.Error.Message;
+                return;
+            }
             if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
             FormOpen = false;
             _entry = _entry with { CorrectionStatus = "Pending" };
@@ -152,13 +169,15 @@ public sealed record CorrectionItem(CorrectionDto Dto, bool CanDecide, bool CanW
 /// <summary>Supervisors/administrators: requests to decide. Inspectors: their own requests (withdraw while pending).</summary>
 public sealed class CorrectionsViewModel : BaseViewModel
 {
+    /// <summary>How often Reject asks for a reason before it gives up and shows the error on the page.</summary>
+    public const int MaxRejectPrompts = 3;
     private readonly IApiClient _api; private readonly ISession _session; private readonly IDialogs _dialogs;
     private bool _empty; private bool _showDecided;
     public CorrectionsViewModel(IApiClient api, ISession session, IDialogs dialogs)
     {
         (_api, _session, _dialogs) = (api, session, dialogs);
         Title = "Corrections";
-        RefreshCommand = new AsyncCommand(LoadAsync);
+        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(LoadAsync));   // review fix: only a pull sets IsRefreshing
         ApproveCommand = new AsyncCommand<CorrectionItem>(ApproveAsync);
         RejectCommand = new AsyncCommand<CorrectionItem>(RejectAsync);
         WithdrawCommand = new AsyncCommand<CorrectionItem>(WithdrawAsync);
@@ -198,8 +217,16 @@ public sealed class CorrectionsViewModel : BaseViewModel
 
     private async Task RejectAsync(CorrectionItem item)
     {
-        var note = await _dialogs.PromptAsync("Reject correction", "Why is the request rejected? The inspector will see this.", "Reject", "Cancel", "Reason");
-        if (note is null) return;
+        // App design round: an empty reason asks again (with an explanation) instead of closing; Cancel stops.
+        string? note = null;
+        for (var attempt = 0; attempt < MaxRejectPrompts; attempt++)
+        {
+            note = await _dialogs.PromptAsync("Reject correction",
+                attempt == 0 ? "Why is the request rejected? The inspector will see this." : "A reason is required. Why is the request rejected? The inspector will see this.",
+                "Reject", "Cancel", "Reason");
+            if (note is null) return;
+            if (!string.IsNullOrWhiteSpace(note)) break;
+        }
         if (string.IsNullOrWhiteSpace(note)) { ErrorMessage = "Give a reason for rejecting the request."; return; }
         await Decide(() => _api.RejectCorrectionAsync(item.Dto.Id, note.Trim()));
     }
@@ -229,9 +256,13 @@ public sealed class SummaryViewModel : BaseViewModel
     public SummaryViewModel(IApiClient api)
     {
         _api = api; Title = "Shift summary";
-        PreviousDayCommand = new AsyncCommand(() => { _day = _day.AddDays(-1); return LoadAsync(); });
-        NextDayCommand = new AsyncCommand(() => { if (_day < _today) _day = _day.AddDays(1); return LoadAsync(); });
-        RefreshCommand = new AsyncCommand(LoadAsync);
+        // Fifth review: "‹" needs a day to step from (the calendar may not have loaded: offline on first open).
+        PreviousDayCommand = new AsyncCommand(() => { if (_day == default) return RefreshAllAsync(); SetDay(_day.AddDays(-1)); return LoadAsync(); }, () => _day != default);
+        // App design round (A7): "›" is disabled on today (it used to reload today).
+        NextDayCommand = new AsyncCommand(() => { if (_day < _today) SetDay(_day.AddDays(1)); return LoadAsync(); }, () => CanGoNext);
+        // Fifth review: a pull re-reads the calendar too, so it recovers from a failed first load and "today" and the
+        // current shift move on while the screen stays open.
+        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(RefreshAllAsync));   // review fix: only a pull sets IsRefreshing
     }
     public ObservableCollection<Option> ShiftOptions { get; } = new();
     public ObservableCollection<SummaryLine> Shops { get; } = new();
@@ -240,6 +271,31 @@ public sealed class SummaryViewModel : BaseViewModel
     public AsyncCommand PreviousDayCommand { get; }
     public AsyncCommand NextDayCommand { get; }
     public AsyncCommand RefreshCommand { get; }
+    /// <summary>The day shown is before today: "›" can move on.</summary>
+    public bool CanGoNext => _day != default && _day < _today;
+
+    private void SetDay(DateOnly day)
+    {
+        _day = day;
+        OnPropertyChanged(nameof(DayText));
+        OnPropertyChanged(nameof(CanGoNext));
+        NextDayCommand.RaiseCanExecuteChanged();
+        PreviousDayCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Size of the top lists asked for; a list this long may be cut (its heading then says "Top 5").</summary>
+    public const int TopCount = 5;
+    public string TopPhenomenaHeading => TopPhenomena.Count >= TopCount ? $"Top {TopCount} phenomena" : "Phenomena";
+    public string TopMachinesHeading => TopMachines.Count >= TopCount ? $"Top {TopCount} machines" : "Machines";
+    public bool HasTopNote => TopPhenomena.Count >= TopCount || TopMachines.Count >= TopCount;
+    public string TopNote => $"Top {TopCount} lists show only the {TopCount} largest; others are not listed.";
+    public bool HasShops => Shops.Count > 0;
+    public bool HasTopPhenomena => TopPhenomena.Count > 0;
+    public bool HasTopMachines => TopMachines.Count > 0;
+
+    /// <summary>"1 entry", "12 entries".</summary>
+    public static string Entries(int n) => n == 1 ? "1 entry" : $"{n.ToString("N0", CultureInfo.CurrentCulture)} entries";
+
     public string DayText => _day == default ? "" : _day.ToString("ddd dd MMM yyyy", CultureInfo.CurrentCulture) + (_day == _today ? " (today)" : "");
     public string TotalText { get => _total; private set => Set(ref _total, value, nameof(TotalText)); }
     public string EntriesText { get => _entries; private set => Set(ref _entries, value, nameof(EntriesText)); }
@@ -247,16 +303,24 @@ public sealed class SummaryViewModel : BaseViewModel
     public bool IsIncomplete => _incomplete.Length > 0;
     public Option? SelectedShift { get => _shift; set { if (Set(ref _shift, value, nameof(SelectedShift)) && _day != default) _ = LoadAsync(); } }
 
-    public override async Task OnAppearingAsync()
+    public override Task OnAppearingAsync() => RefreshAllAsync();
+
+    /// <summary>Calendar (today, shifts, current shift), then the numbers. Used on appearing and by pull-to-refresh.</summary>
+    public async Task RefreshAllAsync()
     {
-        // The calendar is re-read every time the screen appears: "today" moves on at the start of the first shift.
+        // The calendar is re-read every time: "today" moves on at the start of the first shift.
+        var wasToday = _day != default && _day == _today;
+        var shiftWasCurrent = _shift is not null && _shift.Id is int si && si < _shiftCodes.Count && _shiftCodes[si] == _currentShift;
         await RunBusyAsync(async () =>
         {
             var c = await _api.GetCalendarAsync();
             if (!c.IsSuccess) { ErrorMessage = c.Error!.Message; return; }
             var firstTime = _day == default;
             _today = c.Value!.ProductionDate;
-            if (firstTime || _day > _today) _day = _today;
+            if (firstTime || _day > _today || wasToday) _day = _today;   // "today" stays today when the production day moves on
+            var previousCurrent = _currentShift;
+            _currentShift = c.Value.CurrentShift;
+            SetDay(_day);   // "today" may have moved on: "›" may be enabled again
             _shiftCodes = c.Value.Shifts.Select(s => s.ShiftCode).ToList();
             var labels = c.Value.Shifts.Select((s, i) => $"{s.ShiftName} (from {s.StartTime})").ToList();
             if (firstTime || !ShiftOptions.Skip(1).Select(o => o.Name).SequenceEqual(labels))   // full review #12: shifts were edited
@@ -267,6 +331,11 @@ public sealed class SummaryViewModel : BaseViewModel
                 _shift = current >= 0 ? ShiftOptions[current + 1] : ShiftOptions[0];
                 OnPropertyChanged(nameof(SelectedShift));
             }
+            else if (shiftWasCurrent && previousCurrent != _currentShift)   // the selection followed the current shift: keep following
+            {
+                var current = _shiftCodes.IndexOf(_currentShift);
+                if (current >= 0) { _shift = ShiftOptions[current + 1]; OnPropertyChanged(nameof(SelectedShift)); }
+            }
         });
         await LoadAsync();
     }
@@ -274,24 +343,46 @@ public sealed class SummaryViewModel : BaseViewModel
     private int _loadSeq;
 
     private List<string> _shiftCodes = new();
+    private string? _currentShift;
+
+    /// <summary>Day and shift the numbers on screen belong to (null: nothing shown).</summary>
+    private (DateOnly Day, string? Shift)? _shown;
 
     public Task LoadAsync() => _day == default ? Task.CompletedTask : RunBusyAsync(async () =>   // no calendar yet: nothing to ask for
     {
         OnPropertyChanged(nameof(DayText));
         var day = _day;
         var code = _shift?.Id is int i && i < _shiftCodes.Count ? _shiftCodes[i] : null;
+        // Another day or shift: the old numbers must not stay under the new heading while it loads, or if the load fails.
+        if (_shown != (day, code)) ClearResults();
         var seq = Interlocked.Increment(ref _loadSeq);
         var r = await _api.GetTotalsAsync(day, day, code, top: 5);
         if (seq != Volatile.Read(ref _loadSeq)) return;   // a later tap (day or shift) started another load: its result wins
         if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
         var d = r.Value!;
+        _shown = (day, code);
         TotalText = d.Total.Quantity.ToString("N0", CultureInfo.CurrentCulture);
-        EntriesText = $"rejected parts in {d.Total.Entries} entries";
+        EntriesText = $"{(d.Total.Quantity == 1 ? "rejected part" : "rejected parts")} in {Entries(d.Total.Entries)}";
         IncompleteNotice = d.UnavailableShops.Count == 0 ? "" : $"Incomplete: {string.Join(", ", d.UnavailableShops)} could not be read right now.";
-        Fill(Shops, d.Shops.Select(s => new SummaryLine(s.ShopName, $"{s.Entries} entries", s.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
+        Fill(Shops, d.Shops.Select(s => new SummaryLine(s.ShopName, Entries(s.Entries), s.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
         Fill(TopPhenomena, d.TopPhenomena.Select(p => new SummaryLine(p.PhenomenonName, p.ShopCode, p.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
         Fill(TopMachines, d.TopMachines.Select(m => new SummaryLine(m.MachineCode, $"{m.MachineName} · {m.ShopCode}", m.Quantity.ToString("N0", CultureInfo.CurrentCulture))));
+        ListsChanged();
     });
+
+    private void ListsChanged()
+    {
+        foreach (var p in new[] { nameof(TopPhenomenaHeading), nameof(TopMachinesHeading), nameof(HasTopNote), nameof(HasShops), nameof(HasTopPhenomena), nameof(HasTopMachines) })
+            OnPropertyChanged(p);
+    }
+
+    private void ClearResults()
+    {
+        _shown = null;
+        TotalText = "–"; EntriesText = ""; IncompleteNotice = "";
+        Shops.Clear(); TopPhenomena.Clear(); TopMachines.Clear();
+        ListsChanged();
+    }
 
     private static void Fill(ObservableCollection<SummaryLine> target, IEnumerable<SummaryLine> items) { target.Clear(); foreach (var x in items) target.Add(x); }
 }
@@ -299,18 +390,31 @@ public sealed class SummaryViewModel : BaseViewModel
 /// <summary>Feature #8: scan a machine label and go straight to the entry form (or the stage list when a shop has several stages).</summary>
 public sealed class ScanViewModel : BaseViewModel
 {
-    private readonly IApiClient _api; private readonly INavigator _nav;
+    /// <summary>After coming back from the screen a scan opened, the same label is ignored this long (it is usually still in front of the camera).</summary>
+    public static readonly TimeSpan RescanPause = TimeSpan.FromSeconds(3);
+    private readonly IApiClient _api; private readonly INavigator _nav; private readonly TimeProvider _time;
     private int _handling;
+    private string? _lastOpened;          // the scanned text that last opened a screen
+    private DateTimeOffset _ignoreUntil;  // ... ignored until then, unless another code is seen first
     private string _hint = "Point the camera at the QR label on the machine.";
-    public ScanViewModel(IApiClient api, INavigator nav) { (_api, _nav) = (api, nav); Title = "Scan machine"; }
+    public ScanViewModel(IApiClient api, INavigator nav, TimeProvider? time = null) { (_api, _nav) = (api, nav); _time = time ?? TimeProvider.System; Title = "Scan machine"; }
     public string Hint { get => _hint; private set => Set(ref _hint, value, nameof(Hint)); }
     public bool IsScanning => _handling == 0;
 
-    public override Task OnAppearingAsync() { Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); ErrorMessage = null; return Task.CompletedTask; }
+    public override Task OnAppearingAsync()
+    {
+        if (_lastOpened is not null) _ignoreUntil = _time.GetUtcNow() + RescanPause;   // review fix: Back must not reopen the same machine at once
+        Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); ErrorMessage = null; return Task.CompletedTask;
+    }
 
     /// <summary>Called by the camera view for every detected code; only the first one is handled until the page reappears.</summary>
     public async Task OnScannedAsync(string text)
     {
+        if (_lastOpened is not null)
+        {
+            if (text == _lastOpened && _time.GetUtcNow() < _ignoreUntil) return;
+            _lastOpened = null;   // another code, or the pause is over
+        }
         if (Interlocked.CompareExchange(ref _handling, 1, 0) != 0) return;
         OnPropertyChanged(nameof(IsScanning));
         var navigated = false;
@@ -324,12 +428,13 @@ public sealed class ScanViewModel : BaseViewModel
             if (x.Stages.Count == 1)
             { await _nav.GoToAsync(Routes.Entry, new Dictionary<string, object> { ["shop"] = x.Shop, ["stage"] = x.Stages[0], ["machine"] = x.Machine }); navigated = true; }
             else if (x.Stages.Count > 1)
-            { await _nav.GoToAsync(Routes.Stages, new Dictionary<string, object> { ["shop"] = x.Shop }); navigated = true; }
+            { await _nav.GoToAsync(Routes.Stages, new Dictionary<string, object> { ["shop"] = x.Shop, ["machine"] = x.Machine }); navigated = true; }   // the stage screen keeps the scanned machine
             else ErrorMessage = "No inspection stage is configured for this shop.";
         });
         }
         finally
         {
+            if (navigated) _lastOpened = text;
             // Full review #11: whatever happened (error, exception swallowed by RunBusyAsync), scanning resumes unless we left the page.
             if (!navigated) { await Task.Delay(1500); Interlocked.Exchange(ref _handling, 0); OnPropertyChanged(nameof(IsScanning)); }
         }

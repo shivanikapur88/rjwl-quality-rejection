@@ -7,8 +7,10 @@
    * It creates only a new schema [qa] and new tables inside it. It does not
      touch any existing object.
    * Re-runnable: every object is guarded with IF NOT EXISTS / OBJECT_ID checks.
-   * NOT YET EXECUTED against SQL Server (no SQL Server available during authoring).
+   Executed against SQL Server 2022 by the automated tests (docs/TEST_EVIDENCE.md).
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 GO

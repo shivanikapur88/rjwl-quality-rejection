@@ -1,0 +1,8 @@
+desktop-light: overflow 0px; machines table fits: true
+Back after drill: chips=""
+desktop-dark: overflow 0px; machines table fits: true
+tablet: overflow 0px; machines table fits: true
+phone admin overflow 0px
+360 admin overflow 0px
+touch targets < 44px: ["rowbtn:21","rowbtn:21","rowbtn:21","rowbtn:21","rowbtn:21","rowbtn:21","rowbtn:21","barname rowbtn:19","barname rowbtn:38","barname rowbtn:19"]
+page errors: []

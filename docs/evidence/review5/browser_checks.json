@@ -1,0 +1,36 @@
+{
+  "badgeText": "▼ 35% fewer vs Nov 15–Nov 21 (868) · today still running",
+  "badgeSpaced": true,
+  "axis": [
+    1076.932584269663,
+    1179.5842696629215
+  ],
+  "axisGapOk": true,
+  "focus_pareto": "BUTTON.barname rowbtn OTHERS (PRE)",
+  "focus_entries": "TR. Nov 25, 04:46 PMNov 25 BGDCDEV",
+  "chip": [
+    "Machine: DEV-GDC-01 ×"
+  ],
+  "chipKeepsCode": true,
+  "sw503": {
+    "status": 200,
+    "savedCopy": true
+  },
+  "cacheKeys": [
+    "qr-dashboard-v2 /dashboard/labels.html",
+    "qr-dashboard-v2 /dashboard/labels.js",
+    "qr-dashboard-v2 /dashboard/manifest.webmanifest",
+    "qr-dashboard-v2 /dashboard/icons/icon-192.png",
+    "qr-dashboard-v2 /dashboard/icons/icon-512.png",
+    "qr-dashboard-v2 /dashboard/icons/maskable-512.png",
+    "qr-dashboard-v2 /dashboard/icons/icon.svg",
+    "qr-dashboard-v2 /dashboard/icons/favicon-32.png",
+    "qr-dashboard-v2 /dashboard/dashboard.css",
+    "qr-dashboard-v2 /dashboard/common.js",
+    "qr-dashboard-v2 /dashboard/dashboard.js",
+    "qr-dashboard-v2 /dashboard/index.html"
+  ],
+  "noQueryKeys": true,
+  "apiCached": 0,
+  "consoleErrors": []
+}

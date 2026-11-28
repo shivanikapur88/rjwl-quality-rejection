@@ -17,6 +17,8 @@ public sealed class MyEntriesViewModel : BaseViewModel
     private bool _empty;
     private string? _cursor;
     private string? _incomplete;
+    private bool _loaded;              // a first page is on screen
+    private EntryChanges? _opened;     // filled by the detail screen of the entry opened last
 
     public ObservableCollection<EntryRow> Entries { get; } = new();
     public AsyncCommand RefreshCommand { get; }
@@ -24,6 +26,11 @@ public sealed class MyEntriesViewModel : BaseViewModel
 
     public bool IsEmpty { get => _empty; private set => Set(ref _empty, value, nameof(IsEmpty)); }
     public bool HasMore => _cursor is not null;
+
+    private bool _loadingMore;
+
+    /// <summary>Review fix: "Load more" progress, shown under the list (not through the RefreshView, which would reload page 1).</summary>
+    public bool IsLoadingMore { get => _loadingMore; private set => Set(ref _loadingMore, value, nameof(IsLoadingMore)); }
 
     /// <summary>Shown above the list when one or more shops' entries could not be loaded.</summary>
     public string? IncompleteNotice
@@ -40,32 +47,62 @@ public sealed class MyEntriesViewModel : BaseViewModel
         _api = api;
         _session = session;
         _nav = nav;
-        RefreshCommand = new AsyncCommand(LoadAsync);
+        RefreshCommand = new AsyncCommand(() => PullToRefreshAsync(LoadAsync));   // review fix: only a pull sets IsRefreshing
         LoadMoreCommand = new AsyncCommand(LoadMoreAsync, () => HasMore && !IsBusy);
     }
 
+    /// <summary>Review fix: the list (with every page loaded) is kept when coming back from an entry; only that entry's
+    /// row is updated if its detail screen saw a change (e.g. a correction was requested). Pull down to reload everything.</summary>
     public override Task OnAppearingAsync()
     {
         OnPropertyChanged(nameof(Heading));
-        return LoadAsync();
+        var changed = _opened?.Updated;
+        _opened = null;
+        if (!_loaded || Entries.Count == 0) return LoadAsync();
+        if (changed is not null)
+        {
+            for (var i = 0; i < Entries.Count; i++)
+                if (Entries[i].Dto is { } d && d.Id == changed.Id && d.ShopId == changed.ShopId) { Entries[i] = Row(changed); break; }
+        }
+        return Task.CompletedTask;
     }
 
-    /// <summary>First page (newest entries).</summary>
-    public Task LoadAsync() => RunBusyAsync(async () =>
-    {
-        var r = await _api.GetEntriesPageAsync(null, PageSize);
-        if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
-        Entries.Clear();
-        Apply(r.Value!);
-    });
+    private int _loadSeq;
 
-    /// <summary>Next page; appends below the rows already shown.</summary>
-    public Task LoadMoreAsync() => HasMore ? RunBusyAsync(async () =>
+    /// <summary>First page (newest entries). Supersedes any load still running (e.g. a slow "Load more").</summary>
+    public Task LoadAsync() => LoadPageAsync(more: false);
+
+    /// <summary>Next page; appends below the rows already shown. Not started while another load is running.</summary>
+    public Task LoadMoreAsync() => HasMore && !IsBusy ? LoadPageAsync(more: true) : Task.CompletedTask;
+
+    private async Task LoadPageAsync(bool more)
     {
-        var r = await _api.GetEntriesPageAsync(_cursor, PageSize);
-        if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
-        Apply(r.Value!);
-    }) : Task.CompletedTask;
+        // Only the latest load may change the list, the cursor or IsBusy: a "Load more" answering after a refresh
+        // would otherwise append an old page below the new first page and replace the cursor.
+        var seq = Interlocked.Increment(ref _loadSeq);
+        var cursor = more ? _cursor : null;
+        IsBusy = true;
+        IsLoadingMore = more;
+        ErrorMessage = null;
+        LoadMoreCommand.RaiseCanExecuteChanged();
+        try
+        {
+            var r = await _api.GetEntriesPageAsync(cursor, PageSize);
+            if (seq != Volatile.Read(ref _loadSeq)) return;
+            if (!r.IsSuccess) { ErrorMessage = r.Error!.Message; return; }
+            if (!more) Entries.Clear();
+            Apply(r.Value!);
+            _loaded = true;
+        }
+        catch (Exception)
+        {
+            if (seq == Volatile.Read(ref _loadSeq)) ErrorMessage = GenericError;
+        }
+        finally
+        {
+            if (seq == Volatile.Read(ref _loadSeq)) { IsBusy = false; IsLoadingMore = false; LoadMoreCommand.RaiseCanExecuteChanged(); }
+        }
+    }
 
     private void Apply(EntryPage page)
     {
@@ -85,6 +122,27 @@ public sealed class MyEntriesViewModel : BaseViewModel
         e, EntryText.Badge(e));
 
     /// <summary>Round 2: tapping an entry opens its detail (where its inspector can ask for a correction).</summary>
-    public Task OpenAsync(EntryRow row) => row.Dto is null ? Task.CompletedTask
-        : _nav.GoToAsync(Routes.EntryDetail, new Dictionary<string, object> { ["entry"] = row.Dto });
+    private bool _opening;
+
+    /// <summary>Opens the entry detail. A second tap while the first navigation is running is ignored (a double tap
+    /// opened two pages or raised Shell's "navigation in progress").</summary>
+    public async Task OpenAsync(EntryRow row)
+    {
+        if (row.Dto is null || _opening) return;
+        _opening = true;
+        try
+        {
+            _opened = new EntryChanges();
+            await _nav.GoToAsync(Routes.EntryDetail, new Dictionary<string, object> { ["entry"] = row.Dto, [EntryChanges.Key] = _opened });
+        }
+        finally { _opening = false; }
+    }
+}
+
+/// <summary>Review fix: passed to the entry detail screen, which puts the entry here when it changed (a fresher copy,
+/// or a correction requested), so the list can update that row without reloading its pages.</summary>
+public sealed class EntryChanges
+{
+    public const string Key = "changes";
+    public EntryDto? Updated { get; set; }
 }

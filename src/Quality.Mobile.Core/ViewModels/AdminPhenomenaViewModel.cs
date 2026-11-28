@@ -29,6 +29,9 @@ public sealed class AdminPhenomenaViewModel : BaseViewModel
 
 	private int _version;
 
+	/// <summary>Review fix: the latest shop change; a slower earlier one must not add its stages to the newer shop's list.</summary>
+	private int _shopSeq;
+
 	public ObservableCollection<Option> Shops { get; } = new ObservableCollection<Option>();
 
 	public ObservableCollection<Option> Stages { get; } = new ObservableCollection<Option>();
@@ -157,10 +160,14 @@ public sealed class AdminPhenomenaViewModel : BaseViewModel
 
 	private async Task OnShopChangedAsync()
 	{
+		int seq = ++_shopSeq;
+		// Review fix: _initialising is only held while the stage list is rebuilt, not across the request, so choosing
+		// another shop meanwhile is not ignored (the picker would show it with the earlier shop's stages).
 		_initialising = true;
 		Stages.Clear();
 		Stages.Add(new Option(null, "All stages"));
 		SelectedStage = Stages[0];
+		_initialising = false;
 		int? num = _shop?.Id;
 		int sid = default;
 		int num2;
@@ -176,6 +183,11 @@ public sealed class AdminPhenomenaViewModel : BaseViewModel
 		if (num2 != 0)
 		{
 			ApiResult<List<StageDto>> r = await _api.GetStagesAsync(sid);
+			if (seq != _shopSeq)
+			{
+				return;   // another shop was chosen meanwhile: that change fills the list and loads
+			}
+			_initialising = true;
 			if (r.IsSuccess)
 			{
 				foreach (StageDto s in r.Value)

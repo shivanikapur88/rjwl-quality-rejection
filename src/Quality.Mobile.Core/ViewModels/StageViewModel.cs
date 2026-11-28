@@ -16,6 +16,9 @@ public sealed class StageViewModel : BaseViewModel
 
 	private ShopDto? _shop;
 
+	/// <summary>Set when coming from a scanned label: choosing a stage then goes straight to the entry form for this machine.</summary>
+	private MachineDto? _machine;
+
 	public ObservableCollection<StageDto> Stages { get; } = new ObservableCollection<StageDto>();
 
 	public AsyncCommand<StageDto> SelectStageCommand { get; }
@@ -32,6 +35,7 @@ public sealed class StageViewModel : BaseViewModel
 	public override async Task OnNavigatedToAsync(IDictionary<string, object> args)
 	{
 		_shop = BaseViewModel.Arg<ShopDto>(args, "shop");
+		_machine = BaseViewModel.Arg<MachineDto>(args, "machine");
 		Title = "Inspection stage";
 		OnPropertyChanged("ShopName");
 		if ((object)_shop == null)
@@ -59,6 +63,16 @@ public sealed class StageViewModel : BaseViewModel
 
 	private Task Select(StageDto stage)
 	{
+		if ((object)_machine != null)
+		{
+			// Machines belong to the shop, so the scanned machine is valid for every stage of it.
+			return _nav.GoToAsync("entry", new Dictionary<string, object>
+			{
+				["shop"] = _shop,
+				["stage"] = stage,
+				["machine"] = _machine
+			});
+		}
 		return _nav.GoToAsync("machines", new Dictionary<string, object>
 		{
 			["shop"] = _shop,

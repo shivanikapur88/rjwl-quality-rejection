@@ -1,39 +1,44 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!-- Round 2 (#1): supervisors/administrators decide requests; inspectors see and withdraw their own. -->
+<!-- Round 2 (#1): supervisors/administrators decide requests; inspectors see and withdraw their own.
+     App design round: tappable checkbox label, status chip per request, shared type scale. -->
 <pages:AppPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" xmlns:vm="clr-namespace:Quality.Mobile.Core.ViewModels;assembly=Quality.Mobile.Core" xmlns:dto="clr-namespace:Quality.Core.Dtos;assembly=Quality.Core" xmlns:ctl="clr-namespace:Quality.Mobile.Controls" xmlns:pages="clr-namespace:Quality.Mobile.Pages" x:Class="Quality.Mobile.Pages.CorrectionsPage" x:DataType="vm:CorrectionsViewModel" x:Name="Root" Title="Corrections">
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="12" RowSpacing="8">
-        <Label Text="{Binding Heading}" Style="{StaticResource H1}" />
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-            <CheckBox IsChecked="{Binding ShowDecided}" VerticalOptions="Center" />
-            <Label Grid.Column="1" Text="Also show decided requests" Style="{StaticResource Body}" FontSize="16" VerticalOptions="Center" />
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="16,12,16,0" RowSpacing="8">
+        <Label Text="{Binding Heading}" Style="{StaticResource Title}" />
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+            <CheckBox IsChecked="{Binding ShowDecided}" SemanticProperties.Description="Also show decided requests" VerticalOptions="Center" AutomationId="show-decided" />
+            <Label Grid.Column="1" Text="Also show decided requests" Style="{StaticResource CheckLabel}">
+                <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnShowDecidedTapped" /></Label.GestureRecognizers>
+            </Label>
         </Grid>
         <ctl:StatusBar Grid.Row="2" />
-        <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=OneWay}">
+        <RefreshView Grid.Row="3" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsRefreshing, Mode=TwoWay}">
             <Grid>
                 <CollectionView ItemsSource="{Binding Items}" SelectionMode="None">
                     <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="vm:CorrectionItem">
-                            <Border Style="{StaticResource Card}" Padding="12">
+                            <Border Style="{StaticResource CardCompact}">
                                 <VerticalStackLayout Spacing="4">
-                                    <Label Text="{Binding Title}" Style="{StaticResource H2}" FontSize="17" />
-                                    <Label Text="{Binding Proposal}" Style="{StaticResource Body}" FontSize="16" FontAttributes="Bold" />
-                                    <Label Text="{Binding ReasonLine}" Style="{StaticResource Body}" FontSize="15" />
-                                    <Label Text="{Binding Meta}" Style="{StaticResource Muted}" />
-                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,6,0,0" IsVisible="{Binding CanDecide}">
-                                        <Button Text="Reject" Style="{StaticResource DangerButton}" HeightRequest="48" FontSize="15"
+                                    <Label Text="{Binding Title}" Style="{StaticResource Subheading}" />
+                                    <ctl:StatusChip Text="{Binding Dto.Status}" />
+                                    <Label Text="{Binding Proposal}" Style="{StaticResource BodyStrong}" />
+                                    <Label Text="{Binding ReasonLine}" Style="{StaticResource Body}" />
+                                    <Label Text="{Binding Meta}" Style="{StaticResource Secondary}" />
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0" IsVisible="{Binding CanDecide}">
+                                        <Button Text="Reject" Style="{StaticResource DangerButton}"
                                                 Command="{Binding Source={x:Reference Root}, Path=BindingContext.RejectCommand, x:DataType=ContentPage}" CommandParameter="{Binding .}" />
-                                        <Button Grid.Column="1" Text="Approve" Style="{StaticResource PrimaryButton}" HeightRequest="48" FontSize="15"
+                                        <Button Grid.Column="1" Text="Approve" Style="{StaticResource PrimaryButton}"
                                                 Command="{Binding Source={x:Reference Root}, Path=BindingContext.ApproveCommand, x:DataType=ContentPage}" CommandParameter="{Binding .}" />
                                     </Grid>
-                                    <Button Text="Withdraw request" Style="{StaticResource SmallButton}" IsVisible="{Binding CanWithdraw}"
+                                    <Button Text="Withdraw request" Style="{StaticResource SecondaryButton}" IsVisible="{Binding CanWithdraw}" Margin="0,8,0,0"
                                             Command="{Binding Source={x:Reference Root}, Path=BindingContext.WithdrawCommand, x:DataType=ContentPage}" CommandParameter="{Binding .}" />
                                 </VerticalStackLayout>
                             </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
+                    <CollectionView.Footer><BoxView HeightRequest="16" Color="Transparent" /></CollectionView.Footer>
                 </CollectionView>
-                <Label Text="{Binding EmptyText}" Style="{StaticResource Muted}" FontSize="18" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,40,0,0" IsVisible="{Binding IsEmpty}" />
+                <Label Text="{Binding EmptyText}" Style="{StaticResource Secondary}" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,40,0,0" IsVisible="{Binding IsEmpty}" />
             </Grid>
         </RefreshView>
     </Grid>

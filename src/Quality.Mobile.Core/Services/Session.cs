@@ -89,8 +89,12 @@ public sealed class Session : ISession
 		return Task.CompletedTask;
 	}
 
-	public void NotifyExpired()
+	public void NotifyExpired(string? rejectedToken = null)
 	{
+		if (rejectedToken != null && User is { } current && current.Token != rejectedToken)
+		{
+			return;   // review fix: a late 401 for an earlier session must not end a newer one
+		}
 		bool flag = (object)User != null;
 		User = null;
 		try

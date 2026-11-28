@@ -5,6 +5,8 @@
    only so the workflow can be exercised. Replace with your real machine master
    (code + name per shop) before go-live, or deactivate these (IsActive = 0).
    ============================================================================ */
+SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write
+SET ANSI_NULLS ON;
 SET NOCOUNT ON;
 INSERT INTO qa.Machines (MachineCode, MachineName, ShopId)
 SELECT v.Code, v.Name, s.Id

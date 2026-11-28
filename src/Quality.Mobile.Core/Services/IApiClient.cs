@@ -9,6 +9,9 @@ public interface IApiClient
 {
 	Task<ApiResult<Unit>> HealthAsync();
 
+	/// <summary>Review fix: health check against a candidate address that is not saved (Settings, "Test connection").</summary>
+	Task<ApiResult<Unit>> TestConnectionAsync(string baseUrl);
+
 	Task<ApiResult<LoginResponse>> LoginAsync(LoginRequest request);
 
 	Task<ApiResult<List<ShopDto>>> GetShopsAsync();

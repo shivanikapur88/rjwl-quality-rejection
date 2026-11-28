@@ -152,3 +152,25 @@ public class EntryCorrection
     /// <summary>No proposal at all: the entry should simply not count.</summary>
     public bool IsReverseOnly => ProposedMachineId is null && ProposedPhenomenonId is null && ProposedQuantity is null && ProposedRemarks is null;
 }
+
+/// <summary>A (client address, login) pair that signed in successfully: exempt from some throttle limits (db/16).</summary>
+public class LoginKnownClient
+{
+    public string ClientKey { get; set; } = "";
+    public string LoginKey { get; set; } = "";
+    public DateTime LastSuccessAt { get; set; }
+}
+
+/// <summary>Parts produced per machine, production day and shift (db/13), for the rejection rate. Not measured by this system.</summary>
+public class ProductionCount
+{
+    public long Id { get; set; }
+    public int ShopId { get; set; }
+    public int MachineId { get; set; }
+    public DateOnly ProductionDate { get; set; }
+    public string ShiftCode { get; set; } = "";
+    public int ProducedQuantity { get; set; }
+    public string Source { get; set; } = "";
+    public DateTime UpdatedAt { get; set; }
+    public int? UpdatedBy { get; set; }
+}

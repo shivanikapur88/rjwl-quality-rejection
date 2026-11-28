@@ -12,6 +12,9 @@ namespace Quality.Api.Infrastructure;
 public sealed class ShiftCalendarProvider : IShiftCalendarProvider
 {
     private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(5);
+    /// <summary>A FALLBACK calendar (the table could not be read) is retried after 15 seconds, not kept for 5 minutes:
+    /// entries are stamped with it and their shift is never recomputed (third full review).</summary>
+    private static readonly TimeSpan FallbackFor = TimeSpan.FromSeconds(15);
     private readonly IServiceScopeFactory _scopes; private readonly TimeProvider _time; private readonly ILogger<ShiftCalendarProvider> _log;
     private readonly TimeZoneInfo _zone;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -26,11 +29,11 @@ public sealed class ShiftCalendarProvider : IShiftCalendarProvider
     public async Task<ShiftCalendar> GetAsync()
     {
         var now = _time.GetUtcNow().UtcDateTime;
-        if (_cached is not null && now - _loadedAt < CacheFor) return _cached;
+        if (_cached is not null && now - _loadedAt < (_cached.IsFallback || LastLoadFailed ? FallbackFor : CacheFor)) return _cached;
         await _gate.WaitAsync();
         try
         {
-            if (_cached is not null && now - _loadedAt < CacheFor) return _cached;
+            if (_cached is not null && now - _loadedAt < (_cached.IsFallback || LastLoadFailed ? FallbackFor : CacheFor)) return _cached;
             try
             {
                 using var scope = _scopes.CreateScope();
@@ -38,17 +41,22 @@ public sealed class ShiftCalendarProvider : IShiftCalendarProvider
                 var shifts = await db.ShiftDefinitions.AsNoTracking().ToListAsync();
                 // An empty or unusable table (e.g. every shift inactive) throws or falls back; both are flagged for readiness.
                 _cached = shifts.Count == 0 ? Fallback() : new ShiftCalendar(shifts, _zone);
+                LastLoadFailed = false;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _log.LogWarning(ex, "Could not read qa.ShiftDefinitions; using the {Which} shift calendar.", _cached is null ? "default" : "last loaded");
                 _cached ??= Fallback();   // reported by /api/health/ready
+                LastLoadFailed = true;    // also when an older good calendar is kept: readiness says so (Fable review)
             }
             _loadedAt = now;
             return _cached;
         }
         finally { _gate.Release(); }
     }
+
+    /// <summary>The last read of qa.ShiftDefinitions failed (or the table is unusable); retried after 15 seconds.</summary>
+    public bool LastLoadFailed { get; private set; }
 
     private ShiftCalendar Fallback() => new(ShiftCalendar.Default(_zone).Shifts, _zone) { IsFallback = true };
 }

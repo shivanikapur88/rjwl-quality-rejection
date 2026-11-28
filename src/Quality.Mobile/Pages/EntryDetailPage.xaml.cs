@@ -10,4 +10,11 @@ public partial class EntryDetailPage : AppPage
         InitializeComponent();
         BindingContext = vm;
     }
+
+    // App design round: the text next to the checkbox toggles it too.
+    private void OnChangeRemarksTapped(object? sender, TappedEventArgs e)
+    {
+        var vm = (EntryDetailViewModel)BindingContext;
+        vm.ChangeRemarks = !vm.ChangeRemarks;
+    }
 }

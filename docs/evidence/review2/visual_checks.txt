@@ -1,0 +1,6 @@
+rate tile: 0.71% | 788 rejected of 111,138 produced · based on 99% of rejected parts | warn=false
+pareto first rows: Pin Deep (GDC) / CASTING CRACK (FINAL) / DENT (PRE)
+30 days rate: 0.70% | 1,586 rejected of 226,469 produced · based on 88% of rejected parts | warn=false
+labels after two quick Show clicks: shops shown = ["CNC Shop"]
+page errors: []
+forced 40% coverage: ⚠ Partial: based on only 40% of rejected parts (production counts missing). 788 rejected of 111,138 produced | warn=true

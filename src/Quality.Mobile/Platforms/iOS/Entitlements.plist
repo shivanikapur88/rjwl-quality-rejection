@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The sign-in token is kept with MAUI SecureStorage, which uses the iOS Keychain and needs this access group.
+	     $(AppIdentifierPrefix) is the Apple team prefix filled in at signing; the rest must equal ApplicationId. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.yourcompany.qualityrejection</string>
+	</array>
+</dict>
+</plist>

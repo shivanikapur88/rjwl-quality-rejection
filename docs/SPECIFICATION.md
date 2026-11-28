@@ -6,7 +6,7 @@ This document replaces the scattered statements in the supplied README, `Phase2_
 
 | Topic | Supplied documents said | Position (and evidence) |
 |---|---|---|
-| Mobile pages | Short report: 11 pages | **14 pages**: Login, Home, Stage, Machine, Entry form, Confirmation, My entries, Settings, Admin phenomena, Phenomenon editor, Admin machines, Machine editor, Admin users, User editor. Registered in `MauiProgram.cs` and present in the supplied build. |
+| Mobile pages | Short report: 11 pages | **14 pages** as recovered (round 2 added 4: entry detail, corrections, shift summary, QR scan, so 18 now): Login, Home, Stage, Machine, Entry form, Confirmation, My entries, Settings, Admin phenomena, Phenomenon editor, Admin machines, Machine editor, Admin users, User editor. Registered in `MauiProgram.cs` and present in the supplied build. |
 | Framework | ".NET 8, upgrade pending"; mobile already `net10.0-android` | **Everything on .NET 10** (LTS, supported to Nov 2028). .NET 8 left support on 10 Nov 2026. MAUI 10 support ends earlier than .NET 10's; plan the move to MAUI 11 (see [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)). |
 | User management | "No user-management screen" **and** in-app user management | **In-app user management exists** (Admin users + User editor) and is part of the scope. |
 | PRE/FINAL entries | Early design: undecided | **Both in `QualityMasterDB`**, one shared table `qa.QualityRejectionEntries`, separated by `ShopId`/`ShopCode` (CHECK constraint allows only PRE/FINAL there). |
@@ -20,7 +20,9 @@ This document replaces the scattered statements in the supplied README, `Phase2_
 
 **Added in round 2 (approved by the owner, 26 Nov 2026):** entry corrections, shift and production date, the app's shift summary, machine QR codes, and a read-only web dashboard. See section 12.
 
-**Not added (outside the documented scope; listed so nobody assumes they exist):** offline entry or a local queue, a web *administration* portal, an audit-viewing screen, photos, dashboards beyond the read-only one, exports, PLC integration, and rejection percentages. Each needs a business decision first ([BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)).
+**Added in round 3 (approved by the owner, 26 Nov 2026):** dashboard drill-down, comparison with the previous period, Pareto, and a rejection rate where production counts exist (administrators upload them on the dashboard). See section 13.
+
+**Not added (outside the documented scope; listed so nobody assumes they exist):** offline entry or a local queue, a web *administration* portal, an audit-viewing screen, photos, dashboard functions beyond those in sections 12-13, exports, and PLC integration. Each needs a business decision first ([BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md)).
 
 **Outside this application:** the CNC production collector and the ShopMonitor dashboard. The scripts add only schema `qa` and the table `qa.QualityRejectionEntries` to `GDC_AndonDB` and `MachineShopDB`; nothing else in those databases is touched.
 
@@ -94,7 +96,7 @@ Request (`POST /api/rejection-entries`): `SubmissionId, ShopId, StageId, Machine
 | `GET /api/rejection-entries?…&limit` (supplied, kept for compatibility) | At most `limit` newest entries (max 200); **not** a complete history. Fails with 503 if any store is unreachable. |
 | `GET /api/rejection-entries/{shopId}/{id}` | One entry. The shop is part of the key (ids are only unique per database, and PRE/FINAL share a table). |
 
-**Time:** stored as UTC (`datetime2(3)`, server clock). `fromUtc` is inclusive; `toUtc` is **exclusive** in the paged endpoint (inclusive in the legacy one). Query times may carry `Z` or an offset (`+05:30`) and are converted to UTC; times without a zone are taken as UTC. The app shows times in the device's local time zone. No shift or production-day logic exists (the CNC 05:59 reset is not applied); see [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md).
+**Time:** stored as UTC (`datetime2(3)`, server clock). `fromUtc` is inclusive; `toUtc` is **exclusive** in the paged endpoint (inclusive in the legacy one). Query times may carry `Z` or an offset (`+05:30`) and are converted to UTC; times without a zone are taken as UTC. The app shows times in the device's local time zone. From round 2 every entry also gets a production day and shift from the shift calendar (section 12.1); the CNC collector's 05:59 reset is not used.
 
 ## 8. Administration and audit
 
@@ -115,11 +117,12 @@ Safeguards: no self-deactivation or self-demotion; at least one active administr
 | Method and path | Who | Notes |
 |---|---|---|
 | `GET /api/health` | anyone | process is up (liveness) |
-| `GET /api/health/ready` (**new**) | anyone | 200 if the master and all four entry stores are reachable, otherwise 503; reports only `ok`/`unavailable` per component |
+| `GET /api/health/ready` (**new**) | anyone (rate-limited, cached 10 s) | 200 if the master and all four entry stores are reachable, otherwise 503; reports `ok`/`unavailable` per component, plus public `warnings` naming an entry store that still has entries without a production day (no counts, no file names) |
 | `POST /api/auth/login` | anyone | username **or** employee code; 429 `too_many_attempts` with `Retry-After` after repeated failures |
 | `GET /api/shops`, `/shops/{id}/stages`, `/shops/{id}/stages/{id}/machines`, `/…/phenomena` | signed in | only assigned shops; active items only |
 | `POST /api/rejection-entries` | inspector | 201 new / 200 replay |
 | `GET /api/rejection-entries`, `/page`, `/{shopId}/{id}` | signed in | role-scoped (section 7) |
+| Round 2/3: `POST /api/rejection-entries/{shopId}/{id}/corrections`, `/api/corrections` (+ `/count`, `{id}/approve`, `/reject`, `/withdraw`), `/api/reports/calendar`, `/totals`, `/entries`, `/api/machines/lookup`, `/api/admin/machines/{id}/qr.svg`, `POST /api/admin/production-counts` | by role | see sections 12 and 13 |
 | `/api/admin/phenomena`, `/api/admin/machines`, `/api/admin/users` (+ `PATCH {id}/status`, `POST users/{id}/reset-password`, `DELETE`) | administrator | section 8 |
 
 Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `unauthenticated`/`token_expired` 401, `forbidden`/`shop_not_assigned` 403, `*_not_found` 404, conflicts 409 (`concurrent_edit`, `concurrent_change`, `duplicate*`, `last_admin`, `*_in_use`, `*_inactive`, `submission_*`), `value_too_long` 400, `too_many_attempts` 429, `database_unavailable`/`store_not_configured` 503, `server_error` 500. **Only real connectivity problems** are reported as 503 (previously every constraint error was "database unavailable"). Bodies never contain SQL text, stack traces or secrets.
@@ -128,14 +131,15 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 
 * **Tokens:** HS256 JWT, 480 minutes by default, claims `sub`, `emp`, `role`, `tv` (token version). Every request re-checks: user exists, is active, still has that role, and `tv` equals `Users.TokenVersion`. Password reset, deactivation and role change increase `TokenVersion`, so **all earlier tokens stop working immediately**, and reactivating or changing the role back does not revive them. Tokens with missing or malformed claims get 401, not 500.
 * **Login throttling:**
-  * Failed attempts are counted per client address + login (5 in 5 min) and per client address (30 in 15 min).
+  * Failed attempts are counted per client address + login (5 in 5 min) and per client address (30 in 15 min). A login that has already signed in successfully from that address (within 30 days) is exempt from the per-address cap, so one faulty tablet behind the plant's shared address cannot block everybody.
+  * Login keys ignore case, accents and full-width forms. Identifiers longer than 50 characters, passwords longer than 128 and request bodies over 8 KB are refused without a database lookup.
   * Per login (10 in 15 min), counted **only for clients that have not signed in as that login before** (within 30 days). Someone guessing from elsewhere therefore cannot lock the real user out of their usual device.
   * Checking and counting are one atomic step, so a parallel burst cannot slip past.
   * A success clears that login's counters.
   * There is also a generous raw cap of 300 login requests/minute per address (configurable).
   * Counters are in memory, per API instance. Behind a reverse proxy, set `ReverseProxy:KnownProxies` so the real client address is used; otherwise a warning is logged.
 * **Passwords:** ASP.NET Core `PasswordHasher` (PBKDF2, salted). One generic message for unknown user, wrong password and inactive account.
-* **Device:** token in Android Keystore-backed storage, backup disabled, cleartext HTTP disabled; debug builds accept the development certificate only for `10.0.2.2`/`localhost`.
+* **Device:** token in Android Keystore-backed storage, backup disabled, cleartext HTTP disabled; debug builds skip certificate validation for `10.0.2.2`/`localhost` only (any certificate there, not just the development one); release builds always validate. A certificate failure is reported as "The server's security certificate is not trusted on this device", not as a network error.
 
 ## 11. App behaviour on network problems (online-only, as designed)
 
@@ -164,7 +168,7 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 ### 12.3 Reports and the app's shift summary (#4)
 * `GET /api/reports/totals?fromDate&toDate&shopId&shiftCode&top` (supervisor: assigned shops; administrator: all; inspectors: 403). Production days are inclusive, at most 92 per request.
 * Returns totals, per shop, per day+shift, top phenomena and top machines, plus `unavailableShops` (the result is incomplete if any are listed). Reversed entries are excluded.
-* These are **counts of rejected parts**. No rejection percentage is computed, because there is no production count (decision #13).
+* These are **counts of rejected parts**. From round 3 a rejection rate is added only where production counts exist (§13.4); its counting rules still need sign-off (decision #13).
 * The app's **Shift summary** shows one production day (today and the current shift by default; previous/next day; shift picker).
 
 ### 12.4 Machine QR codes (#8)
@@ -172,7 +176,54 @@ Errors are RFC 7807 problem documents with a stable `code`: `validation` 400, `u
 * Administrators print labels at `/dashboard/labels.html` (SVG from `GET /api/admin/machines/{id}/qr.svg`).
 * Inspectors tap **Scan machine QR**. `GET /api/machines/lookup?code=…` checks shop assignment (403), active machine (409 `machine_inactive`) and label format (400 `qr_invalid`), then the entry form opens for that machine. The camera permission is requested the first time the scan screen opens.
 
-### 12.5 Read-only web dashboard (#6)
+### 12.5 Web dashboard (#6)
+
+Read-only for supervisors. From round 3, administrators can also upload production counts on it (§13.4).
+
+**Phone layout:** below 600 px wide, "Top machines" shows code, parts, change and rate only; entries are shown as one card per entry with labelled fields (still exposed as a table to screen readers); the Pareto shows rank, name, parts, share and cumulative share; the page never scrolls sideways. The chart redraws when the width changes (rotation). Rates of machines and shops based on less than 80% of their rejected parts carry "⚠ N%".
 * Served by the API at `/dashboard/`. Supervisors and administrators sign in with their normal credentials; same roles and shop scope as the API.
 * Shows: rejected parts and entries, waiting correction requests, a stacked bar chart per production day by shift (with a table view), top phenomena with share of rejected parts, top machines, and totals by shop.
 * Plain HTML/JS with no external libraries, so it works on an offline plant network. Strict Content-Security-Policy: own scripts only, no inline script, no framing. The token is kept in the browser tab's session storage and cleared on sign-out or expiry.
+
+### 12.6 Dashboard desktop app (approved 28 Nov 2026)
+
+For supervisors and administrators on Windows PCs. The dashboard is installable from Edge or Chrome as a desktop app (web app manifest, own window, Start-menu and taskbar icon). No separate code base: it is the same pages served by the API.
+* Manifest `/dashboard/manifest.webmanifest`: name "Quality Rejection Dashboard", scope and start `/dashboard/`, standalone window, theme #1f3a5f, icons 192/512/maskable/SVG, shortcuts to the dashboard and the QR labels.
+* Service worker `/dashboard/sw.js` (scope `/dashboard/`): network first; it saves only the dashboard's static files for a fast start and a clear page when offline. **It never handles or saves `/api` requests**, so no report data is stored on the PC.
+* "Install app" button in the header when the browser offers installation; hidden once installed.
+* Requires HTTPS (browser rule). IT can deploy it with the `WebAppInstallForceList` policy ([BUILD_AND_DEPLOY.md §4a](BUILD_AND_DEPLOY.md)).
+* Not included: offline data, notifications, a native Windows installer (MSI/MSIX). The mobile app's inspector entry is not part of the desktop app.
+
+
+## 13. Round 3: dashboard insights and rejection rate (approved 26 Nov 2026)
+
+### 13.1 Drill-down
+* Click a **day** in the chart, a **phenomenon** in the Pareto, a **machine** or a **shop** to filter the whole dashboard to it.
+* Active filters appear as chips; click × to remove one. The selection is kept in the page address, so a link can be shared.
+* API: `GET /api/reports/totals` accepts `machineId` and `phenomenonId`. `GET /api/reports/entries` (same filters, `limit` ≤ 200) lists the entries behind a selection, newest first. Reversed entries are excluded, as in the totals.
+* Scope is unchanged: a machine or phenomenon outside the caller's shops simply matches nothing.
+
+### 13.2 Comparison with the previous period
+* `compare=true` adds the previous period of the same length, ending the day before `fromDate`.
+* It covers totals (`previousQuantity`, `previousEntries`, `previousFromDate`/`previousToDate`) and each phenomenon's and machine's `previousQuantity`.
+* The dashboard shows "▲ 12% more rejected parts than 13–19 Nov (913)", and ▲/▼ per phenomenon and machine.
+
+### 13.3 Pareto
+* Phenomena sorted by rejected parts (`top` up to 50; `phenomenaCount` is the total), with share and cumulative share of rejected parts as text.
+* A line marks where 80% is reached, and a readout says "16 of 37 phenomena cause 82% of rejected parts". It is a single-axis chart: the cumulative share is a column, not a second axis.
+
+### 13.4 Rejection rate (#8)
+* **This system does not measure production.** Parts produced per machine, production day and shift are stored in `qa.ProductionCounts` (db/13), from either:
+  * an administrator's **CSV upload** on the dashboard (`shop,machine,date,shift,produced`). `POST /api/admin/production-counts` checks the whole file first (unknown shop, machine not in the shop, unknown shift, future date, quantity 0–1,000,000, duplicate rows; at most 5,000 rows; dates from 400 days ago to today; shift codes as configured, which the dashboard upper-cases). Problems are reported by the **line of the file**. It saves nothing if any row is wrong, offers a dry run first, upserts by machine+day+shift, and is audited;
+  * an **automatic feed** from the production systems, using the read-only `db/14_production_counts_feed_TEMPLATE.sql`. The source names must be filled in with the owners of those systems.
+* If a shop's entries cannot be read in **either** period, that shop is left out of **both** periods and of every total, and the dashboard says so. Report dates start at 2000-01-01.
+* `ProductionCounts.ShopId` is stored with each row; the upload checks that the machine belongs to that shop. A feed built from `db/14` must keep the same rule (the template joins on the machine's shop).
+* **Rate** = rejected parts on machine+day+shift combinations that have a production count ÷ produced parts in scope.
+* Each rate comes with its **coverage**: the share of rejected parts it is based on. With no production data, the dashboard says so instead of showing 0%.
+* Rates are shown for the total, each shop and each machine.
+* **Counting rules still need RJWL's sign-off (decision #13).** For example: does a part rejected for two phenomena count twice? Is rework counted as produced? Until then the figure is labelled "rejected ÷ produced".
+
+### 13.5 Limits and scope notes
+* Correction lists return at most the 200 newest requests; the count endpoint counts all. Older pending requests are reached by filtering by shop.
+* Reports cover the **active** shops in the caller's scope. A deactivated shop's entries are no longer shown in totals and trends (they remain in the database and in history views).
+* The per-day "produced" figure in report data exists only for days with rejections; the rate itself uses all production counts in the selection.

@@ -16,6 +16,7 @@ namespace Quality.Core.Services;
 /// </remarks>
 public sealed class RejectionEntryService
 {
+    private readonly Microsoft.Extensions.Logging.ILogger? _log;
     public const int MaxRemarksLength = 500;
     public const int MaxQuantity = 9999;
     public const int DefaultPageSize = 50, MaxPageSize = 200;
@@ -25,8 +26,9 @@ public sealed class RejectionEntryService
     private readonly TimeProvider _time;
     private readonly IShiftCalendarProvider _calendar;
 
-    public RejectionEntryService(IMasterData master, IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time, IShiftCalendarProvider calendar)
-        => (_master, _router, _guard, _time, _calendar) = (master, router, guard, time, calendar);
+    public RejectionEntryService(IMasterData master, IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time, IShiftCalendarProvider calendar,
+        Microsoft.Extensions.Logging.ILogger<RejectionEntryService>? log = null)
+        => (_master, _router, _guard, _time, _calendar, _log) = (master, router, guard, time, calendar, log);
 
     /// <summary>The one definition of "cleaned-up remarks", used when saving AND when comparing a retry.</summary>
     public static string? CleanRemarks(string? remarks) => string.IsNullOrWhiteSpace(remarks) ? null : remarks.Trim();
@@ -86,7 +88,7 @@ public sealed class RejectionEntryService
                 RejectionPhenomenonId = phen.Id, PhenomenonNameSnapshot = phen.PhenomenonName, Quantity = req.Quantity,
                 InspectorId = user.Id, InspectorEmployeeCode = user.EmployeeCode,   // from the token, never the client
                 Remarks = remarks,
-                ServerCreatedAt = _time.GetUtcNow().UtcDateTime,                    // server time
+                ServerCreatedAt = TimeRules.ToMilliseconds(_time.GetUtcNow().UtcDateTime),   // server time, at the column's datetime2(3) precision
             };
             (entry.ProductionDate, entry.ShiftCode) = calendar.Resolve(entry.ServerCreatedAt);   // #2: plant production day + shift
 
@@ -180,7 +182,7 @@ public sealed class RejectionEntryService
             var filter = new EntryFilter(shop.Id, user.IsInspector ? user.Id : null, query.StageId, from, to, limit + 1,
                 ToInclusive: false, CursorTimeUtc: cursor?.TimeUtc, CursorIdBelow: idBelow);
             try { all.AddRange(await _router.For(shop.EntryStoreKey).ListAsync(filter)); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { unavailable.Add(shop.ShopCode); }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { DbErrors.LogShopUnavailable(_log, shop.ShopCode, "entry history", ex); unavailable.Add(shop.ShopCode); }
         }
 
         var ordered = all.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.ShopId).ThenByDescending(e => e.Id).ToList();

@@ -44,7 +44,9 @@ public sealed class UserAdminService
     private static ServiceError LastAdmin(string what) =>
         new(ErrorKind.Conflict, "last_admin", $"This is the last active administrator and cannot be {what}.");
 
-    private async Task<(List<int>? Ids, ServiceError? Error)> ResolveShopsAsync(string role, IReadOnlyList<int>? requested)
+    /// <param name="alreadyAssigned">On an edit, the user's current shops: a shop deactivated since may be KEPT (otherwise the
+    /// user could not be edited at all until the admin removed it), but not newly assigned.</param>
+    private async Task<(List<int>? Ids, ServiceError? Error)> ResolveShopsAsync(string role, IReadOnlyList<int>? requested, IReadOnlyCollection<int>? alreadyAssigned = null)
     {
         if (role == RoleNames.Administrator) return (new List<int>(), null);   // administrators implicitly see every shop
         var ids = (requested ?? Array.Empty<int>()).Distinct().ToList();
@@ -52,7 +54,9 @@ public sealed class UserAdminService
         foreach (var id in ids)
         {
             var s = await _master.GetShopAsync(id);
-            if (s is null || !s.IsActive) return (null, new ServiceError(ErrorKind.Validation, "shop_not_found", "One of the selected shops does not exist."));
+            if (s is null) return (null, new ServiceError(ErrorKind.Validation, "shop_not_found", "One of the selected shops does not exist."));
+            if (!s.IsActive && alreadyAssigned?.Contains(id) != true)
+                return (null, new ServiceError(ErrorKind.Validation, "shop_inactive", $"The shop {s.ShopName} is not active and cannot be assigned."));
         }
         return (ids, null);
     }
@@ -157,10 +161,10 @@ public sealed class UserAdminService
         if (roleChanges && u.Id == actor.Id) return ServiceResult<AdminUserDto>.Fail(ErrorKind.Conflict, "cannot_change_own_role", "You cannot change your own role.");
         var demotesActiveAdmin = roleChanges && currentRole == RoleNames.Administrator && u.IsActive;
 
-        var (shopIds, shopErr) = await ResolveShopsAsync(roleName, req.ShopIds);
+        var oldShops = (await _master.GetAllUserShopsAsync()).Where(x => x.UserId == u.Id).Select(x => x.ShopId).ToList();
+        var (shopIds, shopErr) = await ResolveShopsAsync(roleName, req.ShopIds, oldShops);
         if (shopErr is not null) return ServiceResult<AdminUserDto>.Fail(shopErr);
 
-        var oldShops = (await _master.GetAllUserShopsAsync()).Where(x => x.UserId == u.Id).Select(x => x.ShopId).ToList();
         var old = Snapshot(u, oldShops);
         var role = await _master.GetRoleAsync(roleName) ?? throw new InvalidOperationException("Role missing in database: " + roleName);
 

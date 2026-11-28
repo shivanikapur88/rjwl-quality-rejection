@@ -62,4 +62,6 @@ public sealed class ShiftCalendar
 public interface IShiftCalendarProvider
 {
     Task<ShiftCalendar> GetAsync();
+    /// <summary>The last attempt to read the shift table failed (the calendar in use may be an older copy or the default).</summary>
+    bool LastLoadFailed => false;
 }

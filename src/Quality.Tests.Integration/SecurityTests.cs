@@ -162,8 +162,13 @@ public sealed class SecurityTests(SqlFixture f) : SqlTest(f)
             """, ("@s", id));
         try
         {
-            var dto = await F.Client().GetFromJsonAsync<ReadinessDto>("/api/health/ready");
-            Assert.Contains(dto!.Warnings!, w => w.StartsWith("entries:CNC:") && w.Contains("db/12"));
+            // A fresh API instance: readiness results are cached for 10 seconds per instance.
+            await using var factory = F.CreateFactory(new Dictionary<string, string?>());
+            var http = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+            var dto = await http.GetFromJsonAsync<ReadinessDto>("/api/health/ready");
+            Assert.Contains(dto!.Warnings!, w => w.StartsWith("entries:CNC:") && w.Contains("script 12"));
+            // The anonymous answer gives no row counts or file names.
+            Assert.DoesNotContain(dto.Warnings!, w => w.Contains(".sql") || System.Text.RegularExpressions.Regex.IsMatch(w, @"\d+ entries"));
         }
         finally { await SqlFixture.Scalar<int>(F.CncCs, "DELETE FROM qa.QualityRejectionEntries WHERE SubmissionId = @s; SELECT 1", ("@s", id)); }
     }
@@ -179,5 +184,18 @@ public sealed class SecurityTests(SqlFixture f) : SqlTest(f)
         Assert.Equal("unavailable", dto!.Components["entries:CNC"]);
         Assert.Equal("ok", dto.Components["master"]);
         Assert.Equal(HttpStatusCode.OK, (await factory.CreateClient().GetAsync("/api/health")).StatusCode);   // liveness unaffected
+    }
+
+    /// <summary>Fable review: role refusals carry the documented problem code, and a successful sign-in is remembered durably
+    /// (qa.LoginKnownClients, db/16) so the throttle's "known login" exemption survives an API restart.</summary>
+    [Fact]
+    public async Task Role_refusals_have_a_code_and_sign_ins_are_remembered()
+    {
+        var (_, user, pw) = await F.CreateUserAsync("QualityInspector", "GDC");
+        var inspector = F.Client(await F.LoginAsync(user, pw));
+        var r = await inspector.GetAsync("/api/admin/users");
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, r.StatusCode);
+        Assert.Equal("forbidden", await Code(r));
+        Assert.Equal(1, await SqlFixture.Scalar<int>(F.MasterCs, "SELECT COUNT(*) FROM qa.LoginKnownClients WHERE LoginKey = @k", ("@k", user.ToUpperInvariant())));
     }
 }

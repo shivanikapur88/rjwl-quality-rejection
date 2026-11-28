@@ -18,6 +18,8 @@ public sealed class SettingsViewModel : BaseViewModel
 
 	private readonly IDialogs _dialogs;
 
+	private readonly EntryDraftStore? _drafts;
+
 	private string _url;
 
 	private string? _info;
@@ -63,8 +65,9 @@ public sealed class SettingsViewModel : BaseViewModel
 
 	public AsyncCommand LogoutCommand { get; }
 
-	public SettingsViewModel(IApiClient api, IAppSettings settings, ISession session, INavigator nav, IDialogs dialogs)
+	public SettingsViewModel(IApiClient api, IAppSettings settings, ISession session, INavigator nav, IDialogs dialogs, EntryDraftStore? drafts = null)
 	{
+		_drafts = drafts;
 		_api = api;
 		_settings = settings;
 		_session = session;
@@ -85,55 +88,79 @@ public sealed class SettingsViewModel : BaseViewModel
 		return Task.CompletedTask;
 	}
 
-	private bool TrySave()
+	/// <summary>Saves the address. Returns null when it is not valid; otherwise whether the session was ended because the server changed.</summary>
+	private async Task<bool?> TrySaveAsync()
 	{
 		ErrorMessage = null;
 		InfoMessage = null;
 		if (!BaseUrlValidator.TryNormalize(ServerUrl, out string normalized, out string error))
 		{
 			ErrorMessage = error;
-			return false;
+			return null;
 		}
 		var previous = _settings.BaseUrl;
 		_settings.BaseUrl = normalized;
 		ServerUrl = normalized;
 		// Full review #10: a token is only for the server that issued it. A different server ends the session,
 		// so the token is never sent to the new address.
-		if (_session.IsAuthenticated && !SameHost(previous, normalized))
+		if (_session.IsAuthenticated && !SameServer(previous, normalized))
 		{
-			_ = _session.EndAsync();
+			_drafts?.Clear();   // the draft's shop, stage and machine belong to the old server
+			_drafts?.ClearPending();
+			await _session.EndAsync();
 			OnPropertyChanged("IsSignedIn");
 			OnPropertyChanged("UserText");
+			return true;
 		}
-		return true;
+		return false;
 	}
 
-	private static bool SameHost(string? a, string? b) =>
-		Uri.TryCreate(a, UriKind.Absolute, out var x) && Uri.TryCreate(b, UriKind.Absolute, out var y)
-		&& string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase) && x.Port == y.Port && x.Scheme == y.Scheme;
-
-	public Task SaveAsync()
+	/// <summary>The session was ended because the server changed: go to sign-in (otherwise every call fails as "session expired").</summary>
+	private async Task SignedOutAsync(string outcome)
 	{
-		if (TrySave())
-		{
-			InfoMessage = "Server address saved.";
-		}
-		return Task.CompletedTask;
+		await _dialogs.AlertAsync("Signed out", (outcome + " You were signed out because the server address changed. Sign in to the new server.").TrimStart());
+		await _nav.GoToAsync(Routes.Login);
 	}
 
-	public async Task TestAsync()
+	/// <summary>Review fix: the same deployment means the same scheme, host (any case), port AND path
+	/// (https://h/prod and https://h/test are different servers); only a trailing slash is ignored.</summary>
+	private static bool SameServer(string? a, string? b) =>
+		Uri.TryCreate(a?.Trim(), UriKind.Absolute, out var x) && Uri.TryCreate(b?.Trim(), UriKind.Absolute, out var y)
+		&& string.Equals(x.Host, y.Host, StringComparison.OrdinalIgnoreCase) && x.Port == y.Port && x.Scheme == y.Scheme
+		&& string.Equals(x.AbsolutePath.TrimEnd('/'), y.AbsolutePath.TrimEnd('/'), StringComparison.Ordinal);
+
+	public async Task SaveAsync()
 	{
-		if (!TrySave())
+		var saved = await TrySaveAsync();
+		if (saved is null)
 		{
 			return;
 		}
+		InfoMessage = "Server address saved.";
+		if (saved == true)
+		{
+			await SignedOutAsync("Server address saved.");
+		}
+	}
+
+	/// <summary>Review fix: tests the address as typed WITHOUT saving it (and without signing out); only Save changes the server.</summary>
+	public async Task TestAsync()
+	{
+		ErrorMessage = null;
+		InfoMessage = null;
+		if (!BaseUrlValidator.TryNormalize(ServerUrl, out string candidate, out string error))
+		{
+			ErrorMessage = error;
+			return;
+		}
+		var unsaved = !SameServer(_settings.BaseUrl, candidate);
 		IsBusy = true;
 		try
 		{
-			ApiResult<Unit> r = await _api.HealthAsync();
+			ApiResult<Unit> r = await _api.TestConnectionAsync(candidate);
 			if (r.IsSuccess)
 			{
-				InfoMessage = "Connected to the server.";
+				InfoMessage = unsaved ? "Connected to the server. Tap Save to use this address." : "Connected to the server.";
 			}
 			else
 			{
@@ -154,6 +181,7 @@ public sealed class SettingsViewModel : BaseViewModel
 	{
 		if (await _dialogs.ConfirmAsync("Sign out", "Sign out of this device?", "Sign out", "Cancel"))
 		{
+			_drafts?.Clear();   // review fix: an explicit sign-out discards the entry kept for an expired session
 			await _session.EndAsync();
 			await _nav.GoToAsync("//login");
 		}

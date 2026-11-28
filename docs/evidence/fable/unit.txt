@@ -1,0 +1,10 @@
+Running tests from /tmp/claude-0/-home-user-mirahbelle/6a0dccf8-a11e-5c3c-9107-aa8f36d4cac3/scratchpad/verify7/src/Quality.Tests.Unit/bin/Debug/net10.0/Quality.Tests.Unit.dll (net10.0|x64)
+/tmp/claude-0/-home-user-mirahbelle/6a0dccf8-a11e-5c3c-9107-aa8f36d4cac3/scratchpad/verify7/src/Quality.Tests.Unit/bin/Debug/net10.0/Quality.Tests.Unit.dll (net10.0|x64) passed (3s 418ms)
+
+Test run summary: Passed!
+  total: 148
+  failed: 0
+  succeeded: 148
+  skipped: 0
+  duration: 3s 686ms
+exit 0

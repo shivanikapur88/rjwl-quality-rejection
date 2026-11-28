@@ -2,7 +2,17 @@ namespace Quality.Mobile;
 
 public partial class App : Application
 {
-    public App() { InitializeComponent(); }
+    public App()
+    {
+        InitializeComponent();
+        // App design round (A2): the palette is a light one; until a dark palette exists, the app always renders light,
+        // whatever the phone's setting (no white text on light cards, light system dialogs).
+        UserAppTheme = AppTheme.Light;
+        // Entry form (A1): with the keyboard open the page is resized rather than panned, so its ScrollView keeps the
+        // selected phenomenon, the quantity and Save reachable.
+        Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.Application.SetWindowSoftInputModeAdjust(
+            this, Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific.WindowSoftInputModeAdjust.Resize);
+    }
     protected override Window CreateWindow(IActivationState? activationState)
     {
 #if DEBUG
