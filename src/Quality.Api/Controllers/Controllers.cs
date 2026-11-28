@@ -56,7 +56,20 @@ public sealed class HealthController : ControllerBase
                 var n = await router.For(key).CountWithoutProductionDateAsync(cts.Token);
                 if (n > 0) warnings.Add($"entries:{key}: some entries have no production day and are not in reports (see the database runbook, script 12).");
             }
-            catch (Exception) { /* reachability is already reported above */ }
+            catch (Exception ex) when (ex is OperationCanceledException || Quality.Core.Abstractions.DbErrors.SqlNumber(ex) == -2)
+            {
+                // A slow count on a large shared table is not a failure of the API: say it could not be checked.
+                warnings.Add($"entries:{key}: the check for entries without a production day took too long and was skipped.");
+            }
+            catch (Exception ex)
+            {
+                // Fifth review: CanConnectAsync only opens a connection. This query reads qa.QualityRejectionEntries, so a
+                // missing column (script 12 not run) or a missing SELECT grant (db/15) shows here instead of every report
+                // silently listing the shop as unavailable. Details go to the log; the anonymous answer stays generic.
+                components["entries:" + key] = "unavailable";
+                warnings.Add($"entries:{key}: connected, but reading the entries table failed (SQL error {Quality.Core.Abstractions.DbErrors.SqlNumber(ex)?.ToString() ?? "–"}); check scripts 08-16 and the API permissions (db/15). Details are in the server log.");
+                HttpContext.RequestServices.GetRequiredService<ILogger<HealthController>>().LogError(ex, "Readiness: reading the entries table of {Store} failed.", key);
+            }
         }
         var ok = components.Values.All(v => v == "ok");
         return (ok ? 200 : 503, new ReadinessDto(ok ? "ok" : "unavailable", components, warnings.Distinct().ToList()));

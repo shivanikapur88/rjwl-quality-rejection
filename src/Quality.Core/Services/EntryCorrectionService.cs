@@ -23,13 +23,15 @@ public sealed record CorrectionOptions(int MaxAgeDays = 30);
 /// </remarks>
 public sealed class EntryCorrectionService
 {
+    private readonly Microsoft.Extensions.Logging.ILogger? _log;
     public const int MaxReasonLength = 500, MaxListSize = 200;
     private const string Entity = "EntryCorrection";
     private readonly IMasterData _master; private readonly IEntryStoreRouter _router; private readonly ShopAccessGuard _guard;
     private readonly TimeProvider _time; private readonly CorrectionOptions _options; private readonly IShiftCalendarProvider _calendar;
 
-    public EntryCorrectionService(IMasterData master, IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time, CorrectionOptions options, IShiftCalendarProvider calendar)
-        => (_master, _router, _guard, _time, _options, _calendar) = (master, router, guard, time, options, calendar);
+    public EntryCorrectionService(IMasterData master, IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time, CorrectionOptions options, IShiftCalendarProvider calendar,
+        Microsoft.Extensions.Logging.ILogger<EntryCorrectionService>? log = null)
+        => (_master, _router, _guard, _time, _options, _calendar, _log) = (master, router, guard, time, options, calendar, log);
 
     private static ServiceResult<T> Fail<T>(ErrorKind k, string code, string msg) => ServiceResult<T>.Fail(k, code, msg);
 
@@ -166,10 +168,11 @@ public sealed class EntryCorrectionService
     }
 
     /// <summary>A read after a committed decision must not turn the success into an error (Fable review #8).</summary>
-    private static async Task<QualityRejectionEntry?> TryGetEntryAsync(IEntryStore store, long id)
+    private async Task<QualityRejectionEntry?> TryGetEntryAsync(IEntryStore store, long id)
     {
         try { return await store.GetByIdAsync(id); }
-        catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { return null; }
+        catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */
+        { DbErrors.LogShopUnavailable(_log, "(entry " + id + ")", "correction read-back", ex); return null; }
     }
 
     // ------------------------------------------------------------------ withdraw
@@ -226,7 +229,7 @@ public sealed class EntryCorrectionService
                 foreach (var e in await _router.For(byId[g.Key].EntryStoreKey).GetByIdsAsync(g.Select(c => c.EntryId).ToList()))
                     if (e.ShopId == g.Key) entries[(g.Key, e.Id)] = e;   // PRE and FINAL share a table: match the shop too
             }
-            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { /* entry database unreachable */ }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { DbErrors.LogShopUnavailable(_log, byId[g.Key].ShopCode, "correction list", ex); /* its requests show without the entry */ }
         }
         var lookups = await LookupsAsync(list);
         var result = list.Select(c => ToDto(c, byId[c.ShopId], entries.GetValueOrDefault((c.ShopId, c.EntryId)), lookups)).ToList();

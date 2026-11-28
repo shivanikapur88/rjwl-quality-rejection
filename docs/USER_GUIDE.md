@@ -25,7 +25,8 @@ The app works the same on Android phones and, once RJWL builds it on a Mac, on i
 | You see | What it means | What to do |
 |---|---|---|
 | "…may not have been saved. Tap Save again - it will not create a duplicate." | The network failed and the app does not know if the server got it | Tap **Save entry** again (the form is still filled). It can never create two entries. |
-| "Already saved earlier – no duplicate created" on the confirmation | Your earlier attempt did reach the server | Nothing; it is saved once |
+| "Already saved earlier – no duplicate created" on the confirmation | Your earlier attempt did reach the server | Nothing; it is saved once. If you were recording a **new** rejection that happens to look the same, tap **Record another** and save it again. |
+| "Your save at 10:05 got no answer…" when you open a machine again | A save on this machine within the last 30 minutes got no answer | The form shows that entry again. Tap **Save entry** to finish it (no duplicate). For a new rejection, check **My entries** first. After 30 minutes the form starts empty. |
 | "The selected rejection phenomenon is no longer active" | An administrator just deactivated it | The list reloads; choose again |
 | "Machine no longer active" | An administrator just deactivated the machine | You are taken back to the refreshed machine list |
 | Session expired while saving | Your sign-in ended during the save | Sign in again as the **same** user; the entry reopens with the same details. Tap **Save entry**; it cannot duplicate. |
@@ -46,7 +47,7 @@ The app works the same on Android phones and, once RJWL builds it on a Mac, on i
 * **Entries** shows all entries of your assigned shops (all inspectors), newest first, with **Load more** and the same "incomplete" notice.
 * Supervisors do not record entries and cannot change master data.
 * **Correction requests:** approve (the entry is reversed, and the corrected entry is saved if one was proposed) or reject (give a reason; the inspector sees it). Tick "Also show decided requests" for history.
-* **Shift summary:** rejected parts for today's production day and the current shift. Use ‹ › to change the day and the picker to change the shift. Shows totals by shop, top phenomena and top machines.
+* **Shift summary:** rejected parts for today's production day and the current shift. Use ‹ › to change the day and the picker to change the shift. Shows totals by shop, top phenomena and top machines. Pull down to refresh: this also moves on to the new day or shift if the screen was left open on "today".
 * **Web dashboard:** open `https://<server>/dashboard/` in a browser and sign in with your app username and password.
   * It shows trends by day and shift, top phenomena and machines, and totals per shop for any period up to 92 days, with a table view of the chart.
   * **Drill down:** click a day in the chart (or a day button in "Show as table"), a phenomenon in the Pareto, or a machine or shop row. Everything filters to it, and the entries behind it are listed at the bottom. Chips above the tiles show the active filters; click × to remove one. You can copy the address to share the same view.

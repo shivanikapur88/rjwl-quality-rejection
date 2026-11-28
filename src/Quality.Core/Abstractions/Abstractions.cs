@@ -106,6 +106,21 @@ public static class DbErrors
             if (e.GetType().Name == "SqlException" && e.GetType().GetProperty("Number")?.GetValue(e) is int n && n == 1205) return true;
         return false;
     }
+
+    /// <summary>The SQL Server error number of the exception or an inner one (null if it is not a SqlException).</summary>
+    public static int? SqlNumber(Exception? ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e.GetType().Name == "SqlException" && e.GetType().GetProperty("Number")?.GetValue(e) is int n) return n;
+        return null;
+    }
+
+    /// <summary>Fifth review: a shop whose entry database could not be read is reported as "unavailable" to the caller;
+    /// the reason (unreachable, missing column, missing permission, ...) goes to the server log so it can be found.</summary>
+    public static void LogShopUnavailable(Microsoft.Extensions.Logging.ILogger? log, string shopCode, string operation, Exception ex) =>
+        Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(log ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, ex,
+            "Entry database of shop {Shop} could not be read during {Operation} (SQL error {SqlError}); the shop is reported as unavailable.",
+            shopCode, operation, SqlNumber(ex));
 }
 
 public sealed class UniqueViolationException : Exception

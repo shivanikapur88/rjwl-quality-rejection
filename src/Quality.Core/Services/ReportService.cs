@@ -14,14 +14,16 @@ namespace Quality.Core.Services;
 /// </summary>
 public sealed class ReportService
 {
+    private readonly Microsoft.Extensions.Logging.ILogger? _log;
     public const int MaxDays = 92, DefaultTop = 10, MaxTop = 50, MaxEntries = 200;
     /// <summary>Earliest report date: keeps the previous-period arithmetic (from - days) far from DateOnly.MinValue.</summary>
     public static readonly DateOnly MinDate = new(2000, 1, 1);
     private readonly IEntryStoreRouter _router; private readonly ShopAccessGuard _guard; private readonly TimeProvider _time;
     private readonly IShiftCalendarProvider _calendar; private readonly IMasterData _master;
 
-    public ReportService(IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time, IShiftCalendarProvider calendar, IMasterData master)
-        => (_router, _guard, _time, _calendar, _master) = (router, guard, time, calendar, master);
+    public ReportService(IEntryStoreRouter router, ShopAccessGuard guard, TimeProvider time, IShiftCalendarProvider calendar, IMasterData master,
+        Microsoft.Extensions.Logging.ILogger<ReportService>? log = null)
+        => (_router, _guard, _time, _calendar, _master, _log) = (router, guard, time, calendar, master, log);
 
     public async Task<CalendarDto> CalendarAsync()
     {
@@ -72,7 +74,7 @@ public sealed class ReportService
                     .Where(r => (machineId is null || r.MachineId == machineId) && (phenomenonId is null || r.PhenomenonId == phenomenonId))
                     .Select(r => (s, r)));
             }
-            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { unavailable.Add(s.ShopCode); }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { DbErrors.LogShopUnavailable(_log, s.ShopCode, "report", ex); unavailable.Add(s.ShopCode); }
         }
         return (rows, unavailable);
     }
@@ -172,7 +174,7 @@ public sealed class ReportService
         foreach (var s in scope!.Shops)
         {
             try { all.AddRange(await _router.For(s.EntryStoreKey).ListForReportAsync(s.Id, scope.From, scope.To, scope.Shift, q.MachineId, q.PhenomenonId, max + 1)); }
-            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { unavailable.Add(s.ShopCode); }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { DbErrors.LogShopUnavailable(_log, s.ShopCode, "report entries", ex); unavailable.Add(s.ShopCode); }
         }
         var ordered = all.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.ShopId).ThenByDescending(e => e.Id).ToList();
         return ServiceResult<ReportEntriesDto>.Ok(new ReportEntriesDto(ordered.Take(max).Select(Mapping.ToDto).ToList(), ordered.Count > max, unavailable));

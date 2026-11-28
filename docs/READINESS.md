@@ -85,4 +85,13 @@ Details are in [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#complete-review-by-clau
 
 The dashboard installs as a desktop app from Edge or Chrome (PWA). Chromium reports it installable with **no errors**; the offline helper controls the page and saved no `/api` responses (docs/evidence/desktop). An integration test checks the manifest, icons and service worker are served under the CSP. **Not yet tried:** installing on a real Windows PC with Edge over the plant's HTTPS certificate, and the `WebAppInstallForceList` policy. Icons are placeholder artwork until RJWL's are supplied.
 
+### Fifth full review (Sonnet 5.5, after the desktop app)
+
+**No high-severity defect.** Medium findings fixed:
+* an unanswered save could swallow a later identical rejection on the same machine (now shown again with its details, and expiring after 30 minutes);
+* the shift summary could not recover from a failed first load;
+* unreadable entry tables were invisible to readiness and the server log.
+
+A missing produced quantity in a count upload is now refused instead of read as 0. Low items: desktop app on server errors, cache keys, dashboard focus, labels and axis. See [FINDINGS_CLOSURE.md](FINDINGS_CLOSURE.md#fifth-full-application-review-sonnet-55-after-the-desktop-app). Deployment note: `/api/health/ready` now returns 503 when an entries table cannot be read (for example db/12 or db/15 not run), with the SQL error number in the answer and the details in the server log.
+
 **Release-candidate verdict:** the server, database and app logic are complete and tested against SQL Server. The build is **not** ready for production use until the ✗ items in the "Tested on Android" and "Blocked" columns are done: the device acceptance run, the machine list, the package id, keystore and certificate, and business acceptance. See [BUSINESS_DECISIONS.md](BUSINESS_DECISIONS.md) and the checklist in [TEST_EVIDENCE.md §3](TEST_EVIDENCE.md).

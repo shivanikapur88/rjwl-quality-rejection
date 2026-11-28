@@ -11,8 +11,8 @@ An Android app (.NET MAUI), an ASP.NET Core Web API and SQL Server, used to reco
 | Review findings Q1-Q9 | Fixed and tested on SQL Server 2022 ([docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md)) |
 | Round 2 | Entry corrections, shift and production date, app shift summary, machine QR codes, web dashboard at `/dashboard/` (read-only; from round 3 administrators also upload production counts there) ([SPECIFICATION.md §12](docs/SPECIFICATION.md)), checked by an independent review |
 | Round 3 | Dashboard drill-down, previous-period comparison, Pareto, and rejection rate from uploaded production counts ([SPECIFICATION.md §13](docs/SPECIFICATION.md)), checked by an independent review |
-| Reviews | Independent reviews by Claude Fable (round 2, round 3, a complete review and a UI/UX review) and four full-application reviews by Claude Sonnet 5.5; findings and fixes in [docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md) |
-| Tests | 166 unit and 57 SQL Server integration tests, all passing on a clean checkout; the API runs as a least-privilege login in the tests ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
+| Reviews | Independent reviews by Claude Fable (round 2, round 3, a complete review and a UI/UX review) and five full-application reviews by Claude Sonnet 5.5; findings and fixes in [docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md) |
+| Tests | 171 unit and 60 SQL Server integration tests, all passing on a clean checkout; the API runs as a least-privilege login in the tests ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
 | Android | Debug APK builds. **Not yet tested on an emulator or device**; no signed release APK yet. |
 | Design | Dashboard and app redesigned after a Fable UI/UX review (2,416 displayed numbers recomputed, 0 mismatches); before/after images in docs/evidence/design |
 | iOS | iOS project parts added (iPhone and iPad, iOS 15+). **Not built yet**: Apple allows iOS builds only on a Mac ([BUILD_AND_DEPLOY.md §6](docs/BUILD_AND_DEPLOY.md)). |

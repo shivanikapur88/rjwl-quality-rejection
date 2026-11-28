@@ -23,7 +23,7 @@ Errors use RFC 7807 problem JSON with an extra `code` field, for example:
 | Method and path | Role | Notes |
 |---|---|---|
 | GET `/api/health` | anonymous | `{ "status": "ok" }` |
-| GET `/api/health/ready` | anonymous | 200 / 503 per database; rate-limited (60/min per address), cached 10 s |
+| GET `/api/health/ready` | anonymous | 200 / 503 per database; each entries table is also read (a missing column or grant gives 503, details in the server log); rate-limited (60/min per address), cached 10 s |
 | POST `/api/auth/login` | anonymous | failed attempts throttled (5 per 5 min per address + login, 10 per 15 min per login, 30 per 15 min per address; see SPECIFICATION §10) → 429 with `Retry-After`; raw cap 300 requests/min per address; body ≤ 8 KB |
 | GET `/api/shops` | any signed-in | inspectors/supervisors: assigned shops only |
 | GET `/api/shops/{shopId}/stages` | any signed-in | stages mapped to the shop |

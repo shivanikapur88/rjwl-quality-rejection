@@ -42,7 +42,8 @@ public sealed class EfEntryStore : IEntryStore
     }
 
     // Uses the plain index IX_QRE_ProductionDate (db/12; NOT a filtered index - the entry databases are shared, see db/12).
-    public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => _db.Entries.CountAsync(e => e.ProductionDate == null, ct);
+    // Also reads ReversedAt (fifth review: readiness then notices a missing column or grant). Reversed entries are not in reports either way.
+    public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => _db.Entries.CountAsync(e => e.ProductionDate == null && e.ReversedAt == null, ct);
 
     public async Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode)
     {

@@ -118,7 +118,10 @@ public sealed record ReportDto(DateOnly FromDate, DateOnly ToDate, string? Shift
 public sealed record ReportEntriesDto(IReadOnlyList<EntryDto> Items, bool HasMore, IReadOnlyList<string> UnavailableShops);
 
 // ---- Production counts (round 3, #8) ----
-public sealed record ProductionCountRow(string ShopCode, string MachineCode, DateOnly ProductionDate, string ShiftCode, int ProducedQuantity);
+// Fifth review: every field is required; a missing "producedQuantity" (e.g. a feed sending "produced") used to be read as 0
+// and overwrote real counts.
+public sealed record ProductionCountRow([property: System.Text.Json.Serialization.JsonRequired] string ShopCode, [property: System.Text.Json.Serialization.JsonRequired] string MachineCode, [property: System.Text.Json.Serialization.JsonRequired] DateOnly ProductionDate,
+    [property: System.Text.Json.Serialization.JsonRequired] string ShiftCode, [property: System.Text.Json.Serialization.JsonRequired] int ProducedQuantity);
 /// <summary>DryRun: validate and report only. Rows are upserted by (machine, production day, shift); the whole upload is rejected if any row is invalid.</summary>
 public sealed record ProductionCountUpload(IReadOnlyList<ProductionCountRow> Rows, bool DryRun = true, string? Source = null);
 public sealed record ProductionCountProblem(int Row, string Problem);
