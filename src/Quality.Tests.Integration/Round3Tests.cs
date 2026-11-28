@@ -137,8 +137,13 @@ public sealed class Round3Tests(SqlFixture f) : SqlTest(f)
         var cnc = (await (await admin.PostAsJsonAsync("/api/admin/machines", new CreateMachineRequest(shopsAll["CNC"].Id, "R3b-CNC", "R3b-CNC name", true))).Content.ReadFromJsonAsync<AdminMachineDto>())!;
         Assert.True((await (await admin.PostAsJsonAsync("/api/admin/production-counts", new ProductionCountUpload(new[] { new ProductionCountRow("CNC", "R3b-CNC", day, "A", 50_000) }, DryRun: false))).Content.ReadFromJsonAsync<ProductionCountResult>())!.Applied);
         var allShops = F.Client(await F.AdminTokenAsync());
-        var byPhen = (await allShops.GetFromJsonAsync<ReportDto>($"/api/reports/totals?fromDate={day:yyyy-MM-dd}&toDate={day.AddDays(1):yyyy-MM-dd}&phenomenonId=7001"))!;
+        // A real GDC phenomenon (its stage is mapped to GDC only) with no rejections in this window: the rate uses GDC's
+        // production only, and with 0 rejections it is 0% - not "no production data" (fourth review S2).
+        var gdcPhen = await SqlFixture.Scalar<int>(F.MasterCs, "SELECT TOP 1 p.Id FROM qa.RejectionPhenomena p JOIN qa.InspectionStages s ON s.Id = p.InspectionStageId WHERE s.StageCode = 'GDC_SHOP' ORDER BY p.Id");
+        var byPhen = (await allShops.GetFromJsonAsync<ReportDto>($"/api/reports/totals?fromDate={day:yyyy-MM-dd}&toDate={day.AddDays(1):yyyy-MM-dd}&phenomenonId={gdcPhen}"))!;
+        Assert.NotNull(byPhen.Total.Rate);
         Assert.Equal(1800, byPhen.Total.Rate!.Produced);                    // GDC only (m1 1000 + 800, m2 0), not + 50,000 CNC
+        Assert.Equal(0m, byPhen.Total.Rate.Rate);
         await SqlFixture.Scalar<int>(F.MasterCs, $"DELETE FROM qa.ProductionCounts WHERE MachineId = {cnc.Id}; SELECT 1");
 
         // Only administrators upload.
