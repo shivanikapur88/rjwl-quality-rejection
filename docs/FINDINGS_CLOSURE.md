@@ -347,3 +347,20 @@ A Fable reviewer tested the live dashboard at desktop, tablet and phone sizes, i
 | Low | Checkbox labels not tappable; status colours; confirmation shop name and row order; Clear without confirmation; Reject with empty reason | Fixed |
 
 The shared style system has a named type scale (body never below 15, captions 13), a spacing scale, cards, a button hierarchy in sentence case (48 dp minimum) and status chips. The 18 new unit tests are in `MobileDesignTests.cs`. **Not verified on a device:** rendering, keyboard behaviour and text wrapping need the device checklist in BUILD_AND_DEPLOY.
+
+## Fourth full application review (Sonnet 5.5, after the redesign)
+
+Three Sonnet 5.5 reviewers checked the server, the database scripts, and the app with the dashboard and documents. The server reviewer found no high defect and the database reviewer only low items; the app reviewer found **one high defect**, now fixed.
+
+| # | Severity | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| C1 | **High** | After a session-expiry draft was restored (or after "Try again"), **Save entry stayed disabled**. The button's state was re-checked only while the screen was still busy. | Commands re-check whenever "busy" ends. | unit test (draft retry) now records what the Save button reads on each `CanExecuteChanged`; it fails without the fix |
+| S1 | Medium | A deadlock inside a per-shop report or list read was reported as "shop unavailable" instead of being retried. | Deadlocks are no longer swallowed by the per-shop error handling; the GET retry handles them. | — |
+| S2 | Medium (plausible) | With a phenomenon selected, the shops in the rate depended on whether rejections occurred (0 rejections showed "no production data"). | The shops come from the phenomenon's stage mapping. | integration upload test |
+| C2 | Medium (plausible) | A Windows server reports the time zone as "India Standard Time", which browsers reject. | IANA id sent; the dashboard falls back to local time if a zone is unknown. | — |
+| C3 | Medium (plausible) | Redesigned Home rows had no screen-reader description. | Descriptions and hints on every row; descriptions on every switch and checkbox. | — (needs TalkBack on a device) |
+| C4 | Medium | The user guide did not describe the redesign. | Updated (two-step entry, Administration card). | — |
+| S3-S5 | Low | A missing `IsActive` in a status or create request was read as false; a failed store lookup was cached as "unknown"; the shared "other" login key could become "known"; a success wiped other addresses' failures for that login. | `IsActive` required; cached only after a successful lookup; the "other" key is never remembered; only the attempt's own reservation is returned. | existing throttle tests (no new test for the required field) |
+| C5-C9 | Low | Tooltip measured at the old position; 21 px row buttons on touch screens; a failed drill-down left a duplicate history step; My entries double tap; Print enabled with nothing to print; stretched sparkline; "Top 15 of 50" wording; login "Next" key; repeated camera alert. | Fixed. | browser checks |
+| D1-D9 | Low | Feed template permissions; stale comments (filtered index, 03 header); db/12 batch size with indexes present (now 1,500); db/15 version check; redundant `IX_QRE_Shop_Time` dropped; test-script prefix allow-list and stricter assertions; runbook wording and a duplicate row. | Fixed. | sqlcmd install and upgrade path |
+| — | Not changed | Unauthenticated lookups before the throttle (bounded by the 300/min limiter); 200-request correction list cap; deactivated shops left out of reports; per-day "produced" only on days with rejections; constraints of tables created by very old script versions not retrofitted. | Documented in SPECIFICATION §13.5 and here. Tables created by earlier versions of 02a/02b/02c should be checked against the current scripts before go-live (DBA). | — |

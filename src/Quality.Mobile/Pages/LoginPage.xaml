@@ -7,9 +7,9 @@
             <Border Style="{StaticResource Card}" Margin="0,8,0,0">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Username or employee ID" Style="{StaticResource FieldLabel}" />
-                    <Entry Text="{Binding Username}" Placeholder="e.g. E1234" Keyboard="Plain" ReturnType="Next" AutomationId="username" />
+                    <Entry Text="{Binding Username}" Placeholder="e.g. E1234" Keyboard="Plain" ReturnType="Next" AutomationId="username" x:Name="UserEntry" Completed="OnUserCompleted" />
                     <Label Text="Password" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-                    <Entry Text="{Binding Password}" IsPassword="True" Placeholder="Password" ReturnType="Done" ReturnCommand="{Binding LoginCommand}" AutomationId="password" />
+                    <Entry x:Name="PasswordEntry" Text="{Binding Password}" IsPassword="True" Placeholder="Password" ReturnType="Done" ReturnCommand="{Binding LoginCommand}" AutomationId="password" />
                     <Button Text="Sign in" Command="{Binding LoginCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" AutomationId="signin" />
                 </VerticalStackLayout>
             </Border>

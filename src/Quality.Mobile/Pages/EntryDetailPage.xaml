@@ -32,7 +32,7 @@
                         <Label Text="Quantity (parts)" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding QuantityText}" Keyboard="Numeric" MaxLength="4" />
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
-                            <CheckBox IsChecked="{Binding ChangeRemarks}" VerticalOptions="Center" />
+                            <CheckBox IsChecked="{Binding ChangeRemarks}" SemanticProperties.Description="Change the remarks" VerticalOptions="Center" />
                             <Label Grid.Column="1" Text="Change the remarks" Style="{StaticResource CheckLabel}">
                                 <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnChangeRemarksTapped" /></Label.GestureRecognizers>
                             </Label>

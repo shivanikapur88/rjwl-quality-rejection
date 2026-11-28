@@ -17,15 +17,16 @@ echo "2. run 07 (quantity), as in the runbook before 08"
 $Q -d QRUP -i $DB_DIR/07_migration_add_quantity.sql >/dev/null
 $Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT '   old entry quantity = ' + CAST(Quantity AS varchar) FROM qa.QualityRejectionEntries"
 echo "3. run 08 with the collision present -> must stop before any login identifier is written"
-if $Q -d QRUP -i $DB_DIR/08_upgrade_master_review_fixes.sql > "$TMP" 2>&1; then fail "08 succeeded despite the collision"; else grep -E "Msg 50080|E100" "$TMP" | head -3 | sed 's/^/   /'; fi
-$Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT '   LoginIdentifiers rows after refused run: ' + CAST(COUNT(*) AS varchar) FROM qa.LoginIdentifiers"
+if $Q -d QRUP -i $DB_DIR/08_upgrade_master_review_fixes.sql > "$TMP" 2>&1; then fail "08 succeeded despite the collision"; fi
+grep -q "Msg 50080" "$TMP" || fail "08 failed, but not with the collision error 50080"; grep -E "Msg 50080|E100" "$TMP" | head -3 | sed 's/^/   /'
+n=$($Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM qa.LoginIdentifiers" | tr -d '[:space:]'); [ "$n" = "0" ] || fail "identifiers written by the refused run: $n"; echo "   LoginIdentifiers rows after refused run: 0"
 echo "4. resolve the collision (rename one account) and re-run 08"
 $Q -d QRUP -Q "UPDATE qa.Users SET Username = 'clash.user' WHERE EmployeeCode = 'E200';" >/dev/null
 $Q -d QRUP -i $DB_DIR/08_upgrade_master_review_fixes.sql >/dev/null && echo "   08 ok"
 $Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT '   identifiers: ' + STRING_AGG(NormalizedIdentifier + ':' + Kind, ', ') WITHIN GROUP (ORDER BY NormalizedIdentifier) FROM qa.LoginIdentifiers; SELECT '   TokenVersion for all = ' + CAST(MAX(TokenVersion) AS varchar) FROM qa.Users"
 echo "5. re-run 08 again (idempotent), then 09 (runbook order: 08 before 09)"; $Q -d QRUP -i $DB_DIR/08_upgrade_master_review_fixes.sql >/dev/null && $Q -d QRUP -i $DB_DIR/09_upgrade_entries_indexes.sql >/dev/null && echo "   ok"
 echo "6. trigger: deactivating the only admin is refused"
-$Q -d QRUP -Q "UPDATE qa.Users SET IsActive = 0 WHERE Username = 'admin1'" 2>&1 | grep -o "At least one active administrator must remain" | sed 's/^/   /'
+$Q -d QRUP -Q "UPDATE qa.Users SET IsActive = 0 WHERE Username = 'admin1'" > "$TMP" 2>&1 || true; grep -q "At least one active administrator must remain" "$TMP" || fail "trigger did not refuse"; echo "   At least one active administrator must remain"
 echo "7. round 2/3 upgrades on the same database: 11, 12 (backfills the old entry), 13; then all three again"
 for f in 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts 16_upgrade_master_login_known_clients; do $Q -d QRUP -i $DB_DIR/$f.sql >/dev/null; done
 for f in 11_upgrade_master_shifts_corrections 12_upgrade_entries_shift_reversal 13_upgrade_master_production_counts 16_upgrade_master_login_known_clients; do $Q -d QRUP -i $DB_DIR/$f.sql >/dev/null; done
@@ -40,7 +41,8 @@ v=$($Q -d QRUP -h -1 -Q "SET NOCOUNT ON; SELECT CONVERT(varchar(10), ProductionD
 [ "$v" = "2026-11-26|C" ] || fail "05:59:59.700 backfilled as $v"; echo "   $v"
 echo "9. db/12 refuses to backfill when its shift times differ from qa.ShiftDefinitions (error 50013)"
 $Q -d QRUP -Q "SET NOCOUNT ON; SET QUOTED_IDENTIFIER ON; UPDATE qa.QualityRejectionEntries SET ProductionDate = NULL, ShiftCode = NULL WHERE SubmissionId = '6B2B7C4E-0000-4000-8000-000000000001'; UPDATE qa.ShiftDefinitions SET StartTime = '07:00' WHERE ShiftCode = 'A';" >/dev/null
-if $Q -d QRUP -i $DB_DIR/12_upgrade_entries_shift_reversal.sql > "$TMP" 2>&1; then fail "12 ran with mismatching shift times"; else grep -o "Msg 50013" "$TMP" | head -1 | sed 's/^/   refused: /'; fi
+if $Q -d QRUP -i $DB_DIR/12_upgrade_entries_shift_reversal.sql > "$TMP" 2>&1; then fail "12 ran with mismatching shift times"; fi
+grep -q "Msg 50013" "$TMP" || fail "12 failed, but not with 50013"; echo "   refused: Msg 50013"
 $Q -d QRUP -Q "SET NOCOUNT ON; UPDATE qa.ShiftDefinitions SET StartTime = '06:00' WHERE ShiftCode = 'A';" >/dev/null
 $Q -d QRUP -i $DB_DIR/12_upgrade_entries_shift_reversal.sql >/dev/null && echo "   ok after the times match again"
 echo "10. db/15 on a database that still has the old schema-wide grants; run twice"

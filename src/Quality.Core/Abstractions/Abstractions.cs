@@ -95,6 +95,19 @@ public interface IMasterData
 }
 
 /// <summary>A unique constraint or unique index was violated. <see cref="Name"/> is the constraint/index name when known.</summary>
+/// <summary>Database error checks the services need without referencing a database driver.</summary>
+public static class DbErrors
+{
+    /// <summary>True if the exception or an inner one is SQL Server error 1205 ("chosen as the deadlock victim"). Such an
+    /// error is transient: it must reach the caller's retry logic, never be reported as "database unavailable".</summary>
+    public static bool IsDeadlock(Exception? ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e.GetType().Name == "SqlException" && e.GetType().GetProperty("Number")?.GetValue(e) is int n && n == 1205) return true;
+        return false;
+    }
+}
+
 public sealed class UniqueViolationException : Exception
 {
     public UniqueViolationException(string? name, Exception? inner = null) : base("Unique constraint violated: " + name, inner) => Name = name;

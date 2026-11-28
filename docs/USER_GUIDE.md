@@ -14,7 +14,10 @@ The app works the same on Android phones and, once RJWL builds it on a Mac, on i
 1. **Home** → tap your shop. You only see shops assigned to you.
 2. **Stage** is skipped automatically when the shop has only one stage (true for all four shops today).
 3. **Machine** → choose the machine (only active machines are listed).
-4. **Rejection entry:** search and choose the phenomenon, set the quantity (1-9,999; type it or use + / −), and add remarks if needed (up to 500 characters). Tap **Save entry** once.
+4. **Rejection entry**, in two steps:
+   * **Choose the phenomenon:** the list fills the screen; type in the search box to narrow it, then tap the phenomenon.
+   * **Quantity and save:** the chosen phenomenon is shown at the top (tap **Change** to pick another), set the quantity (1-9,999; type it or use + / −), tap **+ Add remarks** if needed (up to 500 characters), then tap **Save entry** once. **Clear** asks before it empties the form.
+   * If the list cannot be loaded, a red message with **Try again** appears.
 5. **Confirmation** shows what the server saved: shop, stage, machine, phenomenon, quantity, remarks and server time. Tap **Record another** for the next one.
 
 **If something goes wrong**
@@ -55,7 +58,7 @@ The app works the same on Android phones and, once RJWL builds it on a Mac, on i
 
 ## Administrator
 
-Home shows three extra buttons: **Manage rejection phenomena**, **Manage machines**, **Manage users**.
+Home shows an **Administration** card with **Rejection phenomena**, **Machines** and **Users**.
 
 **Rejection phenomena:** filter by shop, search, add, rename, activate/deactivate, delete.
 * Names keep their exact spelling. A name that differs only in spaces or upper/lower case from an existing one in the same stage is refused.

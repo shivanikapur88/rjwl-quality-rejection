@@ -19,7 +19,7 @@
                     <Entry Text="{Binding MachineName}" MaxLength="100" Placeholder="Name or description" />
                     <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsCreate}" MinimumHeightRequest="48" Margin="0,8,0,0">
                         <Label Text="Active" Style="{StaticResource Body}" VerticalOptions="Center" />
-                        <Switch Grid.Column="1" IsToggled="{Binding IsActive}" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding IsActive}" SemanticProperties.Description="Machine is active" VerticalOptions="Center" />
                     </Grid>
                 </VerticalStackLayout>
             </Border>

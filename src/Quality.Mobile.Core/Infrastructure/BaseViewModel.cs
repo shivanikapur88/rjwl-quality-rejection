@@ -28,11 +28,16 @@ public abstract class BaseViewModel : ObservableObject, INavigationAware
 			if (Set(ref _isBusy, value, "IsBusy"))
 			{
 				OnPropertyChanged("IsNotBusy");
+				OnBusyChanged();
 			}
 		}
 	}
 
 	public bool IsNotBusy => !_isBusy;
+
+	/// <summary>Called when IsBusy changes: commands whose CanExecute depends on IsBusy re-evaluate here (otherwise a button
+	/// disabled while busy - e.g. Save after a restored draft - stays disabled until something else changes).</summary>
+	protected virtual void OnBusyChanged() { }
 
 	/// <summary>Review fix: bound (TwoWay) to a RefreshView's IsRefreshing. RefreshView runs its command whenever IsRefreshing
 	/// becomes true, even when set from code, so only the pull-to-refresh path (<see cref="PullToRefreshAsync"/>) sets it;

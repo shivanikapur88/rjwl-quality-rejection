@@ -14,7 +14,7 @@
    * Production day and shift must follow qa.ShiftDefinitions (A 06:00, B 14:00, C 22:00 IST by default). If the source
      counts per hour or per its own shift (e.g. the CNC 05:59 reset), aggregate to these shifts first.
    * Run it as a SQL Agent job (e.g. every 15 minutes) under a login with SELECT on the source and
-     SELECT/INSERT/UPDATE on qa.ProductionCounts only.
+     SELECT/INSERT/UPDATE on qa.ProductionCounts, and SELECT on qa.Machines and qa.Shops (the MERGE looks machines up).
    ============================================================================ */
 SET NOCOUNT ON; SET XACT_ABORT ON; SET QUOTED_IDENTIFIER ON;
 /*

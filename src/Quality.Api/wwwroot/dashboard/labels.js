@@ -28,6 +28,7 @@
     const q = new URLSearchParams({ shopId: el('shop').value });
     if (el('inactive').value !== 'true') q.set('isActive', 'true');
     try {
+      el('print').disabled = true;   // nothing to print until this selection's labels are loaded
       const machines = await api('/api/admin/machines?' + q);
       if (seq !== loadSeq) return;
       urls.splice(0).forEach(u => URL.revokeObjectURL(u));

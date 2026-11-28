@@ -27,7 +27,9 @@ public sealed class ReportService
     {
         var cal = await _calendar.GetAsync();
         var (day, shift) = cal.Resolve(_time.GetUtcNow().UtcDateTime);
-        return new CalendarDto(day, shift, cal.Zone.Id, cal.Shifts.Select(s => new ShiftDto(s.ShiftCode, s.ShiftName, s.StartTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))).ToList());
+        // Browsers only understand IANA ids ("Asia/Kolkata"); on Windows .NET reports "India Standard Time".
+        var zoneId = cal.Zone.HasIanaId || !TimeZoneInfo.TryConvertWindowsIdToIanaId(cal.Zone.Id, out var iana) ? cal.Zone.Id : iana;
+        return new CalendarDto(day, shift, zoneId, cal.Shifts.Select(s => new ShiftDto(s.ShiftCode, s.ShiftName, s.StartTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))).ToList());
     }
 
     private sealed record Scope(IReadOnlyList<Shop> Shops, DateOnly From, DateOnly To, string? Shift, int Top);
@@ -70,7 +72,7 @@ public sealed class ReportService
                     .Where(r => (machineId is null || r.MachineId == machineId) && (phenomenonId is null || r.PhenomenonId == phenomenonId))
                     .Select(r => (s, r)));
             }
-            catch (Exception ex) when (ex is not OperationCanceledException) { unavailable.Add(s.ShopCode); }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { unavailable.Add(s.ShopCode); }
         }
         return (rows, unavailable);
     }
@@ -104,7 +106,17 @@ public sealed class ReportService
         // With a phenomenon selected, only the shops where that phenomenon occurs (its stage's shop) put production into the
         // denominator: "Pin Deep" is a GDC phenomenon, so CNC/PRE/FINAL production must not dilute its rate (UI review F1).
         var rateShops = shops.Where(s => !unavailable.Contains(s.ShopCode)).Select(s => s.Id).ToList();
-        if (q.PhenomenonId is not null) rateShops = rateShops.Where(id => rows.Any(r => r.Shop.Id == id)).ToList();
+        if (q.PhenomenonId is int phenId)
+        {
+            // The shops whose stage the phenomenon belongs to (not "shops that happened to record it in this period":
+            // a phenomenon with no rejections has a 0% rate, not "no production data").
+            var selected = await _master.GetPhenomenonAsync(phenId);
+            var mapped = new List<int>();
+            if (selected is not null)
+                foreach (var id in rateShops)
+                    if (await _master.IsStageMappedToShopAsync(id, selected.InspectionStageId)) mapped.Add(id);
+            rateShops = mapped;
+        }
         var counts = await _master.GetProductionCountsAsync(rateShops, from, to, shift, q.MachineId);
         // Only machine/day/shift combinations that PRODUCED something put rejected parts into the rate: rejections logged on a
         // shift with 0 produced (stock, rework) would otherwise raise the rate with nothing added below the line. They are
@@ -160,7 +172,7 @@ public sealed class ReportService
         foreach (var s in scope!.Shops)
         {
             try { all.AddRange(await _router.For(s.EntryStoreKey).ListForReportAsync(s.Id, scope.From, scope.To, scope.Shift, q.MachineId, q.PhenomenonId, max + 1)); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { unavailable.Add(s.ShopCode); }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { unavailable.Add(s.ShopCode); }
         }
         var ordered = all.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.ShopId).ThenByDescending(e => e.Id).ToList();
         return ServiceResult<ReportEntriesDto>.Ok(new ReportEntriesDto(ordered.Take(max).Select(Mapping.ToDto).ToList(), ordered.Count > max, unavailable));

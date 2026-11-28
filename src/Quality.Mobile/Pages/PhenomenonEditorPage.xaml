@@ -20,7 +20,7 @@
                     <Label Text="{Binding NameCounter}" Style="{StaticResource Caption}" HorizontalTextAlignment="End" />
                     <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsCreate}" MinimumHeightRequest="48">
                         <Label Text="Active" Style="{StaticResource Body}" VerticalOptions="Center" />
-                        <Switch Grid.Column="1" IsToggled="{Binding IsActive}" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding IsActive}" SemanticProperties.Description="Phenomenon is active" VerticalOptions="Center" />
                     </Grid>
                 </VerticalStackLayout>
             </Border>

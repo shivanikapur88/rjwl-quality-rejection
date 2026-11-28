@@ -122,11 +122,20 @@ public sealed class MyEntriesViewModel : BaseViewModel
         e, EntryText.Badge(e));
 
     /// <summary>Round 2: tapping an entry opens its detail (where its inspector can ask for a correction).</summary>
-    public Task OpenAsync(EntryRow row)
+    private bool _opening;
+
+    /// <summary>Opens the entry detail. A second tap while the first navigation is running is ignored (a double tap
+    /// opened two pages or raised Shell's "navigation in progress").</summary>
+    public async Task OpenAsync(EntryRow row)
     {
-        if (row.Dto is null) return Task.CompletedTask;
-        _opened = new EntryChanges();
-        return _nav.GoToAsync(Routes.EntryDetail, new Dictionary<string, object> { ["entry"] = row.Dto, [EntryChanges.Key] = _opened });
+        if (row.Dto is null || _opening) return;
+        _opening = true;
+        try
+        {
+            _opened = new EntryChanges();
+            await _nav.GoToAsync(Routes.EntryDetail, new Dictionary<string, object> { ["entry"] = row.Dto, [EntryChanges.Key] = _opened });
+        }
+        finally { _opening = false; }
     }
 }
 

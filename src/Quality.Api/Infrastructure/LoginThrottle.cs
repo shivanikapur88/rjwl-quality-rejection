@@ -135,13 +135,17 @@ public sealed class LoginThrottle
         {
             if (_known.TryGetValue(key, out var at) && now - at < KnownClientFor) return;
             if (_checked.TryGetValue(key, out var c) && now - c < RecheckAfter) return;
-            if (_checked.Count > MaxEntries) _checked.Clear();
-            _checked[key] = now;
         }
         try
         {
-            if (await _store.LastSuccessAsync(client, Login(login), ct) is { } last && now - last < KnownClientFor)
-                lock (_gate) { if (!_known.TryGetValue(key, out var mem) || mem < last) _known[key] = last; }
+            var last = await _store.LastSuccessAsync(client, Login(login), ct);
+            lock (_gate)
+            {
+                // Marked as checked only after a successful lookup: a failed one is retried on the next attempt.
+                if (_checked.Count > MaxEntries) _checked.Clear();
+                _checked[key] = now;
+                if (last is { } l && now - l < KnownClientFor && (!_known.TryGetValue(key, out var mem) || mem < l)) _known[key] = l;
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException) { _log?.LogWarning(ex, "Could not read known logins; using memory only."); }
     }
@@ -149,7 +153,7 @@ public sealed class LoginThrottle
     /// <summary>After a successful sign-in: remember the pair durably. Store failures are logged, never fail the sign-in.</summary>
     public async Task RememberAsync(string client, string login, CancellationToken ct)
     {
-        if (_store is null) return;
+        if (_store is null || Login(login) == OtherLoginKey) return;
         try { await _store.SaveAsync(client, Login(login), _time.GetUtcNow().UtcDateTime, ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { _log?.LogWarning(ex, "Could not save a known login; it is kept in memory."); }
     }
@@ -215,10 +219,12 @@ public sealed class LoginThrottle
         lock (_gate)
         {
             var l = Login(login);
-            _failures.Remove($"cl:{client}|{l}");
-            _failures.Remove($"l:{l}");
-            if (!knownAtBegin) RemoveNewest($"c:{client}");   // a known login reserved nothing there
-            _known[$"{client}|{l}"] = now;
+            _failures.Remove($"cl:{client}|{l}");                 // this client signed in: its own failures are cleared
+            // The per-login bucket also holds failures from OTHER addresses (possibly an attacker's): give back only this
+            // attempt's reservation instead of wiping them (fourth review).
+            if (!knownAtBegin) { RemoveNewest($"l:{l}"); RemoveNewest($"c:{client}"); }
+            // The shared key of non-identifier logins never becomes "known" (it would exempt every odd login from this address).
+            if (l != OtherLoginKey) _known[$"{client}|{l}"] = now;
         }
     }
 

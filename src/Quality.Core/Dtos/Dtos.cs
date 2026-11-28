@@ -40,14 +40,15 @@ public sealed record AdminPhenomenonDto(
     int Id, string PhenomenonCode, string PhenomenonName, int StageId, string StageCode, string StageName,
     IReadOnlyList<string> ShopCodes, bool IsActive, int? CreatedBy, DateTime CreatedAtUtc, int? ModifiedBy, DateTime? ModifiedAtUtc, string? Version = null);
 
-public sealed record CreatePhenomenonRequest(int ShopId, int StageId, string Name, bool IsActive);
+public sealed record CreatePhenomenonRequest(int ShopId, int StageId, string Name, [property: System.Text.Json.Serialization.JsonRequired] bool IsActive);
 /// <summary>Version: optional; the Version from the list/detail the screen was built from. If given and stale, the save is refused with 409 concurrent_edit.</summary>
 public sealed record UpdatePhenomenonRequest(string Name, string? Version = null);
-public sealed record SetStatusRequest(bool IsActive, string? Version = null);
+/// <remarks>IsActive is required: a body without it must be refused, not read as "deactivate".</remarks>
+public sealed record SetStatusRequest([property: System.Text.Json.Serialization.JsonRequired] bool IsActive, string? Version = null);
 
 // ---- Machine management (administrator) ----
 public sealed record AdminMachineDto(int Id, string MachineCode, string MachineName, int ShopId, string ShopCode, string ShopName, bool IsActive, string? Version = null);
-public sealed record CreateMachineRequest(int ShopId, string MachineCode, string MachineName, bool IsActive);
+public sealed record CreateMachineRequest(int ShopId, string MachineCode, string MachineName, [property: System.Text.Json.Serialization.JsonRequired] bool IsActive);
 public sealed record UpdateMachineRequest(string MachineCode, string MachineName, string? Version = null);
 
 // ---- User management (administrator) ----

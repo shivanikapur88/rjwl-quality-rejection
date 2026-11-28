@@ -21,7 +21,7 @@
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="dto:ShopDto">
                             <Border Style="{StaticResource CardList}">
-                                <Grid Style="{StaticResource NavRow}" ColumnDefinitions="*,Auto" MinimumHeightRequest="64">
+                                <Grid Style="{StaticResource NavRow}" SemanticProperties.Description="{Binding ShopName}" SemanticProperties.Hint="Opens this screen" ColumnDefinitions="*,Auto" MinimumHeightRequest="64">
                                     <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnShopTapped" /></Grid.GestureRecognizers>
                                     <Label Text="{Binding ShopName}" Style="{StaticResource Subheading}" VerticalOptions="Center" />
                                     <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
@@ -38,13 +38,13 @@
             <!-- Records -->
             <Border Style="{StaticResource CardList}">
                 <VerticalStackLayout>
-                    <Grid Style="{StaticResource NavRow}" ColumnDefinitions="*,Auto">
+                    <Grid Style="{StaticResource NavRow}" SemanticProperties.Description="{Binding EntriesButtonText}" SemanticProperties.Hint="Opens this screen" ColumnDefinitions="*,Auto">
                         <Grid.GestureRecognizers><TapGestureRecognizer Command="{Binding MyEntriesCommand}" /></Grid.GestureRecognizers>
                         <Label Text="{Binding EntriesButtonText}" Style="{StaticResource Body}" VerticalOptions="Center" />
                         <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
                     </Grid>
                     <BoxView Style="{StaticResource DividerLine}" />
-                    <Grid Style="{StaticResource NavRow}" ColumnDefinitions="*,Auto">
+                    <Grid Style="{StaticResource NavRow}" SemanticProperties.Description="{Binding CorrectionsButtonText}" SemanticProperties.Hint="Opens this screen" ColumnDefinitions="*,Auto">
                         <Grid.GestureRecognizers><TapGestureRecognizer Command="{Binding CorrectionsCommand}" /></Grid.GestureRecognizers>
                         <Label Text="{Binding CorrectionsButtonText}" Style="{StaticResource Body}" VerticalOptions="Center" />
                         <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
@@ -57,19 +57,19 @@
                 <Label Text="Administration" Style="{StaticResource FieldLabel}" Margin="4,0" />
                 <Border Style="{StaticResource CardList}">
                     <VerticalStackLayout>
-                        <Grid Style="{StaticResource NavRow}" ColumnDefinitions="*,Auto">
+                        <Grid Style="{StaticResource NavRow}" SemanticProperties.Description="Rejection phenomena" SemanticProperties.Hint="Opens this screen" ColumnDefinitions="*,Auto">
                             <Grid.GestureRecognizers><TapGestureRecognizer Command="{Binding AdminCommand}" /></Grid.GestureRecognizers>
                             <Label Text="Rejection phenomena" Style="{StaticResource Body}" VerticalOptions="Center" />
                             <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
                         </Grid>
                         <BoxView Style="{StaticResource DividerLine}" />
-                        <Grid Style="{StaticResource NavRow}" ColumnDefinitions="*,Auto">
+                        <Grid Style="{StaticResource NavRow}" SemanticProperties.Description="Machines" SemanticProperties.Hint="Opens this screen" ColumnDefinitions="*,Auto">
                             <Grid.GestureRecognizers><TapGestureRecognizer Command="{Binding AdminMachinesCommand}" /></Grid.GestureRecognizers>
                             <Label Text="Machines" Style="{StaticResource Body}" VerticalOptions="Center" />
                             <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
                         </Grid>
                         <BoxView Style="{StaticResource DividerLine}" />
-                        <Grid Style="{StaticResource NavRow}" ColumnDefinitions="*,Auto">
+                        <Grid Style="{StaticResource NavRow}" SemanticProperties.Description="Users" SemanticProperties.Hint="Opens this screen" ColumnDefinitions="*,Auto">
                             <Grid.GestureRecognizers><TapGestureRecognizer Command="{Binding AdminUsersCommand}" /></Grid.GestureRecognizers>
                             <Label Text="Users" Style="{StaticResource Body}" VerticalOptions="Center" />
                             <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />
@@ -80,7 +80,7 @@
 
             <!-- Settings (server address, sign out) -->
             <Border Style="{StaticResource CardList}">
-                <Grid Style="{StaticResource NavRow}" ColumnDefinitions="*,Auto">
+                <Grid Style="{StaticResource NavRow}" SemanticProperties.Description="Settings and sign out" SemanticProperties.Hint="Opens this screen" ColumnDefinitions="*,Auto">
                     <Grid.GestureRecognizers><TapGestureRecognizer Command="{Binding SettingsCommand}" /></Grid.GestureRecognizers>
                     <Label Text="Settings and sign out" Style="{StaticResource Body}" VerticalOptions="Center" />
                     <Label Grid.Column="1" Text="›" Style="{StaticResource Chevron}" />

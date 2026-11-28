@@ -41,7 +41,7 @@ public sealed class EfEntryStore : IEntryStore
         return await q.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.Id).Take(f.Limit).ToListAsync();
     }
 
-    // Uses the filtered index IX_QRE_NoProductionDate (db/12), which is normally empty, so this is not a table scan.
+    // Uses the plain index IX_QRE_ProductionDate (db/12; NOT a filtered index - the entry databases are shared, see db/12).
     public Task<int> CountWithoutProductionDateAsync(CancellationToken ct) => _db.Entries.CountAsync(e => e.ProductionDate == null, ct);
 
     public async Task<IReadOnlyList<EntryAggregateRow>> AggregateAsync(int shopId, DateOnly fromDate, DateOnly toDate, string? shiftCode)

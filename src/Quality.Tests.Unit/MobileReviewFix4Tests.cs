@@ -118,9 +118,16 @@ public sealed partial class MobileViewModelTests
         Assert.Equal(draft, _drafts.Peek(42));     // kept: not restored yet
 
         _http.Respond = _ => Task.FromResult(Json(HttpStatusCode.OK, new List<PhenomenonDto> { Phen }));
+        // What the Save button shows is what it last read when CanExecuteChanged was raised (it does not poll).
+        bool? saveButtonEnabled = null;
+        vm.SubmitCommand.CanExecuteChanged += (_, _) => saveButtonEnabled = vm.SubmitCommand.CanExecute(null);
         await vm.RetryCommand.ExecuteAsync();
         Assert.False(vm.CanRetryLoad);
+        Assert.True(saveButtonEnabled, "the Save button was never told it can run again after the restore");
         Assert.Equal((draft.SubmissionId, "3", "edge crack", Phen), (vm.SubmissionId, vm.QuantityText, vm.Remarks, vm.SelectedPhenomenon));
+        // Fourth Sonnet review (high): Save must be usable right after the restore (it was left disabled).
+        Assert.True(vm.CanSubmit);
+        Assert.True(vm.SubmitCommand.CanExecute(null));
         Assert.Null(_drafts.Peek(42));             // restored: removed from the store
     }
 

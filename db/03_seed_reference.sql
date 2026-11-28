@@ -6,8 +6,8 @@
    Four independent shops, each with exactly one inspection stage of the same name:
      GDC   -> GDC Shop                 (entries: GDC_AndonDB)
      CNC   -> CNC Shop                 (entries: MachineShopDB)
-     PRE   -> Pre-treatment Inspection (entries: database of your choice - see 02c)
-     FINAL -> FINAL Inspection         (entries: database of your choice - see 02c)
+     PRE   -> Pre-treatment Inspection (entries: QualityMasterDB, see 02c)
+     FINAL -> FINAL Inspection         (entries: QualityMasterDB, see 02c)
    No users are seeded here: password hashes must come from the backend (see Quality.UserSqlGen).
    ============================================================================ */
 SET QUOTED_IDENTIFIER ON;   -- sqlcmd starts with it OFF; filtered indexes on these tables need it for any write

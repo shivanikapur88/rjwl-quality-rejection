@@ -60,8 +60,9 @@ IF OBJECT_ID(N'qa.ShiftDefinitions', N'U') IS NOT NULL AND EXISTS (SELECT 1 FROM
 DECLARE @msg nvarchar(200) = CONCAT(N'Backfill parameters: UTC offset ', @OffsetMinutes, N' min; A ', CONVERT(varchar(5), @A, 108), N', B ', CONVERT(varchar(5), @B, 108), N', C ', CONVERT(varchar(5), @C, 108),
     N'; rows to fill: ', (SELECT COUNT(*) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL));
 PRINT @msg;
--- Walk the clustered key in ranges of 4,000 ids: each batch seeks instead of rescanning the filled rows, and stays below
--- the 5,000-lock escalation threshold, so other systems' tables in GDC_AndonDB/MachineShopDB are not locked table-wide.
+-- Walk the clustered key in ranges of 1,500 ids: each batch seeks instead of rescanning the filled rows, and stays below
+-- the 5,000-lock escalation threshold even when the two production-day indexes are updated too (a re-run after the
+-- indexes exist), so qa.QualityRejectionEntries is not locked table-wide.
 -- Times are compared at millisecond precision (time(3)): a cast to time(0) would ROUND 05:59:59.700 up to 06:00:00.
 DECLARE @lo bigint = (SELECT MIN(Id) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL),
         @hi bigint = (SELECT MAX(Id) FROM qa.QualityRejectionEntries WHERE ProductionDate IS NULL);
@@ -75,8 +76,8 @@ BEGIN
                          ELSE N'C' END
     FROM qa.QualityRejectionEntries e
     CROSS APPLY (SELECT DATEADD(MINUTE, @OffsetMinutes, e.ServerCreatedAt) AS LocalTime) l
-    WHERE e.Id >= @lo AND e.Id < @lo + 4000 AND e.ProductionDate IS NULL;
-    SET @lo += 4000;
+    WHERE e.Id >= @lo AND e.Id < @lo + 1500 AND e.ProductionDate IS NULL;
+    SET @lo += 1500;
 END;
 GO
 

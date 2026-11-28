@@ -216,6 +216,12 @@ public sealed class EntryFormViewModel : BaseViewModel
 
 	public string SummaryText => ((object)_selected == null) ? "Select a rejection phenomenon above" : (_selected.PhenomenonName + "  ×  " + (ParsedQuantity?.ToString() ?? "?"));
 
+	protected override void OnBusyChanged()
+	{
+		OnPropertyChanged("CanSubmit");
+		SubmitCommand?.RaiseCanExecuteChanged();
+	}
+
 	public bool CanSubmit => !_submitting && !IsBusy && (object)_selected != null && ParsedQuantity.HasValue && Remarks.Length <= 500;
 
 	public EntryFormViewModel(IApiClient api, INavigator nav, ISession session, EntryDraftStore drafts, IDialogs dialogs)

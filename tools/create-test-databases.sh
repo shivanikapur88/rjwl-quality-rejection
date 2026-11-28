@@ -9,6 +9,8 @@
 # The SQLCMD variable must run sqlcmd (v18 tools) and accept -d <db> -i <file> -b.
 set -euo pipefail
 PREFIX="${1:-QRTEST}"; RCSI="${2:-ON}"
+# Guard: letters, digits and underscore only (the prefix is put into SQL), max 20 characters.
+[[ "$PREFIX" =~ ^[A-Za-z][A-Za-z0-9_]{0,19}$ ]] || { echo "Refusing prefix '$PREFIX': use letters, digits and _ only." >&2; exit 2; }
 # Guard: the script DROPS <prefix>_Master/_Gdc/_Cnc. Refuse prefixes that look like the production database names.
 case "$(echo "$PREFIX" | tr '[:lower:]' '[:upper:]')" in
   QUALITYMASTERDB*|GDC_ANDONDB*|MACHINESHOPDB*|"") echo "Refusing prefix '$PREFIX': it looks like a production database name." >&2; exit 2;;

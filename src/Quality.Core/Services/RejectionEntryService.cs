@@ -180,7 +180,7 @@ public sealed class RejectionEntryService
             var filter = new EntryFilter(shop.Id, user.IsInspector ? user.Id : null, query.StageId, from, to, limit + 1,
                 ToInclusive: false, CursorTimeUtc: cursor?.TimeUtc, CursorIdBelow: idBelow);
             try { all.AddRange(await _router.For(shop.EntryStoreKey).ListAsync(filter)); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { unavailable.Add(shop.ShopCode); }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { unavailable.Add(shop.ShopCode); }
         }
 
         var ordered = all.OrderByDescending(e => e.ServerCreatedAt).ThenByDescending(e => e.ShopId).ThenByDescending(e => e.Id).ToList();

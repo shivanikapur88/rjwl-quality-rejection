@@ -19,6 +19,9 @@ SET XACT_ABORT ON;
 
 DECLARE @ApiUser sysname = N'qr_api';
 
+IF CAST(SERVERPROPERTY('ProductMajorVersion') AS int) < 14
+    THROW 50015, N'SQL Server 2017 or later is required.', 1;
+
 -- The server login must exist (a database user without it cannot connect, even if this script grants it rights).
 IF SUSER_ID(@ApiUser) IS NULL
     THROW 50150, N'The API login does not exist on this server. Create it first (CREATE LOGIN), then run this script.', 1;

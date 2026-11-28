@@ -110,6 +110,7 @@
     el('error').hidden = true;
     el('tip').hidden = true;   // the hovered element is about to be rebuilt, so its mouseleave never fires
     if (focusChips) pushNext = true;   // a drill-down or chip removal: Back undoes it
+    const hashBefore = lastHash, pushed = pushNext;
     writeHash();
     renderChips();
     const seq = ++loadSeq;
@@ -143,7 +144,11 @@
       }
     } catch (e) {
       if (seq !== loadSeq) return;   // an error of a superseded load must not cover the newer view
-      if (shown) { restore(shown); showError(new Error(e.message + ' The previous selection is still shown.')); }
+      if (shown) {
+        // The failed selection's history step is removed again (otherwise Back would seem to do nothing once).
+        if (pushed && location.hash !== hashBefore) { lastHash = hashBefore; history.back(); }
+        restore(shown); showError(new Error(e.message + ' The previous selection is still shown.'));
+      }
       else showError(e);
     }
     finally { if (seq === loadSeq) document.body.classList.remove('busy'); }
@@ -210,6 +215,13 @@
     return ch === 0 ? '± 0%' : (ch > 0 ? '▲ ' : '▼ ') + Math.abs(ch) + '%';
   };
 
+  /** Entry time in the plant's time zone; if the browser does not know the zone id, the browser's own zone. */
+  function savedAt(utc) {
+    const o = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+    try { return new Date(utc).toLocaleString(undefined, cal ? { ...o, timeZone: cal.timeZone } : o); }
+    catch { return new Date(utc).toLocaleString(undefined, o); }
+  }
+
   /** Share of rejected parts: "<1%" instead of a misleading "0%" for small non-zero shares. */
   const sharePct = x => x > 0 && x < 0.005 ? '<1%' : pct(x, 0);
   const cumHead = () => { const d = make('div', 'num'); d.append(make('span', 'cum-long', 'Cumulative'), make('span', 'cum-short', 'Cum.')); return d; };
@@ -220,9 +232,10 @@
     const days = []; for (let d = r.fromDate; d <= r.toDate; d = addDays(d, 1)) days.push(d);
     if (days.length < 3) return;
     const vals = days.map(d => r.byDayShift.filter(t => t.productionDate === d).reduce((a, t) => a + pick(t), 0));
-    const W = 240, H = 34, max = Math.max(1, ...vals);
+    // Drawn at the tile's real width (no stretching), so the end point stays round and the line evenly thick.
+    const W = Math.max(120, Math.round(host.clientWidth || 240)), H = 34, max = Math.max(1, ...vals);
     const pts = vals.map((v, i) => [ (i / (vals.length - 1)) * (W - 6) + 3, H - 4 - (v / max) * (H - 8) ]);
-    const svg = svgEl('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': `${label}: ${vals.join(', ')}` });
+    const svg = svgEl('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `${label}: ${vals.join(', ')}` });
     const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join('');
     svg.append(svgEl('path', { class: 'area', d: `${line}L${pts[pts.length - 1][0]},${H}L${pts[0][0]},${H}Z` }), svgEl('path', { class: 'line', d: line }));
     const [lx, ly] = pts[pts.length - 1]; svg.append(svgEl('circle', { class: 'last', cx: lx, cy: ly, r: 3.5 }));
@@ -274,7 +287,7 @@
         label: `Show only machine ${m.machineCode}`,
         onClick: () => { drill.machineId = String(m.machineId); drill.machineLabel = m.machineCode; load(true); },
       })), 'No rejections in this selection.', 3, 6, { phoneHide: [1, 2, 5] });
-    if (r.topMachines.length > MACHINE_ROWS) el('machines').append(make('p', 'muted small', `Top ${MACHINE_ROWS} of ${r.topMachines.length} machines shown. Drill down by shop to see the others.`));
+    if (r.topMachines.length > MACHINE_ROWS) el('machines').append(make('p', 'muted small', r.topMachines.length >= 50 ? `Top ${MACHINE_ROWS} of 50 or more machines shown. Drill down by shop to see the others.` : `Top ${MACHINE_ROWS} of ${r.topMachines.length} machines shown. Drill down by shop to see the others.`));
     renderTable(el('shops'), ['Shop', 'Parts', 'Entries', 'Rate'],
       r.shops.map(s => ({
         cells: [s.shopName, fmt(s.quantity), fmt(s.entries), rowRate(s.rate)],
@@ -406,7 +419,7 @@
     const items = showAllEntries ? all : all.slice(0, COLLAPSED_ENTRIES);
     text(el('entriesNote'), all.length === 0 ? '' : `${res.hasMore ? 'Newest ' + all.length + ' loaded (more exist: narrow the selection)' : all.length + ' entries'}` + (res.unavailableShops.length ? ` · not available: ${res.unavailableShops.join(', ')}` : ''));
     renderTable(host, ['Saved', 'Day / shift', 'Shop', 'Machine', 'Phenomenon', 'Qty', 'Inspector', 'Remarks'],
-      items.map(e => ({ cells: [new Date(e.serverCreatedAtUtc).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: cal ? cal.timeZone : undefined }),
+      items.map(e => ({ cells: [savedAt(e.serverCreatedAtUtc),
         `${e.productionDate ? shortDay(e.productionDate) : '–'} ${e.shiftCode ?? ''}`, e.shopCode, e.machineCode, e.phenomenonName, fmt(e.quantity),
         e.inspectorEmployeeCode, (e.correctsEntryId ? `[correction of #${e.correctsEntryId}] ` : '') + (e.remarks ?? '')] })),
       'No entries in this selection.', 5, 5, { stack: true });   // phone: each entry becomes a small card
@@ -566,6 +579,7 @@
     const tip = el('tip');
     node.addEventListener('mousemove', ev => {
       tip.textContent = label; tip.hidden = false;
+      tip.style.left = '0px'; tip.style.top = '0px';   // measure at full width, not squeezed by the previous position
       // Keep the whole tip on screen (it used to squeeze into a thin column at the right edge).
       const w = tip.offsetWidth, h = tip.offsetHeight;
       const x = ev.clientX + 12 + w > innerWidth - 8 ? ev.clientX - 12 - w : ev.clientX + 12;

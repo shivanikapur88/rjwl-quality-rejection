@@ -169,7 +169,7 @@ public sealed class EntryCorrectionService
     private static async Task<QualityRejectionEntry?> TryGetEntryAsync(IEntryStore store, long id)
     {
         try { return await store.GetByIdAsync(id); }
-        catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
+        catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { return null; }
     }
 
     // ------------------------------------------------------------------ withdraw
@@ -226,7 +226,7 @@ public sealed class EntryCorrectionService
                 foreach (var e in await _router.For(byId[g.Key].EntryStoreKey).GetByIdsAsync(g.Select(c => c.EntryId).ToList()))
                     if (e.ShopId == g.Key) entries[(g.Key, e.Id)] = e;   // PRE and FINAL share a table: match the shop too
             }
-            catch (Exception ex) when (ex is not OperationCanceledException) { /* entry database unreachable */ }
+            catch (Exception ex) when (ex is not OperationCanceledException && !DbErrors.IsDeadlock(ex))   /* a deadlock goes to the GET retry */ { /* entry database unreachable */ }
         }
         var lookups = await LookupsAsync(list);
         var result = list.Select(c => ToDto(c, byId[c.ShopId], entries.GetValueOrDefault((c.ShopId, c.EntryId)), lookups)).ToList();

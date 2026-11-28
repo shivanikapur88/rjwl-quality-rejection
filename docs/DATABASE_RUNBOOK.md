@@ -61,7 +61,7 @@ sqlcmd -S <I> -E -b -d MachineShopDB -i db/12_upgrade_entries_shift_reversal.sql
 ```sql
 SELECT s.StageCode, COUNT(*) FROM qa.RejectionPhenomena p JOIN qa.InspectionStages s ON s.Id = p.InspectionStageId GROUP BY s.StageCode;
 -- GDC_SHOP 25, CNC_SHOP 52, PRE_TREATMENT 34, FINAL 34
-SELECT Script, AppliedAt FROM qa.SchemaVersions;   -- 08, 11 and 13 register here (09, 12 and 15 do not; check them by their objects)
+SELECT Script, AppliedAt FROM qa.SchemaVersions;   -- 08, 11, 13 and 16 register here (09, 12 and 15 do not; check them by their objects)
 ```
 6. API database login (least privilege; the API never needs DDL rights). The DBA creates the server login once (`CREATE LOGIN [qr_api] ...`, or a Windows/domain account), then:
 ```bash
@@ -69,7 +69,7 @@ sqlcmd -S <I> -E -b -d QualityMasterDB -i db/15_api_permissions.sql
 sqlcmd -S <I> -E -b -d GDC_AndonDB     -i db/15_api_permissions.sql
 sqlcmd -S <I> -E -b -d MachineShopDB   -i db/15_api_permissions.sql
 ```
-   It grants table by table and prints the result. In the master: read access to every `qa` table; writes only where the API maintains data; `qa.AuditLog` is append-only (SELECT, INSERT). In every entries table: SELECT, INSERT, and UPDATE of **only** `ReversedAt` and `ReversedByCorrectionId` (approved corrections). In GDC_AndonDB and MachineShopDB nothing else is granted. The integration tests run the API as a login with exactly these rights.
+   It grants table by table and prints the result. In the master: read access to the `qa` tables the API uses; writes only where the API maintains data; `qa.AuditLog` is append-only (SELECT, INSERT). In every entries table: SELECT, INSERT, and UPDATE of **only** `ReversedAt` and `ReversedByCorrectionId` (approved corrections). In GDC_AndonDB and MachineShopDB nothing else is granted. The integration tests run the API as a login with exactly these rights.
    **Earlier versions of this runbook granted `SELECT, INSERT` on the whole `qa` schema in GDC_AndonDB and MachineShopDB. That is not enough: approving a GDC or CNC correction failed with a permission error.** Running 15 fixes it and removes the old schema-wide grants.
 7. Start the API with the `Bootstrap:*` settings to create the first administrator, then remove them ([BUILD_AND_DEPLOY.md](BUILD_AND_DEPLOY.md)).
 
@@ -118,7 +118,6 @@ Administrators can also add or edit machines in the app (Admin → Machines) ins
 | 13 error 50016 | Production counts whose shop is not their machine's shop (listed). Correct `ShopId`, then re-run 13. |
 | 15 errors 50150-50153 | 50150: the login does not exist. 50151: the login is already mapped to another user in this database. 50152: a user with the API's name belongs to another login. 50153: wrong database (no application tables). 15 also warns about tables that do not exist yet (run the missing script, then 15 again) and about role memberships. |
 | 10 error 50100 | The machine list has problems (listed by row); nothing was changed. |
-| 15 error 50150 | The API login does not exist on the server: the DBA creates it first. 15 also re-maps an orphaned user after a restore and warns if the user is in database roles such as `db_datawriter`. |
 | 08 error 50090 ("At least one active administrator must remain") | A statement tried to remove the last active administrator. Reactivate or create an administrator first. |
 | Seed check 50001 | Some seeded phenomena (by name), or their inspection stages, are missing (03 not run, or rows were renamed/deleted by hand). Compare with `db/seed/phenomena_seed.json`. |
 | New API misbehaves after the upgrade | Stop it. Preferred rollback: restore the backups (section 5) and redeploy the old API. |

@@ -50,12 +50,7 @@ public static class ErrorHandling
     });
 
     /// <summary>True if the exception (or an inner one) is SQL Server error 1205, "chosen as the deadlock victim".</summary>
-    public static bool IsDeadlock(Exception? ex)
-    {
-        for (var e = ex; e is not null; e = e.InnerException)
-            if (e is SqlException { Number: 1205 }) return true;
-        return false;
-    }
+    public static bool IsDeadlock(Exception? ex) => Quality.Core.Abstractions.DbErrors.IsDeadlock(ex);
 
     public static (int Status, string Code, string Message) Classify(Exception? ex)
     {

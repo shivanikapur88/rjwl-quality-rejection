@@ -29,7 +29,7 @@
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="vm:ShopChoice">
                                 <Grid ColumnDefinitions="Auto,*" MinimumHeightRequest="48" ColumnSpacing="4">
-                                    <CheckBox IsChecked="{Binding IsSelected}" VerticalOptions="Center" />
+                                    <CheckBox IsChecked="{Binding IsSelected}" SemanticProperties.Description="{Binding Name}" VerticalOptions="Center" />
                                     <Label Grid.Column="1" Text="{Binding Name}" Style="{StaticResource CheckLabel}">
                                         <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnShopTapped" /></Label.GestureRecognizers>
                                     </Label>

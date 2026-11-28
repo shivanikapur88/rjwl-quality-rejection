@@ -117,7 +117,7 @@ Safeguards: no self-deactivation or self-demotion; at least one active administr
 | Method and path | Who | Notes |
 |---|---|---|
 | `GET /api/health` | anyone | process is up (liveness) |
-| `GET /api/health/ready` (**new**) | anyone (rate-limited, cached 10 s) | 200 if the master and all four entry stores are reachable, otherwise 503; reports only `ok`/`unavailable` per component |
+| `GET /api/health/ready` (**new**) | anyone (rate-limited, cached 10 s) | 200 if the master and all four entry stores are reachable, otherwise 503; reports `ok`/`unavailable` per component, plus public `warnings` naming an entry store that still has entries without a production day (no counts, no file names) |
 | `POST /api/auth/login` | anyone | username **or** employee code; 429 `too_many_attempts` with `Retry-After` after repeated failures |
 | `GET /api/shops`, `/shops/{id}/stages`, `/shops/{id}/stages/{id}/machines`, `/…/phenomena` | signed in | only assigned shops; active items only |
 | `POST /api/rejection-entries` | inspector | 201 new / 200 replay |
@@ -213,3 +213,8 @@ Read-only for supervisors. From round 3, administrators can also upload producti
 * Each rate comes with its **coverage**: the share of rejected parts it is based on. With no production data, the dashboard says so instead of showing 0%.
 * Rates are shown for the total, each shop and each machine.
 * **Counting rules still need RJWL's sign-off (decision #13).** For example: does a part rejected for two phenomena count twice? Is rework counted as produced? Until then the figure is labelled "rejected ÷ produced".
+
+### 13.5 Limits and scope notes
+* Correction lists return at most the 200 newest requests; the count endpoint counts all. Older pending requests are reached by filtering by shop.
+* Reports cover the **active** shops in the caller's scope. A deactivated shop's entries are no longer shown in totals and trends (they remain in the database and in history views).
+* The per-day "produced" figure in report data exists only for days with rejections; the rate itself uses all production counts in the selection.
