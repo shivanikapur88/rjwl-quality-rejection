@@ -269,3 +269,24 @@ Fresh clone of `49ef2d2e806931b8438c92fea82f8dae43816813`, 28 Nov 2026, same env
 | Browser checks (`visual_checks.txt`) | no horizontal scroll at any tested width; no touch target under 44 px; Back undoes a drill-down; a failed load keeps the previous selection; no page errors |
 
 **First run of this round:** the integration suite failed once, in both modes, because the test still used a made-up phenomenon id. With the stage-mapping fix, a made-up id has no shops. The test was corrected; the code was right.
+
+## 13. Dashboard desktop app (commit `31e6ef8`)
+
+Clean clone of `31e6ef8`, fresh databases, script `verify3.sh` (output in `docs/evidence/desktop/verify/`):
+
+| Check | Result |
+|---|---|
+| Build (.NET 10, all projects) | 0 errors, 135 warnings (all in the recovered Mobile.Core, unchanged) |
+| Unit tests | 166 / 166 passed |
+| Integration tests, RCSI ON | 57 / 57 passed (new: `Desktop_app_manifest_icons_and_service_worker_are_served`) |
+| Integration tests, RCSI OFF | 57 / 57 passed |
+| Fresh install, upgrade path, import check | exit 0 |
+| Debug APK | built, SHA-256 `9725fe0c…5787` |
+
+Browser check in Chromium (`docs/evidence/desktop/pwa.js`, result `installability.json`):
+* `Page.getInstallabilityErrors`: **none**; manifest parsed with no errors.
+* Service worker active with scope `/dashboard/` and controlling the page after reload.
+* Saved files: the 13 dashboard files (pages, CSS, JS, manifest, icons). **`/api` responses saved: 0.**
+* "Install app" shown when the browser offers installation (simulated, since headless Chromium does not fire the prompt); phone width 390 px still has no sideways scroll.
+
+Not tested: installing on a real Windows PC in Edge over the plant HTTPS certificate, and the `WebAppInstallForceList` policy.
