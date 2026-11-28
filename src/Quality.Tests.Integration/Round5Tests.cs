@@ -81,8 +81,8 @@ public sealed class Round5Tests(SqlFixture f) : SqlTest(f)
             var dto = (await ready.Content.ReadFromJsonAsync<ReadinessDto>())!;
             Assert.Equal("unavailable", dto.Components["entries:GDC"]);
             Assert.Equal("ok", dto.Components["entries:CNC"]);
-            Assert.Contains(dto.Warnings, w => w.StartsWith("entries:GDC: connected, but reading the entries table failed"));
-            Assert.DoesNotContain(dto.Warnings, w => w.Contains("permission denied"));   // details only in the log (anonymous endpoint)
+            Assert.Contains(dto.Warnings!, w => w.StartsWith("entries:GDC: connected, but reading the entries table failed"));
+            Assert.DoesNotContain(dto.Warnings!, w => w.Contains("permission denied"));   // details only in the log (anonymous endpoint)
             Assert.Contains(log.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("entries table of GDC"));
 
             var http = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
@@ -102,7 +102,7 @@ public sealed class Round5Tests(SqlFixture f) : SqlTest(f)
             var ready = await factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") }).GetAsync("/api/health/ready");
             var dto = (await ready.Content.ReadFromJsonAsync<ReadinessDto>())!;
             Assert.Equal("ok", dto.Components["entries:GDC"]);
-            Assert.Contains(dto.Warnings, w => w.StartsWith("entries:GDC: the check for entries without a production day took too long"));
+            Assert.Contains(dto.Warnings!, w => w.StartsWith("entries:GDC: the check for entries without a production day took too long"));
         }
     }
 

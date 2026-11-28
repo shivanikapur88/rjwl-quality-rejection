@@ -290,3 +290,26 @@ Browser check in Chromium (`docs/evidence/desktop/pwa.js`, result `installabilit
 * "Install app" shown when the browser offers installation (simulated, since headless Chromium does not fire the prompt); phone width 390 px still has no sideways scroll.
 
 Not tested: installing on a real Windows PC in Edge over the plant HTTPS certificate, and the `WebAppInstallForceList` policy.
+
+## 14. Fifth full review (commit `f6055c3`)
+
+Clean clone of `f6055c3`, fresh databases, script `verify3.sh` (output in `docs/evidence/review5/verify/`):
+
+| Check | Result |
+|---|---|
+| Build (.NET 10, all projects) | 0 errors, 137 warnings: 133 in the recovered Mobile.Core and 4 nullable warnings in the new test file, removed in the next commit (test-only annotation; those 3 tests re-run and pass) |
+| Unit tests | 171 / 171 passed (5 new) |
+| Integration tests, RCSI ON / OFF | 60 / 60 passed each (3 new) |
+| Fresh install, upgrade path, import check | exit 0 |
+| Debug APK | built, SHA-256 `555de1ee…9741` |
+
+**Mutation check:** the new tests fail on the code before the fixes. That is 3 of the 5 unit tests (the summary and reopened-form tests; the other two test the new per-machine, expiring save memory) and all 3 integration tests.
+
+**Browser checks** (`docs/evidence/review5/fix5.js`, result `browser_checks.json`):
+* the badge reads "… fewer vs …";
+* on an 89-day range the last two axis labels are at least 48 px apart;
+* focus moves to the first new row after "Show all"/"Show more";
+* a clicked machine keeps its code in the chip on an empty range;
+* a 503 for `labels.html?x=1` is answered from the saved copy;
+* saved keys have no query strings, and 0 `/api` responses are saved;
+* no console errors.
