@@ -1,6 +1,6 @@
 # Test evidence
 
-> **UI/UX review and redesign: see section 11. Complete Fable review and iOS parts: see section 10. Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
+> **Fourth full review (Sonnet 5.5): see section 12. UI/UX review and redesign: see section 11. Complete Fable review and iOS parts: see section 10. Third full review and phone layout: see section 9. Second full review (Sonnet 5.5) fixes: see section 8. Round 3 (dashboard drill-down, comparison, Pareto, rejection rate): see section 7. Round 2 (corrections, shifts, reports, QR, dashboard): see section 6.** Sections 1-5 are the round-1 evidence (commit `3313612`).
 
 Every result below was produced from a **fresh clone** of this repository at the stated commit, with no build output from the supplied package. Raw outputs are in [`docs/evidence/`](evidence/). Counts from the supplied documents (22/23/30/62) are **not** inherited ([SPECIFICATION.md §1](SPECIFICATION.md)).
 
@@ -254,3 +254,18 @@ The Fable UI reviewer recomputed **2,416 displayed numbers** against the API wit
 * before/after comparisons for the dashboard: `compare-desktop.png`, `compare-phone.png`;
 * the dashboard in dark mode;
 * the redesigned app screens as mock-ups drawn from the new XAML (`app-*-mockups.png`). These are **not device screenshots**: the app has not been run on a device or emulator.
+
+## 12. Fourth full review (commit `49ef2d2`)
+
+Fresh clone of `49ef2d2e806931b8438c92fea82f8dae43816813`, 28 Nov 2026, same environment. Raw output: [`docs/evidence/review4/`](evidence/review4/).
+
+| Suite | Result |
+|---|---|
+| Build incl. Android | **0 errors**, 135 warnings (all in the recovered `Quality.Mobile.Core`) |
+| Debug APK | SHA-256 `14bdb04f…d363` |
+| Unit tests | **166 passed**. The draft-restore test now checks what the Save button reads on each change notification; it fails without the fix. |
+| Integration RCSI ON / OFF | **56 passed** each. The phenomenon-rate test uses a real GDC phenomenon: GDC production only, 0% with no rejections. |
+| sqlcmd fresh install, upgrade path (stricter assertions), seed check | OK |
+| Browser checks (`visual_checks.txt`) | no horizontal scroll at any tested width; no touch target under 44 px; Back undoes a drill-down; a failed load keeps the previous selection; no page errors |
+
+**First run of this round:** the integration suite failed once, in both modes, because the test still used a made-up phenomenon id. With the stage-mapping fix, a made-up id has no shops. The test was corrected; the code was right.
