@@ -185,6 +185,15 @@ Read-only for supervisors. From round 3, administrators can also upload producti
 * Shows: rejected parts and entries, waiting correction requests, a stacked bar chart per production day by shift (with a table view), top phenomena with share of rejected parts, top machines, and totals by shop.
 * Plain HTML/JS with no external libraries, so it works on an offline plant network. Strict Content-Security-Policy: own scripts only, no inline script, no framing. The token is kept in the browser tab's session storage and cleared on sign-out or expiry.
 
+### 12.6 Dashboard desktop app (approved 28 Nov 2026)
+
+For supervisors and administrators on Windows PCs. The dashboard is installable from Edge or Chrome as a desktop app (web app manifest, own window, Start-menu and taskbar icon). No separate code base: it is the same pages served by the API.
+* Manifest `/dashboard/manifest.webmanifest`: name "Quality Rejection Dashboard", scope and start `/dashboard/`, standalone window, theme #1f3a5f, icons 192/512/maskable/SVG, shortcuts to the dashboard and the QR labels.
+* Service worker `/dashboard/sw.js` (scope `/dashboard/`): network first; it saves only the dashboard's static files for a fast start and a clear page when offline. **It never handles or saves `/api` requests**, so no report data is stored on the PC.
+* "Install app" button in the header when the browser offers installation; hidden once installed.
+* Requires HTTPS (browser rule). IT can deploy it with the `WebAppInstallForceList` policy ([BUILD_AND_DEPLOY.md §4a](BUILD_AND_DEPLOY.md)).
+* Not included: offline data, notifications, a native Windows installer (MSI/MSIX). The mobile app's inspector entry is not part of the desktop app.
+
 
 ## 13. Round 3: dashboard insights and rejection rate (approved 26 Nov 2026)
 

@@ -52,5 +52,21 @@ const QR = (() => {
     });
   }
 
+  // ---- desktop app (installable web app) ----
+  // The service worker keeps only the dashboard's own files (see sw.js); report data always comes from the server.
+  if ('serviceWorker' in navigator && window.isSecureContext)
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* still works as a web page */ }); });
+  // Edge and Chrome offer installation; show an "Install app" button where they do (hidden once installed).
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', ev => {
+    ev.preventDefault(); installPrompt = ev;
+    const b = document.getElementById('install'); if (b) b.hidden = false;
+  });
+  window.addEventListener('appinstalled', () => { const b = document.getElementById('install'); if (b) b.hidden = true; installPrompt = null; });
+  document.addEventListener('DOMContentLoaded', () => {
+    const b = document.getElementById('install');
+    if (b) b.addEventListener('click', async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; b.hidden = true; });
+  });
+
   return { api, session, clear, wireLogin, el, fmt, text, make };
 })();

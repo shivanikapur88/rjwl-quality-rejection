@@ -55,6 +55,16 @@ The app works the same on Android phones and, once RJWL builds it on a Mac, on i
   * **On a phone:** the same page works; tables show fewer columns and each entry is a small card. Turn the phone sideways for a wider chart.
   * **"⚠ 40%" next to a rate:** that machine's or shop's rate is based on only 40% of its rejected parts (production counts are missing for the rest), so treat it with care.
   * **Rejection rate:** rejected ÷ produced parts. It appears only where production counts have been loaded, and the "based on N% of rejected parts" note says how much of the data it covers.
+* **Desktop app (Windows):** the dashboard can be installed as an app with its own window, Start-menu entry and taskbar icon.
+  1. Open `https://<server>/dashboard/` in **Microsoft Edge** or **Google Chrome**.
+  2. Click **Install app** in the dashboard header. If that button is not shown, use the browser menu instead: Edge **⋯ → Apps → Install this site as an app**; Chrome **⋮ → Cast, save and share → Install page as app**.
+  3. Confirm **Install**. Pin it to the taskbar if you like. It opens with its own window from then on.
+  * It is the same dashboard: same sign-in, same data, same updates (a new version from the server is used automatically).
+  * It needs the server; it does not work offline. With no connection the window opens but shows the sign-in or a connection message.
+  * Sign-in lasts while the window is open. Closing the window signs you out, which is safer on a shared PC.
+  * The app keeps only its own pages and pictures on the PC, never rejection data.
+  * To remove it: Start menu → right-click **Quality Rejections** → Uninstall (or Edge `edge://apps`, Chrome `chrome://apps`).
+  * The **Install app** button appears only over HTTPS (or on the server itself) and only in browsers that support installing. It is hidden once installed.
 
 ## Administrator
 

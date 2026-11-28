@@ -12,10 +12,11 @@ An Android app (.NET MAUI), an ASP.NET Core Web API and SQL Server, used to reco
 | Round 2 | Entry corrections, shift and production date, app shift summary, machine QR codes, web dashboard at `/dashboard/` (read-only; from round 3 administrators also upload production counts there) ([SPECIFICATION.md §12](docs/SPECIFICATION.md)), checked by an independent review |
 | Round 3 | Dashboard drill-down, previous-period comparison, Pareto, and rejection rate from uploaded production counts ([SPECIFICATION.md §13](docs/SPECIFICATION.md)), checked by an independent review |
 | Reviews | Independent reviews by Claude Fable (round 2, round 3, a complete review and a UI/UX review) and four full-application reviews by Claude Sonnet 5.5; findings and fixes in [docs/FINDINGS_CLOSURE.md](docs/FINDINGS_CLOSURE.md) |
-| Tests | 166 unit and 56 SQL Server integration tests, all passing on a clean checkout; the API runs as a least-privilege login in the tests ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
+| Tests | 166 unit and 57 SQL Server integration tests, all passing on a clean checkout; the API runs as a least-privilege login in the tests ([docs/TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md)) |
 | Android | Debug APK builds. **Not yet tested on an emulator or device**; no signed release APK yet. |
 | Design | Dashboard and app redesigned after a Fable UI/UX review (2,416 displayed numbers recomputed, 0 mismatches); before/after images in docs/evidence/design |
 | iOS | iOS project parts added (iPhone and iPad, iOS 15+). **Not built yet**: Apple allows iOS builds only on a Mac ([BUILD_AND_DEPLOY.md §6](docs/BUILD_AND_DEPLOY.md)). |
+| Desktop app | The dashboard installs as a Windows desktop app from Edge or Chrome for supervisors and administrators (own window and taskbar icon, needs HTTPS; IT can push it by policy). Never stores rejection data on the PC ([BUILD_AND_DEPLOY.md §4a](docs/BUILD_AND_DEPLOY.md)) |
 | Production readiness | **Not yet.** See [docs/READINESS.md](docs/READINESS.md) for what is blocked: device acceptance, the real machine list, package id, keystore and certificate, and business acceptance. |
 
 ## Documents
@@ -49,6 +50,7 @@ src/
   Quality.Mobile.Core/    API client, session, navigation abstractions, 18 view-models (14 recovered, 4 added in round 2)
   Quality.Mobile/         Android app: 18 pages (14 recovered, 4 added), styles, platform services, manifest
   Quality.Api/wwwroot/dashboard/  web dashboard (production-count upload for administrators) and QR label printing (no external libraries)
+                                  also installable as a desktop app: manifest.webmanifest, sw.js, icons/
   Quality.Tests.Unit/     166 tests (rules, shifts, throttling, SQL-script checks, app logic through the real API client)
   Quality.Tests.Integration/  56 tests against real SQL Server (HTTP, concurrency, corrections, reports, scripts, reference data)
 ```

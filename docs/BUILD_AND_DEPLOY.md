@@ -79,6 +79,21 @@ Host behind HTTPS (IIS with the ASP.NET Core Hosting Bundle **10.0**, or Kestrel
 
 **Rollback:** stop the new API, restore the database backups taken in step 1 and redeploy the previous build. To run the old API on the upgraded database without a restore, see the trigger warning in [DATABASE_RUNBOOK.md §4](DATABASE_RUNBOOK.md).
 
+## 4a. Dashboard desktop app (Windows, supervisors and administrators)
+
+The dashboard is an installable web app (PWA): `wwwroot/dashboard/manifest.webmanifest`, `sw.js` and `icons/`. Nothing is built or packaged separately: deploying the API deploys the desktop app, and every installed copy picks up the new version from the server.
+
+* **HTTPS is required.** Edge and Chrome install a web app only from a secure origin. Use a certificate the PCs trust (the company CA is fine). Plain `http://` works only on the server itself (`localhost`).
+* **Installing per user:** see [USER_GUIDE.md](USER_GUIDE.md) (Supervisor → Desktop app).
+* **Installing for many PCs (IT):** use the Edge or Chrome policy `WebAppInstallForceList`, for example through Group Policy or Intune:
+  ```json
+  [{"url": "https://<server>/dashboard/", "default_launch_container": "window", "create_desktop_shortcut": true}]
+  ```
+  The browser installs the app for the targeted users at their next sign-in and keeps it until the policy is removed.
+* **Icons:** `icons/icon.svg` is placeholder artwork (a bar chart with a tick). Replace it and the PNGs (192, 512, maskable 512, 180 apple-touch, 32 favicon) with RJWL's artwork, keeping the file names.
+* **Cache version:** after changing the dashboard files, raise `VERSION` in `sw.js` so installed copies drop their old saved files at once. The offline helper fetches from the network first anyway, so the old files are used only when the server cannot be reached.
+* **Data on the PC:** the offline helper saves only the dashboard's own files (pages, styles, scripts, icons). It never saves `/api` responses, so no rejection data stays on the PC. The sign-in token is in the window's session storage and is gone when the window closes.
+
 ## 5. Android app
 
 ### Debug APK (testing)

@@ -335,4 +335,35 @@ public sealed class Round2Tests(SqlFixture f) : SqlTest(f)
         var html = await F.Client().GetStringAsync("/dashboard/");
         Assert.DoesNotContain("<script>", html);   // no inline script (CSP would block it anyway)
     }
+
+    // ---------------- desktop app (installable dashboard) ----------------
+    [Fact]
+    public async Task Desktop_app_manifest_icons_and_service_worker_are_served()
+    {
+        var m = await F.Client().GetAsync("/dashboard/manifest.webmanifest");
+        Assert.Equal(HttpStatusCode.OK, m.StatusCode);
+        Assert.Equal("application/manifest+json", m.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("frame-ancestors 'none'", string.Join(";", m.Headers.GetValues("Content-Security-Policy")));
+        using var doc = JsonDocument.Parse(await m.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+        Assert.Equal("/dashboard/", root.GetProperty("start_url").GetString());
+        Assert.Equal("/dashboard/", root.GetProperty("scope").GetString());
+        Assert.Equal("standalone", root.GetProperty("display").GetString());
+        foreach (var icon in root.GetProperty("icons").EnumerateArray())
+        {
+            var r = await F.Client().GetAsync("/dashboard/" + icon.GetProperty("src").GetString());
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        }
+        Assert.Contains(root.GetProperty("icons").EnumerateArray(), i => i.GetProperty("purpose").GetString() == "maskable");
+
+        var sw = await F.Client().GetAsync("/dashboard/sw.js");
+        Assert.Equal(HttpStatusCode.OK, sw.StatusCode);
+        Assert.Equal("text/javascript", sw.Content.Headers.ContentType?.MediaType);
+        var swText = await sw.Content.ReadAsStringAsync();
+        Assert.Contains("url.pathname.startsWith('/api/')", swText);   // report data is never cached
+
+        var html = await F.Client().GetStringAsync("/dashboard/");
+        Assert.Contains("rel=\"manifest\"", html);
+        Assert.Contains("id=\"install\"", html);
+    }
 }
